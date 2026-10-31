@@ -102,9 +102,9 @@ export type HelpGame = {
 export type Likeliest = {
   /** The team's own conference results, then the likelier result of each game elsewhere that still matters once those are set. */
   picks: { gameId: number; winner: number }[];
-  /** Fraction of all simulated seasons that play out this way on the picked games. */
+  /** Fraction of all simulated seasons that play out this way on the picked games and get the team in. */
   share: number;
-  /** "Likeliest way in (4% of simulated seasons): Virginia beats ..., and Duke beats Wake Forest." */
+  /** "Likeliest way in (4% of simulated seasons get in this way): Virginia beats ..., and Duke beats Wake Forest." */
   line: string;
 };
 
@@ -358,7 +358,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     });
     const share = bestN / total;
     const parts = [own.length ? `${team} ${list(own)}` : "", elsewhere.length ? list(elsewhere) : ""].filter(Boolean);
-    likeliest = { picks, share, line: `Likeliest way in (${formatOdds(share)} of simulated seasons): ${parts.join("; and ")}.` };
+    likeliest = { picks, share, line: `Likeliest way in (${formatOdds(share)} of simulated seasons get in this way): ${parts.join("; and ")}.` };
   }
 
   return {

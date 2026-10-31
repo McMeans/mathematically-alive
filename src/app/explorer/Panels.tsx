@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { formatChance, type TeamOutlook, type TeamPath } from "@/core";
 import { NAVY, pct, type GameInfo, type TeamInfo } from "./Explorer";
 
@@ -23,17 +23,19 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
   onSelect?: (id: number) => void;
 }) {
   const [q, setQ] = useState("");
+  // Rendered twice (desktop column and phone sheet), so the label needs a per-copy id.
+  const searchId = useId();
   const byId = new Map(teams.map((t) => [t.id, t]));
   const odds = new Map(outlook.map((o) => [o.teamId, o]));
   const ids = order.filter((id) => byId.get(id)!.name.toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <div>
       <div className="p-3">
-        <label htmlFor="team-search" className="mb-1 block text-xs font-bold text-ink-muted">
+        <label htmlFor={searchId} className="mb-1 block text-xs font-bold text-ink-muted">
           Team
         </label>
         <input
-          id="team-search"
+          id={searchId}
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}

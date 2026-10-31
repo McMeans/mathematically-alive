@@ -397,7 +397,7 @@ describe("help from elsewhere", () => {
     const t = pathTree(s, { ...base, teamId: 1 });
     expect(t.likeliest!.picks).toEqual([{ gameId: upset.id, winner: 1 }, { gameId: other.id, winner: 3 }]);
     expect(t.likeliest!.share).toBeCloseTo(t.titleGame, 10);
-    expect(t.likeliest!.line).toBe(`Likeliest way in (${formatOdds(t.likeliest!.share)} of simulated seasons): Team1 beats Team2; and Team3 beats Team4.`);
+    expect(t.likeliest!.line).toBe(`Likeliest way in (${formatOdds(t.likeliest!.share)} of simulated seasons get in this way): Team1 beats Team2; and Team3 beats Team4.`);
     // Locking it in makes it certain, and a team already in has no "way in" to show.
     const locked = pathTree(s, { ...base, teamId: 1, locks: { [upset.id]: 1, [other.id]: 3 } });
     expect(locked.root.verdict).toBe("In");
