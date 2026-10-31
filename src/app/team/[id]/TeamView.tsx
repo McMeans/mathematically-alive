@@ -52,8 +52,8 @@ export function TeamView({ teamId, teamName, color, names, games, initialPath, i
   const nameOf = (id: number) => names[id] ?? `Team ${id}`;
   const gameById = new Map(games.map((g) => [g.id, g]));
   const own = games.filter((g) => g.homeId === teamId || g.awayId === teamId);
-  const keyIds = initialPath.keyGames.map((k) => k.gameId);
-  const whatIf = [...own, ...keyIds.map((id) => gameById.get(id)!).filter((g) => !own.includes(g))];
+  const keyGames = path.keyGames.map((k) => gameById.get(k.gameId)).filter((g): g is GameInfo => !!g && !own.includes(g));
+  const whatIf = [...own, ...keyGames];
   const pill = path.status === "alive" ? "Alive" : path.summary;
 
   return (
