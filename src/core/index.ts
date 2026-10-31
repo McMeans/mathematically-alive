@@ -14,3 +14,5 @@ export type {
   Season,
   Team,
 } from "./season";
+export { championshipParticipants, conferenceStandings } from "./tiebreak";
+export type { ConferenceStanding, TiebreakOptions } from "./tiebreak";
