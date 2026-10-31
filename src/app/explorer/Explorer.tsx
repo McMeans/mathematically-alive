@@ -126,7 +126,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
   );
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col md:h-dvh md:overflow-hidden">
       <header className="flex items-center justify-between gap-3 border-b border-ink-muted/25 px-4 py-3">
         <div className="flex items-center gap-2">
           <Logo size={32} decorative />
@@ -166,12 +166,13 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
         </div>
       </div>
 
-      <div className="grid flex-1 md:grid-cols-[260px_minmax(0,1fr)_340px]">
-        <nav aria-label="ACC teams" className="hidden border-r border-ink-muted/25 md:block">
+      {/* On desktop the page is one screen tall and each column scrolls on its own. */}
+      <div className="grid flex-1 md:min-h-0 md:grid-cols-[260px_minmax(0,1fr)_340px]">
+        <nav aria-label="ACC teams" className="scroll-thin hidden border-r border-ink-muted/25 md:block md:overflow-y-auto">
           {list}
         </nav>
 
-        <main aria-busy={going !== null} className="relative min-w-0 p-4 md:p-6">
+        <main aria-busy={going !== null} className="scroll-thin relative min-w-0 p-4 md:overflow-y-auto md:p-6">
           {going !== null && <Loading name={teams.find((t) => t.id === going)?.name} />}
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="font-display text-xl font-bold">
@@ -206,13 +207,13 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
           </div>
         </main>
 
-        <aside aria-label="Summary" aria-busy={going !== null} className={`relative hidden border-l border-ink-muted/25 p-6 md:block ${busy ? "opacity-70" : ""}`}>
+        <aside aria-label="Summary" aria-busy={going !== null} className={`scroll-thin relative hidden border-l border-ink-muted/25 p-6 md:block md:overflow-y-auto ${busy ? "opacity-70" : ""}`}>
           {going !== null && <Loading />}
           <WhatIf
             team={team}
             me={me}
             outlook={outlook}
-            today={initial.outlook.find((o) => o.teamId === teamId)!.titleGame}
+            today={initial.outlook.find((o) => o.teamId === teamId)!}
             locks={locks}
             weeks={tree.weeks}
             names={names}
@@ -229,10 +230,13 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
 /** Covers a column while the next team's page loads. */
 function Loading({ name }: { name?: string }) {
   return (
-    <div className="absolute inset-0 z-10 flex justify-center bg-white/75 pt-24">
-      <div role="status" className="flex h-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-navy shadow">
-        <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-navy/25 border-t-navy" />
-        {name ? `Loading ${name}…` : <span className="sr-only">Loading</span>}
+    // Sticks to the top of the column, so it covers what's on screen however far the column is scrolled.
+    <div className="sticky top-0 z-10 -mx-4 -mt-4 h-0 md:-mx-6 md:-mt-6">
+      <div className="flex h-dvh justify-center bg-white/75 pt-24">
+        <div role="status" className="flex h-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-navy shadow">
+          <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-navy/25 border-t-navy" />
+          {name ? `Loading ${name}…` : <span className="sr-only">Loading</span>}
+        </div>
       </div>
     </div>
   );

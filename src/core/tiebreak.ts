@@ -13,8 +13,8 @@ export type ConferenceStanding = {
 };
 
 export type TiebreakOptions = {
-  /** Uniform random draw in [0, 1), used only when every other step ties. */
-  draw: () => number;
+  /** Uniform random draw in [0, 1), used only when every other step ties. Told how many teams it picks among. */
+  draw: (count: number) => number;
   /** Higher is better. Stands in for the SportSource Team Success Ranking. Defaults to the team's rating. */
   rank?: (teamId: number) => number;
 };
@@ -114,7 +114,7 @@ export function championshipFromData(
   };
   const pickByRankThenDraw = (ids: number[]): number => {
     const top = best(ids, rank);
-    return top.length === 1 ? top[0] : top[Math.floor(opts.draw() * top.length)];
+    return top.length === 1 ? top[0] : top[Math.floor(opts.draw(top.length) * top.length)];
   };
 
   /** Break a tie among 2+ teams of equal pct: place one team, or eliminate one. */

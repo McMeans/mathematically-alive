@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { explore, formatChance, pathTree, seasonOutlook, teamPath } from "@/core";
+import { championshipParticipants, explore, formatChance, pathTree, seasonOutlook, teamPath } from "@/core";
 import type { Game, Season } from "@/core";
 
 let nextId = 0;
@@ -84,5 +84,84 @@ describe("proven clinch and elimination", () => {
     expect(r.path).toEqual(teamPath(s, { ...o, teamId: 3 }));
     expect(r.tree).toEqual(pathTree(s, { ...o, teamId: 3 }));
     expect(r.outlook).toEqual(seasonOutlook(s, o).teams);
+  });
+});
+
+describe("proofs agree with checking every combination", () => {
+  // Small random conferences (schedules 1 or 2 games apart, so the game-count rule comes into play),
+  // each checked against every way its open games can go.
+  function randomConference(seed: number): Season {
+    let x = seed * 2654435761 >>> 0;
+    const rand = () => ((x = (Math.imul(x ^ (x >>> 15), 2246822519) + 0x9e3779b9) >>> 0) / 4294967296);
+    for (;;) {
+      nextId = 0;
+      const n = 5 + Math.floor(rand() * 2);
+      const pairs: [number, number][] = [];
+      for (let a = 1; a <= n; a++) for (let b = a + 1; b <= n; b++) pairs.push([a, b]);
+      pairs.sort(() => rand() - 0.5);
+      const deg = new Array(n + 1).fill(0);
+      const most = seed % 3 === 0 ? 5 : 4;
+      const picked = pairs.filter(([a, b]) => deg[a] < most && deg[b] < most && (rand() < 0.85) && (deg[a]++, deg[b]++, true));
+      const counts = deg.slice(1);
+      const spread = Math.max(...counts) - Math.min(...counts);
+      if (spread < 1 || spread > 2) continue;
+      const games = picked.map(([a, b]) => {
+        const done = rand() < 0.45;
+        return game(a, b, done ? (rand() < 0.5 ? a : b) : undefined, 0);
+      });
+      if (games.filter((g) => !g.completed).length > 9) continue;
+      return {
+        year: 2026, fetchedAt: "", games,
+        teams: Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `Team${i + 1}`, abbreviation: null, conference: "C", classification: "fbs" as const, color: null, altColor: null, rating: 0 })),
+      };
+    }
+  }
+
+  /** Every pair of title-game teams over every way the draws can go (the team's ranking step fixed by `rank`). */
+  function everyDraw(s: Season, winnerOf: (g: Game) => number, rank: (id: number) => number): [number, number][] {
+    const out: [number, number][] = [];
+    const queue: number[][] = [[]];
+    while (queue.length) {
+      const script = queue.pop()!;
+      let j = 0;
+      const pair = championshipParticipants(s, "C", winnerOf, {
+        rank,
+        draw: (count) => {
+          if (j === script.length) for (let c = 1; c < count; c++) queue.push([...script, c]);
+          return ((script[j++] ?? 0) + 0.5) / count;
+        },
+      });
+      out.push(pair);
+    }
+    return out;
+  }
+
+  /** Can the team get in (winning every ranking step), and can it miss (losing every one), over all completions and draws? */
+  function bruteForce(s: Season, teamId: number): { canIn: boolean; canOut: boolean } {
+    const open = s.games.filter((g) => !g.completed);
+    let canIn = false;
+    let canOut = false;
+    for (let m = 0; m < 1 << open.length && !(canIn && canOut); m++) {
+      const pick = new Map(open.map((g, k) => [g.id, (m >> k) & 1 ? g.awayId : g.homeId]));
+      const winnerOf = (g: Game) => (g.completed ? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId) : pick.get(g.id)!);
+      if (everyDraw(s, winnerOf, (id) => (id === teamId ? Infinity : 0)).some(([a, b]) => a === teamId || b === teamId)) canIn = true;
+      if (everyDraw(s, winnerOf, (id) => (id === teamId ? -Infinity : 0)).some(([a, b]) => a !== teamId && b !== teamId)) canOut = true;
+    }
+    return { canIn, canOut };
+  }
+
+  it("never calls a team in or out wrongly, and settles every team that is", () => {
+    let settled = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      const s = randomConference(seed);
+      const outlook = seasonOutlook(s, { conference: "C", iterations: 200, seed: 1 });
+      for (const t of outlook.teams) {
+        const { canIn, canOut } = bruteForce(s, t.teamId);
+        const truth = !canIn ? "eliminated" : !canOut ? "clinched" : "alive";
+        expect({ seed, team: t.teamId, status: t.status }).toEqual({ seed, team: t.teamId, status: truth });
+        if (truth !== "alive") settled++;
+      }
+    }
+    expect(settled).toBeGreaterThan(150);
   });
 });

@@ -33,7 +33,7 @@ export function SeasonWeeks({ weeks, base, teamId, locks, likely, onPick }: {
         <span className="flex items-center gap-1"><span className="h-3 w-5 rounded-sm bg-turf/10" />a little</span>
         <span className="flex items-center gap-1"><span className="h-3 w-5 rounded-sm ring-2 ring-inset ring-navy" />likeliest way</span>
       </div>
-      <ol className="mt-2 flex gap-2 overflow-x-auto pb-2 md:grid md:grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] md:overflow-visible">
+      <ol className="scroll-thin mt-2 flex gap-2 overflow-x-auto pb-2 md:grid md:grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] md:overflow-visible">
         {weeks.map((w) => (
           <Week key={w.week} w={w} base={base.find((b) => b.week === w.week) ?? w} teamId={teamId} locks={locks} likely={likely} onPick={onPick} />
         ))}
@@ -66,9 +66,10 @@ function Week({ w, base, teamId, locks, likely, onPick }: { w: SeasonWeek; base:
           <OwnButton text="Win" odds={own.ifWin} state={state(own.gameId, teamId)} onClick={() => onPick(own.gameId, teamId)} />
           <OwnButton text="Lose" odds={own.ifLose} state={state(own.gameId, own.opponentId)} onClick={() => onPick(own.gameId, own.opponentId)} />
         </div>
-      ) : (
+      ) : w.played ? null : (
         <span className="rounded-lg border border-dashed border-navy/20 px-2 py-2 text-xs text-ink-muted">No game this week</span>
       )}
+      {w.played && <Final played={w.played} />}
       <div className="flex grow flex-col gap-1 rounded-lg bg-mist p-1.5">
         <span className="px-0.5 text-[11px] font-semibold text-ink-muted">Elsewhere</span>
         {games.map((g) => (
@@ -93,7 +94,22 @@ function Week({ w, base, teamId, locks, likely, onPick }: { w: SeasonWeek; base:
   );
 }
 
+/** The team's game this week that's already final. */
+function Final({ played }: { played: NonNullable<SeasonWeek["played"]> }) {
+  return (
+    <div className="flex flex-col gap-0.5 rounded-lg border border-navy/15 bg-white px-2 py-1.5">
+      <span className="text-[11px] text-ink-muted">Final · {played.site === "away" ? "at" : "vs"} {played.opponent}</span>
+      <span className={`text-sm font-bold ${played.won ? "text-turf" : "text-marker-text"}`}>
+        {played.won ? "Won" : "Lost"} {played.score}
+      </span>
+    </div>
+  );
+}
+
 /** Title-game odds for display: In or Out when proven; a team still alive at 0% in the sample shows as under 0.1%. */
+/** Any other odds of a team: a team still alive at 0% in the sample shows as under 0.1%, one that's out as 0%. */
+const sideOdds = (p: number, o: TeamOutlook) => (p === 0 && o.status !== "eliminated" ? "<0.1%" : formatFine(p));
+
 const titleOdds = (o: TeamOutlook) =>
   o.status === "clinched" ? "In" : o.status === "eliminated" ? "Out" : o.titleGame === 0 ? "<0.1%" : formatFine(o.titleGame);
 
@@ -138,7 +154,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
   team: TeamInfo;
   me: TeamOutlook;
   outlook: TeamOutlook[];
-  today: number;
+  today: TeamOutlook;
   locks: Locks;
   weeks: SeasonWeek[];
   names: Record<number, string>;
@@ -179,11 +195,11 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
             <p className="text-xs text-ink-muted">{has ? "Title game, with your picks" : "Title game"}</p>
             <p className={`font-display text-5xl font-bold leading-none ${me.titleGame >= 0.5 || me.status === "clinched" ? "text-turf" : "text-marker-text"}`}>{verdict}</p>
           </div>
-          {has && <p className="text-xs text-ink-muted">Today {formatFine(today)}</p>}
+          {has && <p className="text-xs text-ink-muted">Today {titleOdds(today)}</p>}
         </div>
         <div className="flex flex-col gap-1 border-t border-navy/10 pt-2 text-sm text-ink-soft">
-          <p className="flex justify-between">Win the ACC<span className="font-bold text-navy">{formatFine(me.champion)}</span></p>
-          <p className="flex justify-between">Playoff (beta)<span className="font-bold text-navy">{formatFine(me.playoff)}</span></p>
+          <p className="flex justify-between">Win the ACC<span className="font-bold text-navy">{sideOdds(me.champion, me)}</span></p>
+          <p className="flex justify-between">Playoff (beta)<span className="font-bold text-navy">{sideOdds(me.playoff, me)}</span></p>
         </div>
       </section>
 

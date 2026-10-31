@@ -542,6 +542,20 @@ describe("help from elsewhere", () => {
     expect(Math.min(...gaps.some)).toBeGreaterThan(Math.max(...gaps.small));
   });
 
+  it("a week still being played shows the team's game that's already final, not a bye", () => {
+    const { s, other } = needsHelp();
+    // Team1's loss at Team4 moves into the same week as Team3 v Team4, which is still to play.
+    const games = s.games.map((g) => (g.completed && g.homeId === 4 && g.awayId === 1 ? { ...g, week: other.week, start: other.start } : g));
+    const t = pathTree({ ...s, games }, { ...base, teamId: 1 });
+    const week = t.weeks.find((w) => w.week === other.week)!;
+    expect(week.own).toBeNull();
+    expect(week.played).toMatchObject({ opponent: "Team4", site: "away", won: false, score: "14-21" });
+    // A week can hold both: Team1 beat Team3 in week 1 and still plays Team2 that week.
+    const first = t.weeks.find((w) => w.week !== other.week)!;
+    expect(first.played).toMatchObject({ opponent: "Team3", site: "home", won: true, score: "21-14" });
+    expect(first.own).not.toBeNull();
+  });
+
   it("fine odds tell long shots apart below 1%", () => {
     expect(formatFine(0.0004)).toBe("<0.1%");
     expect(formatFine(0.004)).toBe("0.4%");

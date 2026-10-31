@@ -189,6 +189,8 @@ export type SeasonWeek = {
     ifWin: string;
     ifLose: string;
   } | null;
+  /** The team's conference game that week when it's already final; null otherwise. */
+  played: { gameId: number; opponent: string; site: "home" | "away" | "neutral"; won: boolean; score: string } | null;
   /**
    * Every game elsewhere that week: locked ones first, then those that matter, then the rest, biggest swing first.
    * `ifHome`/`ifAway`: the team's odds if that side wins, for display.
@@ -227,7 +229,6 @@ export type PathTree = {
 };
 
 const MAX_DEPTH = 12;
-const NODE_PROOF_BUDGET = 5_000;
 // Odds for the other side of a locked game: a small simulation each, for at most this many games per call.
 const SWAP_ITERATIONS = 2_000;
 const MAX_SWAP_SIMS = 12;
@@ -353,8 +354,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     const stop = (outcome: TreeOutcome, verdict: string, note: string): TreeNode => ({ ...node, outcome, verdict, note, rest });
     if (node.reach === 0) return stop("never", "—", "A locked result rules this out.");
     if (node.odds === null) return level === 0 ? node : stop("rare", "Rare", "Too few simulated seasons go this way to put odds on it.");
-    // Deeper nodes get a smaller proof budget: there are many of them. One that runs out shows odds, not "Out".
-    const proof = node.odds === 1 || node.odds === 0 ? provenStatus(season, conference, teamId, prefixLocks(path), level === 0 ? undefined : NODE_PROOF_BUDGET) : "open";
+    const proof = node.odds === 1 || node.odds === 0 ? provenStatus(season, conference, teamId, prefixLocks(path)) : "open";
     if (proof === "open" && node.odds === 1) return { ...node, verdict: ">99%" };
     if (proof === "open" && node.odds === 0) return { ...node, verdict: "<1%" };
     if (node.odds === 1) return stop("in", "In", `In the title game whatever else happens.${left}`);
@@ -480,7 +480,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
   let swapSims = 0;
   const swapped = (gameId: number, winner: number): string => {
     const swap = { ...opts.locks, [gameId]: winner };
-    const s = provenStatus(season, conference, teamId, swap, NODE_PROOF_BUDGET);
+    const s = provenStatus(season, conference, teamId, swap);
     if (s === "clinched") return "In";
     if (s === "eliminated") return "Out";
     if (swapSims++ >= MAX_SWAP_SIMS) return "—";
@@ -510,7 +510,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
   const byWeek = new Map<number, SeasonWeek>();
   const weekOf = (g: Game): SeasonWeek => {
     let w = byWeek.get(g.week);
-    if (!w) byWeek.set(g.week, (w = { week: g.week, label: when(g), own: null, games: [], quiet: 0 }));
+    if (!w) byWeek.set(g.week, (w = { week: g.week, label: when(g), own: null, played: null, games: [], quiet: 0 }));
     return w;
   };
   levels.forEach(({ g }, k) => {
@@ -551,6 +551,19 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
         ifHome: side(h.oddsIfHomeWins, h.ifHomeWins), ifAway: side(h.oddsIfAwayWins, h.ifAwayWins), swing: h.swing,
         likely: likelySide(namedWinner.get(g.id), g, h), matters, ...helpsSide(g, h, titleGame) });
     }
+  }
+  // A week still being played can hold the team's game already final: show the result, not a bye.
+  for (const g of data.games) {
+    const w = byWeek.get(g.week);
+    if (!w || !g.completed || (g.homeId !== teamId && g.awayId !== teamId)) continue;
+    const home = g.homeId === teamId;
+    const mine = home ? g.homePoints! : g.awayPoints!;
+    const theirs = home ? g.awayPoints! : g.homePoints!;
+    w.label = when(g);
+    w.played = {
+      gameId: g.id, opponent: name(home ? g.awayId : g.homeId), site: g.neutralSite ? "neutral" : home ? "home" : "away",
+      won: mine > theirs, score: `${mine}-${theirs}`,
+    };
   }
   for (const w of byWeek.values()) w.games.sort((a, b) => Number(b.matters) - Number(a.matters) || b.swing - a.swing || a.gameId - b.gameId);
   const weeks = [...byWeek.values()].sort((a, b) => a.week - b.week);

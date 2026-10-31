@@ -3,9 +3,9 @@
 // Starts from any way in the proof finds, flips results toward the likelier side while the team
 // stays in, then improves it by branch and bound within a node budget. Then it's trimmed to the results its spot depends on. Each result left is
 // needed: drop it and some combination of the rest keeps the team out.
-import { couldTieByCount, guaranteed, twoAhead, wayIn } from "./proof";
+import { couldTieByCount, guaranteed, inEveryDraw, twoAhead, wayIn } from "./proof";
 import type { Game } from "./season";
-import { championshipFromData, type ConferenceData } from "./tiebreak";
+import type { ConferenceData } from "./tiebreak";
 
 const BUDGET = 4_000;
 const WITNESS_BUDGET = 50_000;
@@ -62,7 +62,6 @@ function search(data: ConferenceData, conference: string, teamId: number, locks:
   }
   for (const { g } of games) { left.set(g.homeId, left.get(g.homeId)! + 1); left.set(g.awayId, left.get(g.awayId)! + 1); }
   const pct = (id: number, w: number) => (scheduled.get(id)! === 0 ? 0 : w / scheduled.get(id)!);
-  const rank = (id: number) => (id === teamId ? (luck ? Infinity : -Infinity) : 0);
   const myGames = scheduled.get(teamId)!;
   const likely = games.map(({ g, pHome }) => (pHome >= 0.5 ? g.homeId : g.awayId));
   const choice = new Array<number>(games.length);
@@ -73,22 +72,24 @@ function search(data: ConferenceData, conference: string, teamId: number, locks:
   const isIn = (ws: number[]): boolean => {
     const all = new Map(fixed);
     games.forEach(({ g }, k) => all.set(g.id, ws[k]));
-    const [a, b] = championshipFromData(data, conference, (g) => all.get(g.id)!, { draw: () => 0, rank });
-    return a === teamId || b === teamId;
+    return inEveryDraw(data, conference, teamId, (g) => all.get(g.id)!, luck);
   };
-  // Flip results to the likelier side, costliest first, as long as the team stays in.
-  let best: number[] = games.map(({ g }) => witness.get(g.id)!);
-  for (let improved = true; improved; ) {
+  // The proof's way in holds for some draw; the search wants one that holds for every draw. Start there if it
+  // does, then flip results to the likelier side, costliest first, as long as the team stays in.
+  const start = games.map(({ g }) => witness.get(g.id)!);
+  let best: number[] | null = isIn(start) ? start : null;
+  for (let improved = best !== null; improved; ) {
     improved = false;
-    const order = games.map((_, k) => k).sort((x, y) => costs[y](best[y]) - costs[x](best[x]));
+    const cur: number[] = best!;
+    const order = games.map((_, k) => k).sort((x, y) => costs[y](cur[y]) - costs[x](cur[x]));
     for (const k of order) {
-      if (best[k] === likely[k]) continue;
-      const next = best.slice();
+      if (best![k] === likely[k]) continue;
+      const next = best!.slice();
       next[k] = likely[k];
       if (isIn(next)) { best = next; improved = true; }
     }
   }
-  let bestCost = total(best);
+  let bestCost = best ? total(best) : Infinity;
   let budget = BUDGET;
 
   const dfs = (k: number, spent: number): void => {
@@ -106,8 +107,7 @@ function search(data: ConferenceData, conference: string, teamId: number, locks:
     // In whatever happens from here: the rest go the likelier way, at no extra cost.
     if (maybeAhead < 2 || k === games.length) {
       if (k === games.length) {
-        const [a, b] = championshipFromData(data, conference, (g) => fixed.get(g.id)!, { draw: () => 0, rank });
-        if (a !== teamId && b !== teamId) return;
+        if (!inEveryDraw(data, conference, teamId, (g) => fixed.get(g.id)!, luck)) return;
       }
       best = [...choice.slice(0, k), ...likely.slice(k)];
       bestCost = spent;
@@ -130,7 +130,7 @@ function search(data: ConferenceData, conference: string, teamId: number, locks:
     left.set(g.awayId, left.get(g.awayId)! + 1);
   };
   dfs(0, 0);
-  return best;
+  return best as number[] | null;
 }
 
 /** Drop each picked result the spot doesn't depend on, trying the least likely ones first. */
