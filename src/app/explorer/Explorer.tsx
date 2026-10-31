@@ -34,7 +34,8 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [sheet, setSheet] = useState(false);
-  const [showWay, setShowWay] = useState(false);
+  // The likeliest-way-in picks currently locked by the button (they stay locked while the live tree changes).
+  const [wayPicks, setWayPicks] = useState<{ gameId: number; winner: number }[] | null>(null);
   const worker = useRef<Worker | null>(null);
   const latest = useRef(0);
 
@@ -89,7 +90,19 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
   }, [initial, teams]);
   const hasLocks = Object.keys(locks).length > 0;
   const likeliest = tree.likeliest;
-  const way = showWay && likeliest ? new Set(likeliest.picks.map((p) => `${p.gameId}:${p.winner}`)) : undefined;
+  const wayOn = wayPicks !== null && wayPicks.every((p) => locks[p.gameId] === p.winner);
+  const way = undefined;
+  function toggleWay() {
+    if (wayOn) {
+      const next = { ...locks };
+      for (const p of wayPicks!) delete next[p.gameId];
+      setWayPicks(null);
+      update(next);
+    } else if (likeliest) {
+      setWayPicks(likeliest.picks);
+      update({ ...locks, ...Object.fromEntries(likeliest.picks.map((p) => [p.gameId, p.winner])) });
+    }
+  }
   const status = busy ? "Updating…" : failed ? "Couldn’t update. Showing the last result." : "";
 
   const list = (
@@ -161,24 +174,15 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <button
               type="button"
-              disabled={!likeliest}
-              aria-pressed={showWay}
-              onClick={() => setShowWay(!showWay)}
+              disabled={!likeliest && !wayOn}
+              aria-pressed={wayOn}
+              onClick={toggleWay}
               className="min-h-11 rounded-full border border-marker px-3 text-sm font-bold text-marker-text disabled:opacity-40 aria-pressed:bg-marker aria-pressed:text-white md:min-h-8"
             >
               Likeliest way in
             </button>
-            {way && likeliest && (
-              <button
-                type="button"
-                onClick={() => update({ ...locks, ...Object.fromEntries(likeliest.picks.map((p) => [p.gameId, p.winner])) })}
-                className="min-h-11 text-sm font-bold text-navy underline md:min-h-0"
-              >
-                Apply
-              </button>
-            )}
           </div>
-          {way && likeliest && <p className="mt-1 text-sm text-ink-soft">{likeliest.line}</p>}
+          {!wayOn && likeliest && <p className="mt-1 text-xs text-ink-muted">{likeliest.line}</p>}
 
           <div className={`transition-opacity ${busy ? "opacity-70" : ""}`}>
             <div className="hidden md:block">
