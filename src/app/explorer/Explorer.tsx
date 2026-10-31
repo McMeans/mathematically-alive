@@ -34,6 +34,8 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [sheet, setSheet] = useState(false);
+  // The team just clicked in the list, while its page loads (this component remounts per team).
+  const [going, setGoing] = useState<number | null>(null);
   // The likeliest-way-in picks currently locked by the button (they stay locked while the live tree changes).
   const [wayPicks, setWayPicks] = useState<{ gameId: number; winner: number }[] | null>(null);
   const worker = useRef<Worker | null>(null);
@@ -106,7 +108,16 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
   const status = busy ? "Updating…" : failed ? "Couldn’t update. Showing the last result." : "";
 
   const list = (
-    <TeamList teams={teams} order={order} outlook={initial.outlook} selectedId={teamId} />
+    <TeamList
+      teams={teams}
+      order={order}
+      outlook={initial.outlook}
+      selectedId={going ?? teamId}
+      onSelect={(id) => {
+        if (id !== teamId) setGoing(id);
+        setSheet(false);
+      }}
+    />
   );
 
   return (
@@ -155,7 +166,8 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
           {list}
         </nav>
 
-        <main className="min-w-0 p-4 md:p-6">
+        <main aria-busy={going !== null} className="relative min-w-0 p-4 md:p-6">
+          {going !== null && <Loading name={teams.find((t) => t.id === going)?.name} />}
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="font-display text-xl font-bold">
               <span className="hidden md:inline">Paths to the title game</span>
@@ -202,9 +214,22 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
           </div>
         </main>
 
-        <aside aria-label="Summary" className={`hidden border-l border-ink-muted/25 p-6 md:block ${busy ? "opacity-70" : ""}`}>
+        <aside aria-label="Summary" aria-busy={going !== null} className={`relative hidden border-l border-ink-muted/25 p-6 md:block ${busy ? "opacity-70" : ""}`}>
+          {going !== null && <Loading />}
           <Stats team={team} outlook={outlook} me={me} path={path} teamId={teamId} own={own} names={names} />
         </aside>
+      </div>
+    </div>
+  );
+}
+
+/** Covers a column while the next team's page loads. */
+function Loading({ name }: { name?: string }) {
+  return (
+    <div className="absolute inset-0 z-10 flex justify-center bg-white/75 pt-24">
+      <div role="status" className="flex h-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-navy shadow">
+        <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-navy/25 border-t-navy" />
+        {name ? `Loading ${name}…` : <span className="sr-only">Loading</span>}
       </div>
     </div>
   );

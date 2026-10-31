@@ -14,7 +14,14 @@ function inkOn(hex: string): string {
   return (1.05 / (l + 0.05)) >= (l + 0.05) / 0.0652 ? "#FFFFFF" : NAVY;
 }
 
-export function TeamList({ teams, order, outlook, selectedId }: { teams: TeamInfo[]; order: number[]; outlook: TeamOutlook[]; selectedId: number }) {
+export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
+  teams: TeamInfo[];
+  order: number[];
+  outlook: TeamOutlook[];
+  selectedId: number;
+  /** Called on a plain click, before navigation, so the row can switch at once. */
+  onSelect?: (id: number) => void;
+}) {
   const [q, setQ] = useState("");
   const byId = new Map(teams.map((t) => [t.id, t]));
   const odds = new Map(outlook.map((o) => [o.teamId, o]));
@@ -37,10 +44,8 @@ export function TeamList({ teams, order, outlook, selectedId }: { teams: TeamInf
       </div>
       <div aria-hidden className="flex items-center gap-2 px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-ink-muted">
         <span className="w-2.5" />
-        <span className="flex-1">ACC</span>
-        <span className="w-9 text-right">All</span>
-        <span className="w-9 text-right">Conf</span>
-        <span className="w-10 text-right">Odds</span>
+        <span className="flex-1">ACC · All · Conf</span>
+        <span className="text-right">Odds</span>
       </div>
       <ul>
         {ids.map((id) => {
@@ -54,16 +59,19 @@ export function TeamList({ teams, order, outlook, selectedId }: { teams: TeamInf
               <Link
                 href={`/team/${id}`}
                 aria-current={selected ? "page" : undefined}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                  onSelect?.(id);
+                }}
                 style={selected ? { background: fill, color: ink } : undefined}
-                className={`flex min-h-11 items-center gap-2 px-3 text-sm md:min-h-10 ${selected ? "font-bold" : "hover:bg-mist"}`}
+                className={`flex min-h-11 items-center gap-2 px-3 py-1.5 text-sm ${selected ? "font-bold" : "hover:bg-mist"}`}
               >
                 <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: selected ? (t.altColor ?? ink) : fill, boxShadow: selected ? `0 0 0 1.5px ${ink}` : undefined }} />
-                <span className="flex-1 truncate">{t.name}</span>
-                <span className={`w-9 text-right text-xs tabular-nums ${selected ? "" : "font-normal text-ink-soft"}`}>
-                  {o.record.wins}-{o.record.losses}
-                </span>
-                <span className={`w-9 text-right text-xs tabular-nums ${selected ? "" : "font-normal text-ink-muted"}`}>
-                  {o.record.conferenceWins}-{o.record.conferenceLosses}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate leading-5">{t.name}</span>
+                  <span className={`block text-[11px] leading-4 tabular-nums ${selected ? "font-normal" : "text-ink-muted"}`}>
+                    {o.record.wins}-{o.record.losses} · {o.record.conferenceWins}-{o.record.conferenceLosses}
+                  </span>
                 </span>
                 <span className={`w-10 text-right tabular-nums ${o.status === "eliminated" && !selected ? "font-normal text-ink-muted" : ""}`}>
                   {formatChance(o.titleGame, o.status)}
