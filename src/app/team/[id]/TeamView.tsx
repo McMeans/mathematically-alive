@@ -22,6 +22,7 @@ export function TeamView({ teamId, teamName, color, names, games, initialPath, i
   const [locks, setLocks] = useState<Record<number, number>>({});
   const [result, setResult] = useState({ path: initialPath, outlook: initialOutlook });
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   const worker = useRef<Worker | null>(null);
   const latest = useRef(0);
 
@@ -31,6 +32,10 @@ export function TeamView({ teamId, teamName, color, names, games, initialPath, i
       if (e.data.id !== latest.current) return; // a newer request is in flight
       setResult({ path: e.data.path, outlook: e.data.outlook });
       setBusy(false);
+    };
+    w.onerror = () => {
+      setBusy(false);
+      setFailed(true);
     };
     worker.current = w;
     return () => w.terminate();
@@ -45,6 +50,7 @@ export function TeamView({ teamId, teamName, color, names, games, initialPath, i
       return;
     }
     setBusy(true);
+    setFailed(false);
     worker.current?.postMessage({ id: ++latest.current, teamId, locks: next } satisfies SimRequest);
   }
 
@@ -52,7 +58,9 @@ export function TeamView({ teamId, teamName, color, names, games, initialPath, i
   const nameOf = (id: number) => names[id] ?? `Team ${id}`;
   const gameById = new Map(games.map((g) => [g.id, g]));
   const own = games.filter((g) => g.homeId === teamId || g.awayId === teamId);
-  const keyGames = path.keyGames.map((k) => gameById.get(k.gameId)).filter((g): g is GameInfo => !!g && !own.includes(g));
+  // Keep locked games listed: teamPath drops them from keyGames, but the user still needs their toggle.
+  const keyIds = [...new Set([...initialPath.keyGames.map((k) => k.gameId), ...path.keyGames.map((k) => k.gameId), ...Object.keys(locks).map(Number)])];
+  const keyGames = keyIds.map((id) => gameById.get(id)).filter((g): g is GameInfo => !!g && !own.includes(g));
   const whatIf = [...own, ...keyGames];
   const pill = path.status === "alive" ? "Alive" : path.summary;
 
@@ -72,6 +80,7 @@ export function TeamView({ teamId, teamName, color, names, games, initialPath, i
 
       <div aria-live="polite" className={busy ? "opacity-60" : ""}>
         {busy && <p className="mt-3 text-sm text-ink-muted" role="status">Recalculating…</p>}
+        {failed && <p className="mt-3 text-sm text-marker-text" role="alert">Couldn&apos;t recalculate. Showing the last result.</p>}
         <h2 className="sr-only">Odds</h2>
         <dl className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
           <Odds label="ACC title game" value={outlook.titleGame} className="text-turf" />
