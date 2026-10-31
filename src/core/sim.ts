@@ -74,6 +74,7 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
     if (gi === undefined) throw new Error(`lock for unknown game ${gid}`);
     const g = games[gi];
     if (winner !== g.homeId && winner !== g.awayId) throw new Error(`team ${winner} is not in game ${gid}`);
+    if (g.completed) throw new Error(`game ${gid} is already final and can't be locked`);
     locked[gi] = winner === g.homeId ? 1 : 0;
   }
 
@@ -93,7 +94,10 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
     gamesPer[homeIdx[i]]++;
     gamesPer[awayIdx[i]]++;
     conf[i] = g.conferenceGame ? 1 : 0;
-    if (g.completed) fixed[i] = g.homePoints! > g.awayPoints! ? 1 : 0;
+    if (g.completed) {
+      if (g.homePoints === null || g.awayPoints === null) throw new Error(`completed game ${g.id} has no final score`);
+      fixed[i] = g.homePoints > g.awayPoints ? 1 : 0;
+    }
     else if (locked[i] >= 0) fixed[i] = locked[i];
     else {
       fixed[i] = -1;

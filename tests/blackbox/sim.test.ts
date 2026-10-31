@@ -62,6 +62,18 @@ describe("simulateSeason", () => {
     }
   });
 
+  it("rejects a lock on a game that is already final", () => {
+    const s = tiny();
+    s.games[0] = { ...s.games[0], completed: true, homePoints: 10, awayPoints: 20 };
+    expect(() => simulateSeason(s, { iterations: 1, seed: 1, locks: { [s.games[0].id]: s.games[0].homeId } })).toThrow(/already final/);
+  });
+
+  it("rejects a completed game with no score", () => {
+    const s = tiny();
+    s.games[0] = { ...s.games[0], completed: true, homePoints: null, awayPoints: null };
+    expect(() => simulateSeason(s, { iterations: 1, seed: 1 })).toThrow(/no final score/);
+  });
+
   it("rejects a lock for a team not in the game or an unknown game", () => {
     expect(() => simulateSeason(tiny(), { iterations: 1, seed: 1, locks: { 10: 4 } })).toThrow();
     expect(() => simulateSeason(tiny(), { iterations: 1, seed: 1, locks: { 99: 1 } })).toThrow();
