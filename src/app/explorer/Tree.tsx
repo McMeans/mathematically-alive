@@ -5,8 +5,6 @@ import { oddsTone, type Locks } from "./Explorer";
 
 type Ctx = {
   locks: Locks;
-  /** "gameId:winner" picks of the likeliest way in, to highlight. */
-  way?: Set<string>;
   teamId: number;
   oppOf: (gameId: number) => number;
   onPick: (gameId: number, winner: number | undefined) => void;
@@ -28,9 +26,7 @@ type View = Ctx & {
   toggle: (key: string, n: TreeNode, level: number) => void;
 };
 
-const onWay = (n: TreeNode, c: Ctx) => n.gameId !== undefined && !!c.way?.has(`${n.gameId}:${winnerOf(n, c)}`);
-
-function Branch({ node, ctx, off, path, level, way }: { node: TreeNode; ctx: View; off: boolean; path: string; level: number; way: boolean }) {
+function Branch({ node, ctx, off, path, level }: { node: TreeNode; ctx: View; off: boolean; path: string; level: number }) {
   const hasKids = node.children.length > 0;
   const root = node.gameId === undefined;
   const open = hasKids && ctx.isOpen(path, node, level);
@@ -53,7 +49,7 @@ function Branch({ node, ctx, off, path, level, way }: { node: TreeNode; ctx: Vie
           <span className="font-display text-xl">{node.verdict}</span>
         </div>
       ) : (
-        <NodePill node={node} ctx={ctx} off={off} leaf={!hasKids} way={way} />
+        <NodePill node={node} ctx={ctx} off={off} leaf={!hasKids} />
       )}
       {hasKids && !open && toggle(`+ ${countLeaves(node)} outcomes`, false)}
       {open && !root && ctx.userOpened(path) && toggle("−", true)}
@@ -64,7 +60,7 @@ function Branch({ node, ctx, off, path, level, way }: { node: TreeNode; ctx: Vie
             const key = path + (c.win ? "W" : "L");
             return (
               <div key={key} className={`kid ${c.likely ? "likely" : ""}`}>
-                <Branch node={c} ctx={ctx} off={off} path={key} level={level + 1} way={way && onWay(c, ctx)} />
+                <Branch node={c} ctx={ctx} off={off} path={key} level={level + 1} />
               </div>
             );
           })}
@@ -74,9 +70,9 @@ function Branch({ node, ctx, off, path, level, way }: { node: TreeNode; ctx: Vie
   );
 }
 
-function NodePill({ node, ctx, off, leaf, way }: { node: TreeNode; ctx: Ctx; off: boolean; leaf: boolean; way: boolean }) {
+function NodePill({ node, ctx, off, leaf }: { node: TreeNode; ctx: Ctx; off: boolean; leaf: boolean }) {
   const locked = isLocked(node, ctx);
-  const border = (node.likely ? "border-2 border-turf" : "border border-ink-muted/40") + (way ? " ring-2 ring-marker ring-offset-1" : "");
+  const border = node.likely ? "border-2 border-turf" : "border border-ink-muted/40";
   const extra = [node.record, node.note].filter(Boolean).join(". ");
   return (
     <button
@@ -106,12 +102,12 @@ function NodePill({ node, ctx, off, leaf, way }: { node: TreeNode; ctx: Ctx; off
   );
 }
 
-export function TreeView({ tree, locks, way, teamId, oppOf, onPick }: { tree: PathTree } & Ctx) {
+export function TreeView({ tree, locks, teamId, oppOf, onPick }: { tree: PathTree } & Ctx) {
   // Open by default: the first two levels, the most likely path and the locked path. Clicks override.
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
-  const base: Ctx = { locks, way, teamId, oppOf, onPick };
+  const base: Ctx = { locks, teamId, oppOf, onPick };
   const byDefault = (n: TreeNode, level: number) =>
-    level < 2 || n.likely || n.children.some((c) => isLocked(c, base) || (!!way && onWay(c, base)));
+    level < 2 || n.likely || n.children.some((c) => isLocked(c, base));
   const ctx: View = {
     ...base,
     isOpen: (key, n, level) => toggled[key] ?? byDefault(n, level),
@@ -122,7 +118,7 @@ export function TreeView({ tree, locks, way, teamId, oppOf, onPick }: { tree: Pa
     <div>
       <div className="tree -mx-4 overflow-x-auto px-4 py-4 md:-mx-6 md:px-6">
         <div className="inline-block min-w-max">
-          <Branch node={tree.root} ctx={ctx} off={false} path="" level={0} way={!!way} />
+          <Branch node={tree.root} ctx={ctx} off={false} path="" level={0} />
         </div>
       </div>
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">

@@ -93,7 +93,6 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
   const hasLocks = Object.keys(locks).length > 0;
   const likeliest = tree.likeliest;
   const wayOn = wayPicks !== null && wayPicks.every((p) => locks[p.gameId] === p.winner);
-  const way = undefined;
   function toggleWay() {
     if (wayOn) {
       const next = { ...locks };
@@ -202,7 +201,7 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
           <div className={`transition-opacity ${busy ? "opacity-70" : ""}`}>
             <div className="hidden md:block">
               <p className="text-sm text-ink-muted">Click a branch to lock it</p>
-              <TreeView tree={tree} locks={locks} way={way} teamId={teamId} oppOf={oppOf} onPick={pick} />
+              <TreeView tree={tree} locks={locks} teamId={teamId} oppOf={oppOf} onPick={pick} />
             </div>
             <div className="md:hidden">
               <Drill tree={tree} locks={locks} teamId={teamId} oppOf={oppOf} onPick={pick} onUnlock={(ids) => {
@@ -215,7 +214,7 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
             {showHelp && (
               <>
                 <h2 className="mt-8 font-display text-xl font-bold">Help from elsewhere</h2>
-                <HelpList help={help} base={initial.tree} live={tree} names={names} locks={locks} onPick={pick} way={way} />
+                <HelpList help={help} base={initial.tree} live={tree} names={names} locks={locks} onPick={pick} />
               </>
             )}
           </div>

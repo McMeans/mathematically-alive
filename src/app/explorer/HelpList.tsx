@@ -15,11 +15,9 @@ type Props = {
   names: Record<number, string>;
   locks: Locks;
   onPick: (gameId: number, winner: number | undefined) => void;
-  /** "gameId:winner" picks of the likeliest way in, to highlight. */
-  way?: Set<string>;
 };
 
-export function HelpList({ help, base, live, names, locks, onPick, way }: Props) {
+export function HelpList({ help, base, live, names, locks, onPick }: Props) {
   // Order never changes (by date); which rows show comes from the live run, so rows only come and go when a lock changes.
   const liveOf = (id: number) => live.help.find((k) => k.gameId === id);
   const matters = (g: HelpGame) => {
@@ -40,14 +38,13 @@ export function HelpList({ help, base, live, names, locks, onPick, way }: Props)
           const sel = locks[g.gameId];
           const seg = (label: string, d: number | null, winner: number | undefined, proven: "in" | "out" | null = null) => {
             const on = sel === winner;
-            const hl = winner !== undefined && way?.has(`${g.gameId}:${winner}`);
             return (
               <button
                 key={label}
                 type="button"
                 aria-pressed={on}
                 onClick={() => onPick(g.gameId, winner)}
-                className={`min-h-11 flex-1 px-2 py-1 text-center text-sm leading-tight focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-navy ${on ? "rounded-md bg-white font-bold shadow" : ""} ${hl ? "rounded-md ring-2 ring-marker" : ""}`}
+                className={`min-h-11 flex-1 px-2 py-1 text-center text-sm leading-tight focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-navy ${on ? "rounded-md bg-white font-bold shadow" : ""}`}
               >
                 {label}
                 {proven ? (

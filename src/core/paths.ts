@@ -1,7 +1,7 @@
 // What has to happen for one team to reach its conference championship game.
-// Everything is Monte Carlo based: odds are counts over simulated seasons, so
-// "clinched" and "eliminated" mean the title-game odds came out as exactly 1 or
-// 0 in the sample, not that they are mathematically proven.
+// Odds are Monte Carlo counts over simulated seasons. "clinched" and "eliminated"
+// are mathematically proven (provenStatus checks every remaining combination);
+// odds of exactly 1 or 0 without a proof stay "open".
 import { mix, mulberry32, simulateSeason, type SimResult } from "./sim";
 import { provenStatus } from "./proof";
 import type { Game, Season } from "./season";
