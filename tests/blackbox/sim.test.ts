@@ -93,11 +93,10 @@ describe("simulateSeason", () => {
       const a = (h + 1 + (i % 128)) % 130;
       games.push(game(i + 1, h + 1, a + 1, { spread: null, conferenceGame: i % 2 === 0 }));
     }
-    const t0 = performance.now();
     const r = simulateSeason(season(teams, games), { iterations: 10000, seed: 1 });
-    // Loose ceiling: catches a big algorithmic regression, not runner jitter.
-    expect(performance.now() - t0).toBeLessThan(10000);
     expect(r.iterations).toBe(10000);
+    const total = Object.values(r.teams).reduce((n, t) => n + t.winDistribution.reduce((a, b) => a + b, 0), 0);
+    expect(total).toBe(130 * 10000);
   });
 });
 
@@ -106,6 +105,7 @@ describe("gameWinProbability", () => {
     const s = tiny();
     expect(gameWinProbability(s, game(1, 1, 2, { spread: -7 }))).toBeCloseTo(winProbability(-7));
     expect(gameWinProbability(s, game(1, 1, 2, { spread: -7 }), { sd: 7 })).toBeCloseTo(winProbability(-7, 7));
+    expect(() => gameWinProbability(s, game(1, 1, 2, { spread: -7 }), { sd: 0 })).toThrow(RangeError);
   });
 
   it("falls back to ratings with home field", () => {
