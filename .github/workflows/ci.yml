@@ -47,9 +47,11 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Log every tool call, so a blocked one shows up in the job log.
+          show_full_output: true
           claude_args: >-
             --model claude-sonnet-5-5 --max-turns 30
-            --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr review:*),Bash(git diff:*),Bash(git log:*),Read,Grep,Glob,mcp__github_inline_comment__create_inline_comment"
+            --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr review:*),Bash(git diff:*),Bash(git log:*),Write(//tmp/**),Read,Grep,Glob,mcp__github_inline_comment__create_inline_comment"
           prompt: |
             Review PR #${{ github.event.pull_request.number }} in ${{ github.repository }} using the checks in
             .claude/skills/pr-review/SKILL.md. Skip its coverage gate step and its output and posting
@@ -65,7 +67,8 @@ jobs:
             one or two sentences. No inline comments for Nits.
 
             Then submit exactly one review with `gh pr review ${{ github.event.pull_request.number }}`
-            and --body-file, choosing the verdict:
+            and --body-file. Write the body to a file under /tmp first (the Write tool is allowed there only).
+            Choose the verdict:
             - Approved (--approve): no findings.
             - Approved with nits (--approve): only Nits.
             - Changes requested (--request-changes): at least one Should, no Blockers.
@@ -83,3 +86,13 @@ jobs:
             <areas with no findings>
 
             Leave out empty tier sections. Be brief: no praise, no restating the diff.
+      # The action exits 0 even when no review got posted, so check that one did for this commit.
+      - name: Check a review was posted
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          n=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" --paginate \
+            --jq "[.[] | select(.commit_id == \"$SHA\" and .user.login == \"claude[bot]\" and .state != \"COMMENTED\")] | length")
+          echo "Reviews from claude[bot] on $SHA: $n"
+          [ "$n" -gt 0 ] || { echo "::error::The review bot finished without posting a review."; exit 1; }
