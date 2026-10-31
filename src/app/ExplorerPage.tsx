@@ -10,7 +10,8 @@ export function ExplorerPage({ teamId }: { teamId: number }) {
 
   const own = season.games.filter((g) => !g.completed && (g.homeId === teamId || g.awayId === teamId)).map(toInfo);
   // Frozen for this team: every other conference game that matters now or in one of its scenarios, from the run with no locks.
-  const help = tree.help.filter((h) => h.now || h.scenario !== null);
+  const kickoff = new Map(season.games.map((g) => [g.id, Date.parse(g.start) || 0]));
+  const help = [...tree.help].sort((a, b) => kickoff.get(a.gameId)! - kickoff.get(b.gameId)! || a.gameId - b.gameId);
 
   const teams: TeamInfo[] = accTeams.map((t) => ({ id: t.id, name: t.name, color: t.color }));
   return (

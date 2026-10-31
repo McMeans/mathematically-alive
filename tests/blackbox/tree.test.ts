@@ -371,6 +371,18 @@ describe("help from elsewhere", () => {
     expect(scenarioOnly).toBeGreaterThan(0);
   });
 
+  it("locking the team's win-out makes a game's swing clear when it wasn't before", () => {
+    const { s, upset, other } = needsHelp();
+    upset.spread = 30;
+    const o = { ...base, iterations: 300, teamId: 1 };
+    const before = pathTree(s, o).help.find((h) => h.gameId === other.id)!;
+    expect(before.now).toBe(false);
+    expect(before.scenario).toBeNull();
+    const after = pathTree(s, { ...o, locks: { [upset.id]: 1 } }).help.find((h) => h.gameId === other.id)!;
+    expect(after.now).toBe(true);
+    expect(after.rooting).toBe(3);
+  });
+
   it("a locked game drops out of the help list", () => {
     const { s, other } = needsHelp();
     const t = pathTree(s, { ...base, teamId: 1, locks: { [other.id]: 3 } });
