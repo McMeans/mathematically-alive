@@ -33,7 +33,7 @@ export function TeamView({ teamId, teamName, color, names, games, initialPath, i
       setResult({ path: e.data.path, outlook: e.data.outlook });
       setBusy(false);
     };
-    w.onerror = () => {
+    w.onerror = w.onmessageerror = () => {
       setBusy(false);
       setFailed(true);
     };
