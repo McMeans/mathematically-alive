@@ -8,7 +8,7 @@ Next.js (TypeScript) site: pick a college football team, see what has to happen 
 - `tests/unit`: optional white-box tests. Keep them, but they don't count toward the gate.
 - `fixtures/`: test data (schedules, results) and the scripts that generate them.
 
-Dev: `npm run dev`. Lint: `npm run lint`. Types: `npm run typecheck`. Test: `npm test`. Build: `npm run build`.
+Package manager: pnpm (`corepack enable` once; npm's lockfile drops other platforms' native bindings, which broke CI). Dev: `pnpm dev`. Lint: `pnpm lint`. Types: `pnpm typecheck`. Test: `pnpm test`. Build: `pnpm build`.
 
 ## Black-box testing as we go
 
@@ -25,6 +25,14 @@ Every change to `src/core` behavior ships with black-box tests in the same chang
 
 ## Before calling a change done
 
-1. `npm run lint`, `npm run typecheck` and `npm test` pass.
+1. `pnpm lint`, `pnpm typecheck` and `pnpm test` pass.
 2. Run the `coverage-gate` skill (`.claude/skills/coverage-gate/gate.sh`). It must pass at the threshold in the script. Never lower the threshold without asking.
 3. For a branch or PR, run the `pr-review` skill.
+
+## Brand
+
+Identity direction D (canvas: https://claude.ai/artifact/KL6C75XoRFuUYPqYurETpt). Light-only, white page.
+
+- Type: Space Grotesk 700 for display (`font-display`), Inter for body and data (`font-sans`).
+- Colors (Tailwind tokens in `src/app/globals.css`): `navy` #14213D (text, the ball), `turf` #1F7A4D (accent, conference odds), `marker` #D9622B (fills only; use `marker-text` #B4501F for orange text on white), `mist` #F3F5F8 (cards), `ink-soft` #3A4458 (secondary text), `ink-muted` #5B6478 (labels, captions).
+- Mark: a football whose laces form a pulse line. `src/app/Logo.tsx`; below 48px it drops the lace ticks. Favicon is `src/app/icon.svg`; `public/logo.svg` is the standalone file for README, social and external use.

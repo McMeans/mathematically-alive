@@ -13,21 +13,22 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - name: Lint
-        run: npm run lint
+        run: pnpm lint
       - name: Typecheck
-        run: npm run typecheck
+        run: pnpm typecheck
       - name: Tests
-        run: npm test
+        run: pnpm test
       - name: Black-box coverage gate
         run: .claude/skills/coverage-gate/gate.sh
       - name: Build
-        run: npm run build
+        run: pnpm build
 
   review:
     # Same-repo PRs only: a fork's PR never runs this job, so it can't spend the subscription.

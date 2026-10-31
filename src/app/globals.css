@@ -1,26 +1,22 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Brand: identity direction D ("Pulse type, Proof colors").
+   The site is light-only for now. */
+@theme {
+  --color-navy: #14213d;
+  --color-turf: #1f7a4d;
+  --color-marker: #d9622b;
+  --color-marker-text: #b4501f; /* marker orange darkened for text on white */
+  --color-mist: #f3f5f8;
+  --color-ink-muted: #5b6478;
+  --color-ink-soft: #3a4458;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-space-grotesk);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #ffffff;
+  color: var(--color-navy);
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
