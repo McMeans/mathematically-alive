@@ -1,6 +1,6 @@
 // Season outlook for one conference: how likely each team is to reach the
 // conference championship game, win it, and (experimentally) make the playoff.
-import { gameWinProbability, mulberry32, simulateSeason } from "./sim";
+import { gameWinProbability, mix, mulberry32, simulateSeason } from "./sim";
 import { teamRecord } from "./season";
 import type { Game, Season, TeamRecord } from "./season";
 import { championshipFromData, conferenceData } from "./tiebreak";
@@ -119,15 +119,4 @@ export function seasonOutlook(season: Season, opts: OutlookOptions): SeasonOutlo
       playoff: (playoff.get(id) ?? 0) / n,
     })),
   };
-}
-
-/** Hash (seed, iteration, salt) to a well-mixed 32-bit stream seed. */
-function mix(seed: number, iteration: number, salt: number): number {
-  let h = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(iteration + 1, 0xc2b2ae35) ^ Math.imul(salt, 0x27d4eb2f);
-  h ^= h >>> 16;
-  h = Math.imul(h, 0x85ebca6b);
-  h ^= h >>> 13;
-  h = Math.imul(h, 0xc2b2ae35);
-  h ^= h >>> 16;
-  return h >>> 0;
 }

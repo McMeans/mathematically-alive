@@ -172,3 +172,14 @@ export function mulberry32(seed: number): () => number {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+/** Hash (seed, iteration, salt) to a well-mixed 32-bit stream seed. */
+export function mix(seed: number, iteration: number, salt: number): number {
+  let h = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(iteration + 1, 0xc2b2ae35) ^ Math.imul(salt, 0x27d4eb2f);
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
