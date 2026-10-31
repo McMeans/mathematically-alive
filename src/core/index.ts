@@ -14,3 +14,5 @@ export type {
   Season,
   Team,
 } from "./season";
+export { gameWinProbability, simulateSeason } from "./sim";
+export type { OddsOptions, SimOptions, SimResult, TeamSimStats } from "./sim";
