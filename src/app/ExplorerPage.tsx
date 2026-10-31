@@ -9,7 +9,7 @@ export function ExplorerPage({ teamId }: { teamId: number }) {
   const toInfo = (g: (typeof season.games)[number]): GameInfo => ({ id: g.id, homeId: g.homeId, awayId: g.awayId, week: g.week, start: g.start });
 
   const own = season.games.filter((g) => !g.completed && (g.homeId === teamId || g.awayId === teamId)).map(toInfo);
-  // Frozen for this team: every other conference game that matters now or in one of its scenarios, from the run with no locks.
+  // Every other remaining conference game, by kickoff, from the run with no locks. HelpList shows only the ones that matter.
   const kickoff = new Map(season.games.map((g) => [g.id, Date.parse(g.start) || 0]));
   const help = [...tree.help].sort((a, b) => kickoff.get(a.gameId)! - kickoff.get(b.gameId)! || a.gameId - b.gameId);
 

@@ -18,7 +18,7 @@ type Props = {
   names: Record<number, string>;
   /** The team's own unplayed games. */
   own: GameInfo[];
-  /** Frozen for this team: the other conference games that matter (now or in a scenario), from the run with no locks. */
+  /** Every other remaining conference game, by kickoff, from the run with no locks; HelpList picks the ones that matter. */
   help: HelpGame[];
   asOf: string;
   initial: Result;

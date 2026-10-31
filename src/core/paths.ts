@@ -118,7 +118,6 @@ export function teamPath(season: Season, opts: PathOptions, shared?: SimResult):
   const status: PathStatus = proven === "clinched" ? "clinched" : proven === "eliminated" ? "eliminated" : "alive";
 
   // Each outcome needs enough iterations for its conditional odds to mean anything.
-  // Conditional odds need enough simulated seasons on that side to mean anything.
   const minSample = Math.max(30, Math.ceil(n * 0.01));
   const ifWinOut = own.length > 0 && outN >= minSample ? outIn / outN : null;
   const keyGames: KeyGame[] = [];
