@@ -10,7 +10,7 @@ cd "$ROOT"
 OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 
-npx vitest run tests/blackbox \
+node_modules/.bin/vitest run tests/blackbox \
     --coverage.enabled --coverage.provider=v8 \
     --coverage.include='src/core/**' \
     --coverage.reporter=text --coverage.reporter=json-summary \
