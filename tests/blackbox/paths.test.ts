@@ -39,7 +39,7 @@ describe("team path", () => {
     const p = path(scenario().s, 1);
     expect(p.status).toBe("clinched");
     expect(p.titleGame).toBe(1);
-    expect(p.summary).toBe("Clinched a spot in the C Championship Game.");
+    expect(p.summary).toBe("Made the C title game in every simulated season.");
   });
 
   it("an eliminated team says eliminated", () => {
@@ -50,7 +50,7 @@ describe("team path", () => {
     ], 5);
     const p = path(s, 5);
     expect(p.status).toBe("eliminated");
-    expect(p.summary).toBe("Eliminated from the C Championship Game.");
+    expect(p.summary).toBe("Missed the C title game in every simulated season.");
     expect(p.keyGames).toEqual([]);
   });
 
@@ -102,6 +102,35 @@ describe("team path", () => {
     decider.start = "2026-11-22T00:30:00Z";
     const line = path(s, 2).steps.find((x) => x.includes("Team3"))!;
     expect(line).toContain("Nov 21");
+  });
+
+  it("a locked game is absent from keyGames", () => {
+    const { s, decider } = scenario();
+    const third = s.games[5];
+    const p = teamPath(s, { conference: "C", teamId: 2, iterations: 3000, seed: 3, locks: { [third.id]: 3 } });
+    expect(p.keyGames.some((k) => k.gameId === third.id)).toBe(false);
+    expect(p.keyGames[0].gameId).toBe(decider.id);
+  });
+
+  it("a lock shifts titleGame and ifWinOut, and a lock on the team's own game counts toward win-out", () => {
+    const { s, decider } = scenario();
+    const base = path(s, 2);
+    const win = teamPath(s, { conference: "C", teamId: 2, iterations: 3000, seed: 3, locks: { [decider.id]: 2 } });
+    const lose = teamPath(s, { conference: "C", teamId: 2, iterations: 3000, seed: 3, locks: { [decider.id]: 3 } });
+    expect(win.titleGame).toBeGreaterThan(base.titleGame);
+    expect(win.status).toBe("clinched");
+    expect(win.ifWinOut).toBe(1);
+    expect(lose.titleGame).toBeLessThan(base.titleGame);
+    expect(lose.ifWinOut).toBeNull();
+  });
+
+  it("skips a near-certain game whose upset is too rare to measure", () => {
+    const { s } = scenario();
+    const third = s.games[5];
+    const open = path(s, 2).keyGames.some((k) => k.gameId === third.id);
+    expect(open).toBe(true);
+    third.spread = -60;
+    expect(path(s, 2).keyGames.some((k) => k.gameId === third.id)).toBe(false);
   });
 
   it("is deterministic for a seed", () => {

@@ -31,7 +31,7 @@ export type KeyGame = {
 };
 
 export type TeamPath = {
-  /** Monte Carlo based: "clinched" is odds of exactly 1 in the sample, "eliminated" exactly 0. */
+  /** Monte Carlo based: "clinched" means the team made the title game in every simulated season, "eliminated" in none; neither is a proof. */
   status: PathStatus;
   /** Fraction of iterations the team plays in the title game. */
   titleGame: number;
@@ -106,10 +106,12 @@ export function teamPath(season: Season, opts: PathOptions): TeamPath {
   const ifWinOut = own.length > 0 && outN > 0 ? outIn / outN : null;
   const status: PathStatus = titleGame === 1 ? "clinched" : titleGame === 0 ? "eliminated" : "alive";
 
+  // Each outcome needs enough iterations for its conditional odds to mean anything.
+  const minSample = Math.max(30, Math.ceil(n * 0.01));
   const keyGames: KeyGame[] = [];
   candidates.forEach(({ g }, k) => {
     const awayN = n - homeN[k];
-    if (homeN[k] === 0 || awayN === 0) return;
+    if (homeN[k] < minSample || awayN < minSample) return;
     const oddsIfHomeWins = homeIn[k] / homeN[k];
     const oddsIfAwayWins = awayIn[k] / awayN;
     const swing = Math.abs(oddsIfHomeWins - oddsIfAwayWins);
@@ -123,7 +125,6 @@ export function teamPath(season: Season, opts: PathOptions): TeamPath {
   keyGames.length = Math.min(keyGames.length, MAX_KEY_GAMES);
 
   const team = name(teamId);
-  const title = `${conference} Championship Game`;
   const when = (g: Game): string => {
     const d = new Date(g.start);
     return Number.isNaN(d.getTime()) ? `week ${g.week}` : DATE_FORMAT.format(d);
@@ -132,16 +133,15 @@ export function teamPath(season: Season, opts: PathOptions): TeamPath {
     const g = season.games[gameIndex.get(k.gameId)!];
     const other = k.rooting === k.homeId ? k.awayId : k.homeId;
     const [from, to] = k.rooting === k.homeId ? [k.oddsIfAwayWins, k.oddsIfHomeWins] : [k.oddsIfHomeWins, k.oddsIfAwayWins];
-    const who = k.rooting === teamId ? `${team} to beat ${name(other)}` : `${name(k.rooting)} over ${name(other)}`;
     return k.rooting === teamId
       ? `Win ${when(g)} vs ${name(other)}: it moves ${team}'s odds from ${formatOdds(from)} to ${formatOdds(to)}.`
-      : `Root for ${who} (${when(g)}): it moves ${team}'s odds from ${formatOdds(from)} to ${formatOdds(to)}.`;
+      : `Root for ${name(k.rooting)} over ${name(other)} (${when(g)}): it moves ${team}'s odds from ${formatOdds(from)} to ${formatOdds(to)}.`;
   };
 
   let summary: string;
   const steps: string[] = [];
-  if (status === "clinched") summary = `Clinched a spot in the ${title}.`;
-  else if (status === "eliminated") summary = `Eliminated from the ${title}.`;
+  if (status === "clinched") summary = `Made the ${conference} title game in every simulated season.`;
+  else if (status === "eliminated") summary = `Missed the ${conference} title game in every simulated season.`;
   else if (ifWinOut !== null) summary = `Win out and ${team} makes the ${conference} title game ${formatOdds(ifWinOut)} of the time.`;
   else if (keyGames.length > 0) summary = rootLine(keyGames[0]);
   else summary = `${team} has a ${formatOdds(titleGame)} chance of making the ${conference} title game.`;
