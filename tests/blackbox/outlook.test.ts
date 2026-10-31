@@ -106,6 +106,16 @@ describe("season outlook", () => {
     expect(byTeam(o, 1).playoff).toBeGreaterThan(0);
   });
 
+  it("lets a strong non-champion in on ranking, beyond its title odds", () => {
+    const { season } = build();
+    // 12 idle FBS teams sit at score 0, so only teams that win enough rank top 11.
+    const idle = Array.from({ length: 12 }, (_, i) => team(100 + i, "Idle"));
+    const crowded: Season = { ...season, teams: [...season.teams, ...idle] };
+    const t = byTeam(run(crowded), 2);
+    expect(t.playoff).toBeGreaterThan(t.champion);
+    expect(t.playoff).toBeLessThan(1);
+  });
+
   it("throws for a conference with no teams", () => {
     const { season } = build();
     expect(() => seasonOutlook(season, { conference: "Nope", iterations: 10, seed: 1 })).toThrow(/fewer than two teams/);
