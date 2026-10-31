@@ -4,12 +4,19 @@ type LogoProps = {
   color?: string;
   /** Drop the lace ticks and thicken the pulse; use below ~48px. */
   simple?: boolean;
+  /** Hide from screen readers when the name is already in adjacent text. */
+  decorative?: boolean;
 };
 
 /** The football mark: its laces form a pulse line. */
-export function Logo({ size = 48, color = "#14213D", simple = size < 48 }: LogoProps) {
+export function Logo({ size = 48, color = "#14213D", simple = size < 48, decorative = false }: LogoProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 140 140" role="img" aria-label="Mathematically Alive">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 140 140"
+      {...(decorative ? { "aria-hidden": true } : { role: "img", "aria-label": "Mathematically Alive" })}
+    >
       <g transform="rotate(-30 70 70)">
         <path d="M8 70 Q70 2 132 70 Q70 138 8 70 Z" fill={color} />
         {simple ? (
