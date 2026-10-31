@@ -39,6 +39,17 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
   // The likeliest-way-in picks currently locked by the button (they stay locked while the live tree changes).
   const [wayPicks, setWayPicks] = useState<{ gameId: number; winner: number }[] | null>(null);
   const worker = useRef<Worker | null>(null);
+  // The next team's page remounts this component; if it never arrives (failed load, back button), drop the overlay.
+  useEffect(() => {
+    if (going === null) return;
+    const clear = () => setGoing(null);
+    const timer = setTimeout(clear, 10_000);
+    window.addEventListener("popstate", clear);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("popstate", clear);
+    };
+  }, [going]);
   const latest = useRef(0);
 
   useEffect(() => {
