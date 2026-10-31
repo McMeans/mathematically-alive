@@ -25,13 +25,18 @@ describe("2025 ACC fixture", () => {
   // Skipped: our July 2026 ACC policy picks Miami over Duke for the second slot
   // from the real 2025 results; the 2025 ACC used different tiebreak steps
   // (SportSource Team Success Ranking etc.), so the real field is not reproduced.
-  it.skip("the real results send Duke and Virginia to the ACC Championship Game", () => {
+  it("the real 2025 title game was Duke vs Virginia", () => {
     const title = season.games.find((g) => g.week === 15 && !g.conferenceGame && g.neutralSite && acc.some((t) => t.id === g.homeId) && acc.some((t) => t.id === g.awayId));
     expect(title).toBeDefined();
     const played = [title!.homeId, title!.awayId].sort((a, b) => a - b);
     expect(played).toEqual([byName("Duke"), byName("Virginia")].sort((a, b) => a - b));
+  });
 
+  // Duke reached the 2025 game under the old policy. The July 2026 policy,
+  // written in response, would have sent Miami instead (SP+ standing in for the
+  // SportSource ranking).
+  it("under the 2026 policy the 2025 results send Virginia and Miami", () => {
     const pair = championshipParticipants(season, "ACC", winnerOf, { draw: () => 0.5 });
-    expect([...pair].sort((a, b) => a - b)).toEqual(played);
+    expect([...pair].sort((a, b) => a - b)).toEqual([byName("Virginia"), byName("Miami")].sort((a, b) => a - b));
   });
 });
