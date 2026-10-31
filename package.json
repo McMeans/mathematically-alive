@@ -10,7 +10,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "gate": ".claude/skills/coverage-gate/gate.sh",
-    "data": "tsx --env-file-if-exists=.env.local scripts/fetch-season.ts"
+    "data": "tsx --env-file-if-exists=.env.local scripts/fetch-season.ts",
+    "fixture": "tsx --env-file-if-exists=.env.local scripts/make-fixture.ts",
+    "prebuild": "tsx scripts/build-data.ts"
   },
   "dependencies": {
     "next": "^16.4.3",
