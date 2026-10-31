@@ -34,6 +34,7 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const [showWay, setShowWay] = useState(false);
   const worker = useRef<Worker | null>(null);
   const latest = useRef(0);
 
@@ -87,6 +88,8 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
     return teams.map((t) => t.id).sort((a, b) => rank.get(b)! - rank.get(a)! || a - b);
   }, [initial, teams]);
   const hasLocks = Object.keys(locks).length > 0;
+  const likeliest = tree.likeliest;
+  const way = showWay && likeliest ? new Set(likeliest.picks.map((p) => `${p.gameId}:${p.winner}`)) : undefined;
   const status = busy ? "Updating…" : failed ? "Couldn’t update. Showing the last result." : "";
 
   const list = (
@@ -155,10 +158,32 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
             </div>
           </div>
 
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={!likeliest}
+              aria-pressed={showWay}
+              onClick={() => setShowWay(!showWay)}
+              className="min-h-11 rounded-full border border-marker px-3 text-sm font-bold text-marker-text disabled:opacity-40 aria-pressed:bg-marker aria-pressed:text-white md:min-h-8"
+            >
+              Likeliest way in
+            </button>
+            {way && likeliest && (
+              <button
+                type="button"
+                onClick={() => update({ ...locks, ...Object.fromEntries(likeliest.picks.map((p) => [p.gameId, p.winner])) })}
+                className="min-h-11 text-sm font-bold text-navy underline md:min-h-0"
+              >
+                Apply
+              </button>
+            )}
+          </div>
+          {way && likeliest && <p className="mt-1 text-sm text-ink-soft">{likeliest.line}</p>}
+
           <div className={`transition-opacity ${busy ? "opacity-70" : ""}`}>
             <div className="hidden md:block">
               <p className="text-sm text-ink-muted">Click a branch to lock it</p>
-              <TreeView tree={tree} locks={locks} teamId={teamId} oppOf={oppOf} onPick={pick} />
+              <TreeView tree={tree} locks={locks} way={way} teamId={teamId} oppOf={oppOf} onPick={pick} />
             </div>
             <div className="md:hidden">
               <Drill tree={tree} locks={locks} teamId={teamId} oppOf={oppOf} onPick={pick} onUnlock={(ids) => {
@@ -169,7 +194,7 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
             </div>
 
             <h2 className="mt-8 font-display text-xl font-bold">Help from elsewhere</h2>
-            <HelpList help={help} base={initial.tree} live={tree} names={names} locks={locks} onPick={pick} />
+            <HelpList help={help} base={initial.tree} live={tree} names={names} locks={locks} onPick={pick} way={way} />
           </div>
         </main>
 

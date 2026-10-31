@@ -93,6 +93,19 @@ export type HelpGame = {
   } | null;
   /** Team to root for: the winner that gives the better odds (in the scenario when it only matters there); null if it doesn't matter. */
   rooting: number | null;
+  /** Proven effect of each result: "in" clinches the title-game spot, "out" eliminates the team; null otherwise. */
+  ifHomeWins: "in" | "out" | null;
+  ifAwayWins: "in" | "out" | null;
+};
+
+/** The single most common full scenario among simulated seasons where the team makes the title game. */
+export type Likeliest = {
+  /** The team's own conference results, then the results elsewhere that clearly matter now. */
+  picks: { gameId: number; winner: number }[];
+  /** Fraction of all simulated seasons that play out exactly this way (on these games). */
+  share: number;
+  /** "Likeliest way in (4% of simulated seasons): Virginia beats ..., and Duke beats Wake Forest." */
+  line: string;
 };
 
 export type PathTree = {
@@ -107,6 +120,8 @@ export type PathTree = {
   help: HelpGame[];
   /** One line about the help list, covering the games that don't matter. */
   helpNote: string;
+  /** Null when the team is proven in or out, or never made the title game in the sample. */
+  likeliest: Likeliest | null;
 };
 
 const MAX_DEPTH = 12;
@@ -161,12 +176,16 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
   const homeIn = new Float64Array(H * size);
   const awayIn = new Float64Array(H * size);
   let total = 0;
+  const reachedAt = new Uint8Array(sim.iterations);
+  const bucketAt = new Int32Array(sim.iterations);
   sim.forEachIteration((iteration, winnerAt) => {
     let b = 0;
     for (let k = 0; k < depth; k++) if (winnerAt(levels[k].i) !== teamId) b |= 1 << (depth - 1 - k);
     const rand = mulberry32(mix(seed, iteration, 1));
     const [x, y] = championshipFromData(data, conference, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: rand });
     const reached = x === teamId || y === teamId;
+    if (reached) reachedAt[iteration] = 1;
+    bucketAt[iteration] = b;
     count[b]++;
     if (reached) inTitle[b]++;
     for (let h = 0; h < H; h++) {
@@ -287,12 +306,56 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     const hn = sum(homeN, 0, size, off);
     return { hn, hIn: sum(homeIn, 0, size, off), an: total - hn, aIn: sum(awayIn, 0, size, off) };
   }, peaks, minSample, name);
+  for (const h of help) {
+    const proveIf = (p: number | null, winner: number): "in" | "out" | null => {
+      if (p !== 0 && p !== 1) return null;
+      const s = provenStatus(season, conference, teamId, { ...opts.locks, [h.gameId]: winner });
+      return s === "clinched" ? "in" : s === "eliminated" ? "out" : null;
+    };
+    h.ifHomeWins = proveIf(h.oddsIfHomeWins, h.homeId);
+    h.ifAwayWins = proveIf(h.oddsIfAwayWins, h.awayId);
+  }
+
+  // Likeliest way in: the most common (own results + results elsewhere that matter now) among seasons that reach.
+  let likeliest: Likeliest | null = null;
+  if (root.outcome === null && sum(inTitle, 0, size) > 0) {
+    const loud = others.map((o, h) => ({ ...o, h })).filter(({ g }) => help.find((x) => x.gameId === g.id)!.now);
+    const counts = new Map<string, number>();
+    sim.forEachIteration((it, winnerAt) => {
+      if (!reachedAt[it]) return;
+      const key = `${bucketAt[it]}|${loud.map(({ g, i }) => (winnerAt(i) === g.homeId ? 1 : 0)).join("")}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    let best = "";
+    let bestN = 0;
+    for (const [k, n] of counts) if (n > bestN || (n === bestN && k < best)) [best, bestN] = [k, n];
+    if (bestN > 0) {
+      const [b, bits] = best.split("|");
+      const picks: Likeliest["picks"] = [];
+      const own: string[] = [];
+      levels.forEach(({ g }, k) => {
+        const won = ((Number(b) >> (depth - 1 - k)) & 1) === 0;
+        const opp = g.homeId === teamId ? g.awayId : g.homeId;
+        picks.push({ gameId: g.id, winner: won ? teamId : opp });
+        own.push(`${won ? "beats" : "loses to"} ${name(opp)}`);
+      });
+      const elsewhere = loud.map(({ g }, j) => {
+        const w = bits[j] === "1" ? g.homeId : g.awayId;
+        picks.push({ gameId: g.id, winner: w });
+        return `${name(w)} beats ${name(w === g.homeId ? g.awayId : g.homeId)}`;
+      });
+      const share = bestN / total;
+      const parts = [own.length ? `${team} ${list(own)}` : "", elsewhere.length ? list(elsewhere) : ""].filter(Boolean);
+      likeliest = { picks, share, line: `Likeliest way in (${formatOdds(share)} of simulated seasons): ${parts.join("; and ")}.` };
+    }
+  }
 
   return {
     titleGame,
     root,
     footnote: footnote(ownAll.filter(({ g }) => !confGames.has(g)).map(({ g }) => g), ownConf.length - depth, depth, teamId, conference, name),
     help,
+    likeliest,
     helpNote: helpNote(help, root.outcome === "in" ? "clinched" : root.outcome === "out" ? "eliminated" : "open", team, conference),
   };
 }
@@ -327,6 +390,7 @@ function helpGames(
       detail: when(g),
       oddsIfHomeWins, oddsIfAwayWins, swing, now, scenario,
       rooting: from === null ? null : from[0] >= from[1] ? g.homeId : g.awayId,
+      ifHomeWins: null, ifAwayWins: null,
     };
   });
   const order = new Map(games.map((g, h) => [g.id, h]));

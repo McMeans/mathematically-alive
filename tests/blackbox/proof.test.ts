@@ -51,6 +51,13 @@ describe("proven clinch and elimination", () => {
     expect(formatChance(0.42, "alive")).toBe("42%");
   });
 
+  it("help marks the result elsewhere that would knock the team out", () => {
+    const { s, upset1, upset2 } = longshot();
+    const h = pathTree(s, { ...o, teamId: 1, locks: { [upset1.id]: 3 } }).help.find((x) => x.gameId === upset2.id)!;
+    expect(h.ifHomeWins).toBe("out");
+    expect(h.ifAwayWins).toBeNull();
+  });
+
   it("explore gives the same numbers as the separate calls, from one simulation", () => {
     const { s } = longshot();
     const r = explore(s, { ...o, teamId: 3 });

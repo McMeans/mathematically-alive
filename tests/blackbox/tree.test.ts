@@ -383,6 +383,26 @@ describe("help from elsewhere", () => {
     expect(after.rooting).toBe(3);
   });
 
+  it("a result that clinches the team's spot is marked in, one that doesn't prove anything is not", () => {
+    const { s, upset, other } = needsHelp();
+    const h = pathTree(s, { ...base, teamId: 1, locks: { [upset.id]: 1 } }).help.find((x) => x.gameId === other.id)!;
+    expect(h.ifHomeWins).toBe("in");
+    expect(h.ifAwayWins).toBeNull();
+    expect(pathTree(s, { ...base, teamId: 1 }).help[0].ifHomeWins).toBeNull();
+  });
+
+  it("the likeliest way in names the team's results and the results elsewhere it needs", () => {
+    const { s, upset, other } = needsHelp();
+    const t = pathTree(s, { ...base, teamId: 1 });
+    expect(t.likeliest!.picks).toEqual([{ gameId: upset.id, winner: 1 }, { gameId: other.id, winner: 3 }]);
+    expect(t.likeliest!.share).toBeCloseTo(t.titleGame, 10);
+    expect(t.likeliest!.line).toBe(`Likeliest way in (${formatOdds(t.likeliest!.share)} of simulated seasons): Team1 beats Team2; and Team3 beats Team4.`);
+    // Locking it in makes it certain, and a team already in has no "way in" to show.
+    const locked = pathTree(s, { ...base, teamId: 1, locks: { [upset.id]: 1, [other.id]: 3 } });
+    expect(locked.root.verdict).toBe("In");
+    expect(locked.likeliest).toBeNull();
+  });
+
   it("a locked game drops out of the help list", () => {
     const { s, other } = needsHelp();
     const t = pathTree(s, { ...base, teamId: 1, locks: { [other.id]: 3 } });

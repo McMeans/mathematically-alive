@@ -5,6 +5,8 @@ import { oddsTone, type Locks } from "./Explorer";
 
 type Ctx = {
   locks: Locks;
+  /** "gameId:winner" picks of the likeliest way in, to highlight. */
+  way?: Set<string>;
   teamId: number;
   oppOf: (gameId: number) => number;
   onPick: (gameId: number, winner: number | undefined) => void;
@@ -26,7 +28,9 @@ type View = Ctx & {
   toggle: (key: string, n: TreeNode, level: number) => void;
 };
 
-function Branch({ node, ctx, off, path, level }: { node: TreeNode; ctx: View; off: boolean; path: string; level: number }) {
+const onWay = (n: TreeNode, c: Ctx) => n.gameId !== undefined && !!c.way?.has(`${n.gameId}:${winnerOf(n, c)}`);
+
+function Branch({ node, ctx, off, path, level, way }: { node: TreeNode; ctx: View; off: boolean; path: string; level: number; way: boolean }) {
   const hasKids = node.children.length > 0;
   const root = node.gameId === undefined;
   const open = hasKids && ctx.isOpen(path, node, level);
@@ -49,18 +53,18 @@ function Branch({ node, ctx, off, path, level }: { node: TreeNode; ctx: View; of
           <span className="font-display text-xl">{node.verdict}</span>
         </div>
       ) : (
-        <NodePill node={node} ctx={ctx} off={off} leaf={!hasKids} />
+        <NodePill node={node} ctx={ctx} off={off} leaf={!hasKids} way={way} />
       )}
       {hasKids && !open && toggle(`+ ${countLeaves(node)} outcomes`, false)}
       {open && !root && ctx.userOpened(path) && toggle("−", true)}
       {open && (
         <div className={`kids ${node.likely ? "likely" : ""}`}>
           {node.children.map((c) => {
-            const contradicted = c.gameId !== undefined && ctx.locks[c.gameId] !== undefined && !isLocked(c, ctx);
+            // A branch the current lock rules out stays clickable: clicking it switches the lock.
             const key = path + (c.win ? "W" : "L");
             return (
               <div key={key} className={`kid ${c.likely ? "likely" : ""}`}>
-                <Branch node={c} ctx={ctx} off={off || contradicted || c.outcome === "never"} path={key} level={level + 1} />
+                <Branch node={c} ctx={ctx} off={off} path={key} level={level + 1} way={way && onWay(c, ctx)} />
               </div>
             );
           })}
@@ -70,9 +74,9 @@ function Branch({ node, ctx, off, path, level }: { node: TreeNode; ctx: View; of
   );
 }
 
-function NodePill({ node, ctx, off, leaf }: { node: TreeNode; ctx: Ctx; off: boolean; leaf: boolean }) {
+function NodePill({ node, ctx, off, leaf, way }: { node: TreeNode; ctx: Ctx; off: boolean; leaf: boolean; way: boolean }) {
   const locked = isLocked(node, ctx);
-  const border = node.likely ? "border-2 border-turf" : "border border-ink-muted/40";
+  const border = (node.likely ? "border-2 border-turf" : "border border-ink-muted/40") + (way ? " ring-2 ring-marker ring-offset-1" : "");
   const extra = [node.record, node.note].filter(Boolean).join(". ");
   return (
     <button
@@ -102,11 +106,12 @@ function NodePill({ node, ctx, off, leaf }: { node: TreeNode; ctx: Ctx; off: boo
   );
 }
 
-export function TreeView({ tree, locks, teamId, oppOf, onPick }: { tree: PathTree } & Ctx) {
+export function TreeView({ tree, locks, way, teamId, oppOf, onPick }: { tree: PathTree } & Ctx) {
   // Open by default: the first two levels, the most likely path and the locked path. Clicks override.
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
-  const base: Ctx = { locks, teamId, oppOf, onPick };
-  const byDefault = (n: TreeNode, level: number) => level < 2 || n.likely || n.children.some((c) => isLocked(c, base));
+  const base: Ctx = { locks, way, teamId, oppOf, onPick };
+  const byDefault = (n: TreeNode, level: number) =>
+    level < 2 || n.likely || n.children.some((c) => isLocked(c, base) || (!!way && onWay(c, base)));
   const ctx: View = {
     ...base,
     isOpen: (key, n, level) => toggled[key] ?? byDefault(n, level),
@@ -117,7 +122,7 @@ export function TreeView({ tree, locks, teamId, oppOf, onPick }: { tree: PathTre
     <div>
       <div className="tree overflow-x-auto py-4">
         <div className="inline-block min-w-max pr-2">
-          <Branch node={tree.root} ctx={ctx} off={false} path="" level={0} />
+          <Branch node={tree.root} ctx={ctx} off={false} path="" level={0} way={!!way} />
         </div>
       </div>
       <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
@@ -180,7 +185,6 @@ export function Drill({ tree, locks, teamId, oppOf, onPick, onUnlock }: { tree: 
               <button
                 key={c.label}
                 type="button"
-                disabled={c.outcome === "never"}
                 onClick={() => onPick(c.gameId!, winnerOf(c, ctx))}
                 className={`min-h-11 rounded-xl bg-mist p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:opacity-40 ${c.likely ? "border-2 border-turf" : "border border-ink-muted/40"}`}
               >

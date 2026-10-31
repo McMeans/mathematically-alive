@@ -25,4 +25,4 @@ export { explore } from "./explore";
 export type { Exploration } from "./explore";
 export type { KeyGame, PathOptions, PathStatus, TeamPath } from "./paths";
 export { pathTree } from "./tree";
-export type { HelpGame, PathTree, TreeNode, TreeOptions, TreeOutcome } from "./tree";
+export type { HelpGame, Likeliest, PathTree, TreeNode, TreeOptions, TreeOutcome } from "./tree";
