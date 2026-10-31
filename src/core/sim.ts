@@ -96,6 +96,7 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
     conf[i] = g.conferenceGame ? 1 : 0;
     if (g.completed) {
       if (g.homePoints === null || g.awayPoints === null) throw new Error(`completed game ${g.id} has no final score`);
+      if (g.homePoints === g.awayPoints) throw new Error(`completed game ${g.id} ended in a tie`);
       fixed[i] = g.homePoints > g.awayPoints ? 1 : 0;
     }
     else if (locked[i] >= 0) fixed[i] = locked[i];
@@ -121,7 +122,10 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
     const base = it * stride;
     for (let i = 0; i < G; i++) {
       const f = fixed[i];
-      const homeWon = f >= 0 ? f === 1 : rand() < prob[i];
+      // Draw for every game, fixed or not, so a lock changes only its own game
+      // and what-if runs at the same seed stay paired.
+      const r = rand();
+      const homeWon = f >= 0 ? f === 1 : r < prob[i];
       const w = homeWon ? homeIdx[i] : awayIdx[i];
       if (homeWon) bits[base + (i >> 3)] |= 1 << (i & 7);
       wins[w]++;

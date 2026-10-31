@@ -68,6 +68,25 @@ describe("simulateSeason", () => {
     expect(() => simulateSeason(s, { iterations: 1, seed: 1, locks: { [s.games[0].id]: s.games[0].homeId } })).toThrow(/already final/);
   });
 
+  it("rejects a completed game that ended in a tie", () => {
+    const s = tiny();
+    s.games[0] = { ...s.games[0], completed: true, homePoints: 14, awayPoints: 14 };
+    expect(() => simulateSeason(s, { iterations: 1, seed: 1 })).toThrow(/tie/);
+  });
+
+  it("a lock changes only its own game at the same seed", () => {
+    const s = tiny();
+    const g = s.games[0];
+    const free = simulateSeason(s, { iterations: 50, seed: 9 });
+    const locked = simulateSeason(s, { iterations: 50, seed: 9, locks: { [g.id]: g.homeId } });
+    const rows = (r: typeof free) => {
+      const out: number[][] = [];
+      r.forEachIteration((_, winnerOf) => out.push(s.games.slice(1).map((_g, i) => winnerOf(i + 1))));
+      return out;
+    };
+    expect(rows(locked)).toEqual(rows(free));
+  });
+
   it("rejects a completed game with no score", () => {
     const s = tiny();
     s.games[0] = { ...s.games[0], completed: true, homePoints: null, awayPoints: null };
