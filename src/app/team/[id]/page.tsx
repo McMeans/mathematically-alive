@@ -16,9 +16,10 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   const outlook = baseOutlook.teams.find((o) => o.teamId === teamId)!;
 
   const names = Object.fromEntries(season.teams.map((t) => [t.id, t.name]));
-  const wanted = new Set(path.keyGames.map((k) => k.gameId));
+  // Every unplayed ACC game, plus the team's own: what-if runs can surface any of them as a key game.
+  const acc = new Set(accTeams.map((t) => t.id));
   const games: GameInfo[] = season.games
-    .filter((g) => !g.completed && (wanted.has(g.id) || g.homeId === teamId || g.awayId === teamId))
+    .filter((g) => !g.completed && ((g.conferenceGame && acc.has(g.homeId) && acc.has(g.awayId)) || g.homeId === teamId || g.awayId === teamId))
     .map((g) => ({ id: g.id, homeId: g.homeId, awayId: g.awayId, week: g.week, start: g.start }));
 
   return (
