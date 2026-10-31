@@ -3,7 +3,7 @@
 // Makes 4 API calls per run.
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { seasonFromCfbd, type CfbdSnapshot } from "../src/core";
+import type { CfbdSnapshot } from "../src/core";
 
 const API = "https://api.collegefootballdata.com";
 
@@ -25,13 +25,12 @@ async function main() {
     get<CfbdSnapshot["ratings"]>(`ratings/sp?year=${year}`),
   ]);
 
-  const season = seasonFromCfbd({ year, fetchedAt: new Date().toISOString(), teams, games, lines, ratings });
+  const season: CfbdSnapshot = { year, fetchedAt: new Date().toISOString(), teams, games, lines, ratings };
   const out = path.join("data", `season-${year}.json`);
   await mkdir("data", { recursive: true });
   await writeFile(out, JSON.stringify(season));
 
-  const done = season.games.filter((g) => g.completed).length;
-  console.log(`${out}: ${season.teams.length} teams, ${season.games.length} games (${done} completed)`);
+  console.log(`${out}: ${teams.length} teams, ${games.length} games (raw CFBD snapshot)`);
 }
 
 main().catch((err) => {
