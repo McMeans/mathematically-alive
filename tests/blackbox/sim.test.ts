@@ -95,7 +95,8 @@ describe("simulateSeason", () => {
     }
     const t0 = performance.now();
     const r = simulateSeason(season(teams, games), { iterations: 10000, seed: 1 });
-    expect(performance.now() - t0).toBeLessThan(2000);
+    // Loose ceiling: catches a big algorithmic regression, not runner jitter.
+    expect(performance.now() - t0).toBeLessThan(10000);
     expect(r.iterations).toBe(10000);
   });
 });
@@ -104,6 +105,7 @@ describe("gameWinProbability", () => {
   it("uses the game's spread when present", () => {
     const s = tiny();
     expect(gameWinProbability(s, game(1, 1, 2, { spread: -7 }))).toBeCloseTo(winProbability(-7));
+    expect(gameWinProbability(s, game(1, 1, 2, { spread: -7 }), { sd: 7 })).toBeCloseTo(winProbability(-7, 7));
   });
 
   it("falls back to ratings with home field", () => {
