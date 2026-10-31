@@ -62,6 +62,24 @@ describe("simulateSeason", () => {
     }
   });
 
+  it("keeps a single game's odds what the spread says", () => {
+    const s = season([team(1), team(2)], [game(10, 1, 2, { spread: -7 })]);
+    const r = simulateSeason(s, { iterations: 40000, seed: 3 });
+    expect(r.teams[1].expectedWins).toBeCloseTo(winProbability(-7), 2);
+  });
+
+  it("spreads a team's win totals wider than independent coin flips, since its rating is uncertain", () => {
+    const opponents = Array.from({ length: 10 }, (_, k) => team(k + 2));
+    const s = season([team(1), ...opponents], opponents.map((o, k) => game(20 + k, 1, o.id, { spread: 0, neutralSite: true })));
+    const r = simulateSeason(s, { iterations: 20000, seed: 4 });
+    const dist = r.teams[1].winDistribution;
+    const mean = dist.reduce((a, n, w) => a + n * w, 0) / 20000;
+    const variance = dist.reduce((a, n, w) => a + n * (w - mean) ** 2, 0) / 20000;
+    expect(mean).toBeCloseTo(5, 1);
+    // Ten independent 50/50 games give a variance of 2.5.
+    expect(variance).toBeGreaterThan(3);
+  });
+
   it("rejects a lock on a game that is already final", () => {
     const s = tiny();
     s.games[0] = { ...s.games[0], completed: true, homePoints: 10, awayPoints: 20 };

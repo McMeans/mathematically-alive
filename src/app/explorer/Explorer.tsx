@@ -1,11 +1,11 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatOdds, type HelpGame, type PathTree, type TeamOutlook, type TeamPath } from "@/core";
+import { formatOdds, type PathTree, type TeamOutlook, type TeamPath } from "@/core";
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
 import { Logo } from "@/app/Logo";
-import { HelpList } from "./HelpList";
-import { Drill, TreeView } from "./Tree";
-import { Stats, StatTiles, TeamList } from "./Panels";
+import { WayCard } from "./WayIn";
+import { SeasonWeeks, WhatIf } from "./Season";
+import { StatTiles, TeamList } from "./Panels";
 
 export type GameInfo = { id: number; homeId: number; awayId: number; week: number; start: string };
 export type TeamInfo = { id: number; name: string; color: string | null; altColor: string | null };
@@ -16,10 +16,6 @@ type Props = {
   teamId: number;
   teams: TeamInfo[];
   names: Record<number, string>;
-  /** The team's own unplayed games. */
-  own: GameInfo[];
-  /** Every other remaining conference game, by kickoff, from the run with no locks; HelpList picks the ones that matter. */
-  help: HelpGame[];
   asOf: string;
   initial: Result;
 };
@@ -28,7 +24,7 @@ export const NAVY = "#14213D";
 export const pct = (p: number | null) => (p === null ? "—" : formatOdds(p));
 export const oddsTone = (p: number | null) => (p === null ? "text-navy" : p >= 0.5 ? "text-turf" : p < 0.1 ? "text-marker-text" : "text-navy");
 
-export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Props) {
+export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
   const [locks, setLocks] = useState<Locks>({});
   const [result, setResult] = useState<Result>(initial);
   const [busy, setBusy] = useState(false);
@@ -93,10 +89,6 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
   const { outlook, path, tree } = result;
   const me = outlook.find((o) => o.teamId === teamId)!;
   const team = teams.find((t) => t.id === teamId)!;
-  const oppOf = (gameId: number) => {
-    const g = own.find((x) => x.id === gameId)!;
-    return g.homeId === teamId ? g.awayId : g.homeId;
-  };
   // Row order is fixed by the no-lock odds so rows don't jump when a lock changes the numbers.
   const order = useMemo(() => {
     const rank = new Map(initial.outlook.map((o) => [o.teamId, o.titleGame]));
@@ -104,6 +96,8 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
   }, [initial, teams]);
   const hasLocks = Object.keys(locks).length > 0;
   const likeliest = tree.likeliest;
+  // Outline only what the card names: the team's own results and the non-favorites it needs.
+  const likely = useMemo(() => new Map((likeliest?.named ?? []).map((p) => [p.gameId, p.winner])), [likeliest]);
   const wayOn = wayPicks !== null && wayPicks.every((p) => locks[p.gameId] === p.winner);
   function toggleWay() {
     if (wayOn) {
@@ -116,9 +110,6 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
       update({ ...locks, ...Object.fromEntries(likeliest.picks.map((p) => [p.gameId, p.winner])) });
     }
   }
-  // Settled In or Out by the team's own results: nothing elsewhere can change it (unless a help game is locked, so it can be undone).
-  const ownIds = new Set(own.map((g) => g.id));
-  const showHelp = tree.root.outcome === null || Object.keys(locks).some((id) => !ownIds.has(Number(id)));
   const status = busy ? "Updating…" : failed ? "Couldn’t update. Showing the last result." : "";
 
   const list = (
@@ -184,8 +175,7 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
           {going !== null && <Loading name={teams.find((t) => t.id === going)?.name} />}
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="font-display text-xl font-bold">
-              <span className="hidden md:inline">Paths to the title game</span>
-              <span className="md:hidden">Path to the title game</span>
+              Play out the season
             </h2>
             <div className="flex items-center gap-3">
               <span role="status" className={`text-xs ${failed ? "text-marker-text" : "text-ink-muted"}`}>{status}</span>
@@ -205,36 +195,31 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
               onClick={toggleWay}
               className="min-h-11 rounded-full border border-marker px-3 text-sm font-bold text-marker-text disabled:opacity-40 aria-pressed:bg-marker aria-pressed:text-white md:min-h-8"
             >
-              Likeliest way in
+              Fill in the likeliest way
             </button>
           </div>
-          {!wayOn && likeliest && <p className="mt-1 text-xs text-ink-muted">{likeliest.line}</p>}
+          {!wayOn && likeliest && <WayCard way={likeliest} teamName={team.name} />}
 
           <div className={`transition-opacity ${busy ? "opacity-70" : ""}`}>
-            <div className="hidden md:block">
-              <p className="text-sm text-ink-muted">Click a branch to lock it</p>
-              <TreeView tree={tree} locks={locks} teamId={teamId} oppOf={oppOf} onPick={pick} />
-            </div>
-            <div className="md:hidden">
-              <Drill tree={tree} locks={locks} teamId={teamId} oppOf={oppOf} onPick={pick} onUnlock={(ids) => {
-                const next = { ...locks };
-                for (const id of ids) delete next[id];
-                update(next);
-              }} />
-            </div>
-
-            {showHelp && (
-              <>
-                <h2 className="mt-8 font-display text-xl font-bold">Help from elsewhere</h2>
-                <HelpList help={help} base={initial.tree} live={tree} names={names} locks={locks} onPick={pick} />
-              </>
-            )}
+            <SeasonWeeks weeks={tree.weeks} base={initial.tree.weeks} teamId={teamId} locks={locks} likely={likely} onPick={pick} />
+            {tree.footnote && <p className="mt-2 text-xs text-ink-muted">{tree.footnote}</p>}
           </div>
         </main>
 
         <aside aria-label="Summary" aria-busy={going !== null} className={`relative hidden border-l border-ink-muted/25 p-6 md:block ${busy ? "opacity-70" : ""}`}>
           {going !== null && <Loading />}
-          <Stats team={team} outlook={outlook} me={me} path={path} teamId={teamId} own={own} names={names} />
+          <WhatIf
+            team={team}
+            me={me}
+            outlook={outlook}
+            today={initial.outlook.find((o) => o.teamId === teamId)!.titleGame}
+            locks={locks}
+            weeks={tree.weeks}
+            names={names}
+            teamId={teamId}
+            onPick={pick}
+            onReset={() => update({})}
+          />
         </aside>
       </div>
     </div>

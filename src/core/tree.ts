@@ -13,11 +13,12 @@
 //
 // Uses the same simulated seasons and title-game draw as teamPath, so the root
 // odds equal teamPath's titleGame for the same seed and locks.
-import { formatOdds, type PathOptions } from "./paths";
+import { formatFine, formatOdds, type PathOptions } from "./paths";
 import { teamRecord } from "./season";
 import type { Game, Season } from "./season";
 import { OVERALL, SCENARIO, isClear } from "./signal";
-import { mix, mulberry32, simulateSeason, type SimResult } from "./sim";
+import { gameWinProbability, mix, mulberry32, simulateSeason, type SimResult } from "./sim";
+import { likeliestWayIn, type WayIn } from "./likeliest";
 import { provenStatus } from "./proof";
 import { championshipFromData, conferenceData } from "./tiebreak";
 
@@ -98,18 +99,119 @@ export type HelpGame = {
   ifAwayWins: "in" | "out" | null;
 };
 
-/** The single most common full scenario among simulated seasons where the team makes the title game. */
+/**
+ * The most probable combination of remaining conference results that puts the team in the title game,
+ * found exactly (not sampled), keeping only the results its spot depends on.
+ */
 export type Likeliest = {
-  /** The team's own conference results, then the likelier result of each game elsewhere that still matters once those are set. */
+  /** The team's own results first, then results elsewhere; every one is needed given the others. */
   picks: { gameId: number; winner: number }[];
-  /** Fraction of all simulated seasons that play out this way on the picked games and get the team in. */
-  share: number;
-  /** "Likeliest way in (4% of simulated seasons get in this way): Virginia beats ..., and Duke beats Wake Forest." */
+  /** The picks the card names: the team's own results and the non-favorites elsewhere (not favorites winning). */
+  named: { gameId: number; winner: number }[];
+  /** Chance every picked result happens: their game odds multiplied. */
+  chance: number;
+  /** Picked results that go against the likelier side. */
+  upsets: number;
+  /** True when every way in needs the team to win a ranking or draw tiebreak step. */
+  needsTiebreak: boolean;
+  /** "Likeliest way in (4% chance): Virginia beats Duke; and Miami beats Pitt." */
   line: string;
+  /** The same, in parts for a card. "4% chance". */
+  heading: string;
+  /** The team's own results: "Beat Duke", "Lose to Miami". */
+  own: string[];
+  /** Results elsewhere that aren't the favorite winning: "Miami over Pitt". */
+  needs: string[];
+  /** "Favorites win the other 11 games it needs", or null. */
+  favorites: string | null;
+  /** "Virginia also has to win the ranking tiebreak.", or null. */
+  note: string | null;
+  /** The team's part: "Win all 4 left", "Win 3 of 4 left". */
+  ownJob: string;
+  /** Chance the team gets its own results in the picks. */
+  ownChance: number;
+  /** Teams the picks need to lose a game they're favored in, most losses first. */
+  rivals: Rival[];
+  /** The picks by week, in order, with the team's odds once each week goes this way. */
+  weeks: WayWeek[];
+};
+
+export type Rival = {
+  teamId: number;
+  team: string;
+  /** Losses the picks give it, out of `left` games still to play (not counting the team's own game with it). */
+  needs: number;
+  left: number;
+  /** "2 of 4" */
+  line: string;
+  /** Its games left: the opponent and the chance of that upset (the rival losing). */
+  games: { opponent: string; chance: number }[];
+  /** Chance it loses at least `needs` of them. */
+  chance: number;
+};
+
+export type WayWeek = {
+  /** "Nov 7" */
+  label: string;
+  /** The team's own pick that week, "Beat Clemson", or null. */
+  own: string | null;
+  /** Named results elsewhere that week (not a favorite winning), with their chances. */
+  root: { what: string; chance: number }[];
+  /** "Favorites win 2 others", or null. */
+  favorites: string | null;
+  /** Team's odds once every pick through this week happens; null when too few simulated seasons go this way. */
+  after: number | null;
+  /** `after` for display: "In", "12%", "<1%", or "—" when unknown. */
+  afterLabel: string;
+};
+
+export type Impact = "big" | "some" | "small";
+// Impact is the gap between the two sides' odds, relative to the team's odds now (floored at 2%, so a
+// long shot's noise doesn't read as big): at least half of it is big, a fifth some, anything else small.
+const IMPACT_FLOOR = 0.02;
+const BIG = 0.5;
+const SOME = 0.2;
+
+/** One week of the rest of the season, for picking results week by week. */
+export type SeasonWeek = {
+  week: number;
+  /** "Nov 7": the team's game that week, else the first game. */
+  label: string;
+  /** The team's own conference game that week, with its odds if it wins or loses; null on a bye. */
+  own: {
+    gameId: number;
+    opponentId: number;
+    opponent: string;
+    site: "home" | "away" | "neutral";
+    oddsIfWin: number | null;
+    oddsIfLose: number | null;
+    /** For display: "In", "Out", "12%", "0.4%", or "—" when too few simulated seasons go that way. A locked game's other side is worked out by itself. */
+    ifWin: string;
+    ifLose: string;
+  } | null;
+  /**
+   * Every game elsewhere that week: locked ones first, then those that matter, then the rest, biggest swing first.
+   * `ifHome`/`ifAway`: the team's odds if that side wins, for display.
+   */
+  games: {
+    gameId: number; homeId: number; awayId: number; home: string; away: string; ifHome: string; ifAway: string; swing: number;
+    /** The winner the likeliest way in names here, when that side is also the one that helps the team more; else null. */
+    likely: number | null;
+    /** Locked, changes the team's odds (now or in a scenario), or needed by the likeliest way in. */
+    matters: boolean;
+    /** The side whose win raises the team's odds, or null when it can't be told (or it's locked). */
+    helps: number | null;
+    /** How much picking `helps` moves the team's odds, relative to its odds now: "big", "some", "small", or null. */
+    impact: Impact | null;
+  }[];
+  /** Games elsewhere that week that don't change the team's odds. */
+  quiet: number;
 };
 
 export type PathTree = {
   titleGame: number;
+  /** The rest of the season by week. */
+  weeks: SeasonWeek[];
   root: TreeNode;
   /** Names the team's remaining games that aren't in the tree and why; null when the tree covers them all. */
   footnote: string | null;
@@ -120,11 +222,15 @@ export type PathTree = {
   help: HelpGame[];
   /** One line about the help list, covering the games that don't matter. */
   helpNote: string;
-  /** Null when the team is proven in or out, or never made the title game in the sample. */
+  /** Null when the team is proven in or out, or no combination of results gets it in. */
   likeliest: Likeliest | null;
 };
 
 const MAX_DEPTH = 12;
+const NODE_PROOF_BUDGET = 5_000;
+// Odds for the other side of a locked game: a small simulation each, for at most this many games per call.
+const SWAP_ITERATIONS = 2_000;
+const MAX_SWAP_SIMS = 12;
 const DATE_FORMAT = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
 
 const when = (g: Game): string => {
@@ -177,15 +283,13 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
   const awayIn = new Float64Array(H * size);
   let total = 0;
   const reachedAt = new Uint8Array(sim.iterations);
-  const bucketAt = new Int32Array(sim.iterations);
-  sim.forEachIteration((iteration, winnerAt) => {
+  sim.forEachIteration((iteration, winnerAt, teams) => {
     let b = 0;
     for (let k = 0; k < depth; k++) if (winnerAt(levels[k].i) !== teamId) b |= 1 << (depth - 1 - k);
     const rand = mulberry32(mix(seed, iteration, 1));
-    const [x, y] = championshipFromData(data, conference, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: rand });
+    const [x, y] = championshipFromData(data, conference, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: rand, rank: teams.rank });
     const reached = x === teamId || y === teamId;
     if (reached) reachedAt[iteration] = 1;
-    bucketAt[iteration] = b;
     count[b]++;
     if (reached) inTitle[b]++;
     for (let h = 0; h < H; h++) {
@@ -249,7 +353,8 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     const stop = (outcome: TreeOutcome, verdict: string, note: string): TreeNode => ({ ...node, outcome, verdict, note, rest });
     if (node.reach === 0) return stop("never", "—", "A locked result rules this out.");
     if (node.odds === null) return level === 0 ? node : stop("rare", "Rare", "Too few simulated seasons go this way to put odds on it.");
-    const proof = node.odds === 1 || node.odds === 0 ? provenStatus(season, conference, teamId, prefixLocks(path)) : "open";
+    // Deeper nodes get a smaller proof budget: there are many of them. One that runs out shows odds, not "Out".
+    const proof = node.odds === 1 || node.odds === 0 ? provenStatus(season, conference, teamId, prefixLocks(path), level === 0 ? undefined : NODE_PROOF_BUDGET) : "open";
     if (proof === "open" && node.odds === 1) return { ...node, verdict: ">99%" };
     if (proof === "open" && node.odds === 0) return { ...node, verdict: "<1%" };
     if (node.odds === 1) return stop("in", "In", `In the title game whatever else happens.${left}`);
@@ -317,53 +422,143 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     h.ifAwayWins = proveIf(h.oddsIfAwayWins, h.awayId);
   }
 
-  // Likeliest way in: the team's most common own results among seasons that reach, then, for each
-  // game elsewhere that still clearly matters given those results, the side that wins more often in them.
+  // Likeliest way in: the most probable combination of remaining results that gets the team in,
+  // found exactly, trimmed to the results its spot depends on. Own games first, then the rest by importance.
   let likeliest: Likeliest | null = null;
-  if (root.outcome === null && sum(inTitle, 0, size) > 0) {
-    const byBucket = new Map<number, number>();
-    sim.forEachIteration((it) => {
-      if (reachedAt[it]) byBucket.set(bucketAt[it], (byBucket.get(bucketAt[it]) ?? 0) + 1);
-    });
-    let bucket = -1;
-    let bucketN = 0;
-    for (const [k, n] of byBucket) if (n > bucketN || (n === bucketN && k < bucket)) [bucket, bucketN] = [k, n];
-    const needed = others.filter((_, h) => {
-      const hn = homeN[h * size + bucket];
-      const an = count[bucket] - hn;
-      return hn >= minSample && an >= minSample && isClear(hn, homeIn[h * size + bucket], an, awayIn[h * size + bucket], SCENARIO);
-    });
-    const homeWins = new Array<number>(needed.length).fill(0);
-    sim.forEachIteration((it, winnerAt) => {
-      if (!reachedAt[it] || bucketAt[it] !== bucket) return;
-      needed.forEach(({ g, i }, j) => { if (winnerAt(i) === g.homeId) homeWins[j]++; });
-    });
-    const homeWon = homeWins.map((n) => n * 2 >= bucketN);
-    let bestN = 0;
-    sim.forEachIteration((it, winnerAt) => {
-      if (reachedAt[it] && bucketAt[it] === bucket && needed.every(({ g, i }, j) => (winnerAt(i) === g.homeId) === homeWon[j])) bestN++;
-    });
-    const picks: Likeliest["picks"] = [];
-    const own: string[] = [];
-    levels.forEach(({ g }, k) => {
-      const won = ((bucket >> (depth - 1 - k)) & 1) === 0;
-      const opp = g.homeId === teamId ? g.awayId : g.homeId;
-      picks.push({ gameId: g.id, winner: won ? teamId : opp });
-      own.push(`${won ? "beats" : "loses to"} ${name(opp)}`);
-    });
-    const elsewhere = needed.map(({ g }, j) => {
-      const w = homeWon[j] ? g.homeId : g.awayId;
-      picks.push({ gameId: g.id, winner: w });
-      return `${name(w)} beats ${name(w === g.homeId ? g.awayId : g.homeId)}`;
-    });
-    const share = bestN / total;
-    const parts = [own.length ? `${team} ${list(own)}` : "", elsewhere.length ? list(elsewhere) : ""].filter(Boolean);
-    likeliest = { picks, share, line: `Likeliest way in (${formatOdds(share)} of simulated seasons get in this way): ${parts.join("; and ")}.` };
+  if (root.outcome === null) {
+    const unlocked = (g: Game) => !(opts.locks && g.id in opts.locks);
+    const choices = [
+      ...ownConf.filter(({ g }) => unlocked(g)).map(({ g }) => g),
+      ...help.map((h) => others.find(({ g }) => g.id === h.gameId)!.g),
+    ].map((g) => ({ g, pHome: gameWinProbability(season, g) }));
+    const way = likeliestWayIn(data, conference, teamId, opts.locks ?? {}, choices);
+    if (way) {
+      // Name the team's own results and the upsets elsewhere; favorites winning elsewhere are counted.
+      const own: string[] = [];
+      const elsewhere: string[] = [];
+      const ownItems: string[] = [];
+      const needs: string[] = [];
+      let favorites = 0;
+      const named: Likeliest["picks"] = [];
+      const pHome = new Map(choices.map(({ g, pHome }) => [g.id, pHome]));
+      for (const { gameId, winner } of way.picks) {
+        const g = season.games.find((x) => x.id === gameId)!;
+        const loser = winner === g.homeId ? g.awayId : g.homeId;
+        const p = winner === g.homeId ? pHome.get(gameId)! : 1 - pHome.get(gameId)!;
+        if (winner === teamId) { own.push(`beats ${name(loser)}`); ownItems.push(`Beat ${name(loser)}`); }
+        else if (loser === teamId) { own.push(`loses to ${name(winner)}`); ownItems.push(`Lose to ${name(winner)}`); }
+        // A toss-up is named too (1e-9 absorbs the normal approximation's error at a spread of 0).
+        else if (p < 0.5 + 1e-9) { elsewhere.push(`${name(winner)} beats ${name(loser)}`); needs.push(`${name(winner)} over ${name(loser)}`); }
+        else { favorites++; continue; }
+        named.push({ gameId, winner });
+      }
+      if (favorites > 0) elsewhere.push(elsewhere.length ? `the favorites win ${favorites} other game${favorites === 1 ? "" : "s"}` : `the favorites win ${favorites} game${favorites === 1 ? "" : "s"} elsewhere`);
+      const parts = [own.length ? `${team} ${list(own)}` : "", elsewhere.length ? list(elsewhere) : ""].filter(Boolean);
+      const what = parts.length ? parts.join("; and ") : `${team} needs nothing more`;
+      const extra = [
+        way.needsTiebreak ? ` ${team} also has to win the ranking tiebreak.` : "",
+      ].join("");
+      likeliest = {
+        picks: way.picks,
+        named,
+        chance: way.chance,
+        upsets: way.upsets,
+        needsTiebreak: way.needsTiebreak,
+        line: `Likeliest way in (${formatOdds(way.chance)} chance): ${what}.${extra}`,
+        heading: `${formatOdds(way.chance)} chance`,
+        own: ownItems,
+        needs,
+        favorites: favorites > 0 ? `Favorites win the other ${favorites} game${favorites === 1 ? "" : "s"} it needs` : null,
+        note: way.needsTiebreak ? `${team} also has to win the ranking tiebreak.` : null,
+        ...wayParts(way, choices, teamId, name, sim, reachedAt, minSample, gameIndex),
+      };
+    }
   }
+
+  // The season week by week: the team's own game with its odds either way, and the games elsewhere that matter.
+  // A locked game's other side: the sample can't say (every season has the lock), so prove it, else run a small simulation.
+  let swapSims = 0;
+  const swapped = (gameId: number, winner: number): string => {
+    const swap = { ...opts.locks, [gameId]: winner };
+    const s = provenStatus(season, conference, teamId, swap, NODE_PROOF_BUDGET);
+    if (s === "clinched") return "In";
+    if (s === "eliminated") return "Out";
+    if (swapSims++ >= MAX_SWAP_SIMS) return "—";
+    const n = Math.min(SWAP_ITERATIONS, iterations);
+    let hit = 0;
+    simulateSeason(season, { iterations: n, seed, locks: swap }).forEachIteration((it, winnerAt, teams) => {
+      const [x, y] = championshipFromData(data, conference, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: mulberry32(mix(seed, it, 1)), rank: teams.rank });
+      if (x === teamId || y === teamId) hit++;
+    });
+    return hit === 0 ? "<0.1%" : hit === n ? ">99%" : formatFine(hit / n);
+  };
+  const proofOf = (gameId: number, winner: number) => provenStatus(season, conference, teamId, { ...opts.locks, [gameId]: winner });
+  const verdict = (odds: number | null, gameId: number, winner: number): string => {
+    if (odds === 1 || odds === 0) {
+      const s = proofOf(gameId, winner);
+      if (s === "clinched") return "In";
+      if (s === "eliminated") return "Out";
+      // Not proven: never shown as a flat 0% or 100%.
+      return odds === 0 ? "<0.1%" : ">99%";
+    }
+    return odds === null ? "—" : formatFine(odds);
+  };
+  // Games the likeliest way in needs show in their week even when the sample is too thin to flag them.
+  const likelyIds = new Set((likeliest?.picks ?? []).map((p) => p.gameId));
+  const namedWinner = new Map((likeliest?.named ?? []).map((p) => [p.gameId, p.winner]));
+  const helpById = new Map(help.map((h) => [h.gameId, h]));
+  const byWeek = new Map<number, SeasonWeek>();
+  const weekOf = (g: Game): SeasonWeek => {
+    let w = byWeek.get(g.week);
+    if (!w) byWeek.set(g.week, (w = { week: g.week, label: when(g), own: null, games: [], quiet: 0 }));
+    return w;
+  };
+  levels.forEach(({ g }, k) => {
+    const w = weekOf(g);
+    const opp = g.homeId === teamId ? g.awayId : g.homeId;
+    const bit = 1 << (depth - 1 - k);
+    let winN = 0, winIn = 0, loseN = 0, loseIn = 0;
+    for (let b = 0; b < size; b++) {
+      if (b & bit) { loseN += count[b]; loseIn += inTitle[b]; }
+      else { winN += count[b]; winIn += inTitle[b]; }
+    }
+    const oddsIfWin = winN >= minSample ? winIn / winN : null;
+    const oddsIfLose = loseN >= minSample ? loseIn / loseN : null;
+    const lockedTo = opts.locks?.[g.id];
+    w.label = when(g);
+    w.own = {
+      gameId: g.id, opponentId: opp, opponent: name(opp), site: g.neutralSite ? "neutral" : g.homeId === teamId ? "home" : "away",
+      oddsIfWin, oddsIfLose,
+      ifWin: lockedTo === opp ? swapped(g.id, teamId) : verdict(oddsIfWin, g.id, teamId),
+      ifLose: lockedTo === teamId ? swapped(g.id, opp) : verdict(oddsIfLose, g.id, opp),
+    };
+  });
+  for (const g of data.games) {
+    if (g.completed || g.homeId === teamId || g.awayId === teamId) continue;
+    const w = weekOf(g);
+    const locked = opts.locks?.[g.id];
+    const h = helpById.get(g.id);
+    if (locked !== undefined) {
+      const mine = root.outcome === "in" ? "In" : root.outcome === "out" ? "Out" : formatFine(titleGame);
+      w.games.push({ gameId: g.id, homeId: g.homeId, awayId: g.awayId, home: name(g.homeId), away: name(g.awayId),
+        ifHome: locked === g.homeId ? mine : swapped(g.id, g.homeId), ifAway: locked === g.awayId ? mine : swapped(g.id, g.awayId), swing: Infinity, likely: null, matters: true, helps: null, impact: null });
+    } else if (h) {
+      const side = (odds: number | null, proof: "in" | "out" | null) =>
+        proof === "in" ? "In" : proof === "out" ? "Out" : odds === null ? "—" : odds === 0 ? "<0.1%" : odds === 1 ? ">99%" : formatFine(odds);
+      const matters = h.now || h.scenario !== null || likelyIds.has(g.id);
+      if (!matters) w.quiet++;
+      w.games.push({ gameId: g.id, homeId: g.homeId, awayId: g.awayId, home: name(g.homeId), away: name(g.awayId),
+        ifHome: side(h.oddsIfHomeWins, h.ifHomeWins), ifAway: side(h.oddsIfAwayWins, h.ifAwayWins), swing: h.swing,
+        likely: likelySide(namedWinner.get(g.id), g, h), matters, ...helpsSide(g, h, titleGame) });
+    }
+  }
+  for (const w of byWeek.values()) w.games.sort((a, b) => Number(b.matters) - Number(a.matters) || b.swing - a.swing || a.gameId - b.gameId);
+  const weeks = [...byWeek.values()].sort((a, b) => a.week - b.week);
 
   return {
     titleGame,
     root,
+    weeks,
     footnote: footnote(ownAll.filter(({ g }) => !confGames.has(g)).map(({ g }) => g), ownConf.length - depth, depth, teamId, conference, name),
     help,
     likeliest,
@@ -409,6 +604,111 @@ function helpGames(
   return help.sort((x, y) => tier(x) - tier(y) || weight(y) - weight(x) || order.get(x.gameId)! - order.get(y.gameId)!);
 }
 
+/** The card's breakdown of a way in: the team's own job, rival loss counts, and a week-by-week script. */
+function wayParts(
+  way: WayIn,
+  choices: { g: Game; pHome: number }[],
+  teamId: number,
+  name: (id: number) => string,
+  sim: SimResult,
+  reachedAt: Uint8Array,
+  minSample: number,
+  gameIndex: Map<number, number>,
+): Pick<Likeliest, "ownJob" | "ownChance" | "rivals" | "weeks"> {
+  const byId = new Map(choices.map((c) => [c.g.id, c]));
+  const chanceOf = (gameId: number, winner: number) => {
+    const { g, pHome } = byId.get(gameId)!;
+    return winner === g.homeId ? pHome : 1 - pHome;
+  };
+  const picks = way.picks.map((p) => ({ ...p, g: byId.get(p.gameId)!.g, i: gameIndex.get(p.gameId)!, p: chanceOf(p.gameId, p.winner) }));
+  const loserOf = (x: (typeof picks)[number]) => (x.winner === x.g.homeId ? x.g.awayId : x.g.homeId);
+  const isOwn = (g: Game) => g.homeId === teamId || g.awayId === teamId;
+
+  const ownLeft = choices.filter(({ g }) => isOwn(g)).length;
+  const ownPicks = picks.filter((x) => isOwn(x.g));
+  const ownWins = ownPicks.filter((x) => x.winner === teamId).length;
+  const ownJob = ownPicks.length === 0
+    ? "Its own results don't matter on this way in"
+    : ownWins === ownLeft ? (ownLeft === 1 ? "Win its last game" : `Win all ${ownLeft} left`) : `Win ${ownWins} of ${ownLeft} left`;
+  const ownChance = ownPicks.reduce((a, x) => a * x.p, 1);
+
+  // Rivals: teams the picks need to lose at least one game they're favored in. Count every loss the picks give them.
+  const losses = new Map<number, number>();
+  const upset = new Set<number>();
+  for (const x of picks) {
+    if (isOwn(x.g)) continue;
+    losses.set(loserOf(x), (losses.get(loserOf(x)) ?? 0) + 1);
+    if (x.p < 0.5 + 1e-9) upset.add(loserOf(x));
+  }
+  const rivals: Rival[] = [...losses].filter(([id]) => upset.has(id)).map(([id, needs]) => {
+    const games = choices
+      .filter(({ g }) => !isOwn(g) && (g.homeId === id || g.awayId === id))
+      .map(({ g }) => ({ opponent: name(g.homeId === id ? g.awayId : g.homeId), chance: chanceOf(g.id, g.homeId === id ? g.awayId : g.homeId) }));
+    // Chance of at least `needs` losses: dist[k] = chance of exactly k so far.
+    let dist = [1];
+    for (const { chance } of games) {
+      const next = new Array<number>(dist.length + 1).fill(0);
+      dist.forEach((q, k) => { next[k] += q * (1 - chance); next[k + 1] += q * chance; });
+      dist = next;
+    }
+    const chance = dist.slice(needs).reduce((a, q) => a + q, 0);
+    return { teamId: id, team: name(id), needs, left: games.length, line: `${needs} of ${games.length}`, games, chance };
+  }).sort((a, b) => b.needs - a.needs || a.chance - b.chance || a.team.localeCompare(b.team));
+
+  // Weeks in kickoff order; each holds the picks played that week.
+  const weekOf = new Map<number, typeof picks>();
+  for (const x of [...picks].sort((a, b) => (Date.parse(a.g.start) || 0) - (Date.parse(b.g.start) || 0) || a.g.week - b.g.week)) {
+    const list = weekOf.get(x.g.week) ?? [];
+    list.push(x);
+    weekOf.set(x.g.week, list);
+  }
+  const groups = [...weekOf.values()];
+  // Odds after each week: among simulated seasons matching every pick through it, the share that get in.
+  const n = new Float64Array(groups.length);
+  const hit = new Float64Array(groups.length);
+  sim.forEachIteration((it, winnerAt) => {
+    for (let w = 0; w < groups.length; w++) {
+      if (!groups[w].every((x) => winnerAt(x.i) === x.winner)) break;
+      n[w]++;
+      if (reachedAt[it]) hit[w]++;
+    }
+  });
+  const weeks: WayWeek[] = groups.map((list, w) => {
+    const own = list.find((x) => isOwn(x.g));
+    const rest = list.filter((x) => !isOwn(x.g));
+    const named = rest.filter((x) => x.p < 0.5 + 1e-9);
+    const fav = rest.length - named.length;
+    const last = w === groups.length - 1;
+    const after = last && !way.needsTiebreak ? 1 : n[w] >= minSample ? hit[w] / n[w] : null;
+    return {
+      label: when((own ?? list[0]).g),
+      own: own ? (own.winner === teamId ? `Beat ${name(loserOf(own))}` : `Lose to ${name(own.winner)}`) : null,
+      root: named.map((x) => ({ what: `${name(x.winner)} over ${name(loserOf(x))}`, chance: x.p })),
+      favorites: fav > 0 ? `Favorites win ${fav === 1 ? "1 other" : `${fav} others`}` : null,
+      after,
+      afterLabel: after === null ? "—" : after === 1 ? "In" : after === 0 ? "<1%" : formatOdds(after),
+    };
+  });
+  return { ownJob, ownChance, rivals, weeks };
+}
+
+/** Which side of a game elsewhere helps the team, and how much. Nothing when the sample can't say or the gap is noise. */
+function helpsSide(g: Game, h: HelpGame, now: number): { helps: number | null; impact: Impact | null } {
+  const a = h.oddsIfHomeWins;
+  const b = h.oddsIfAwayWins;
+  if (a === null || b === null || a === b || (!h.now && !h.scenario)) return { helps: null, impact: null };
+  const rel = Math.abs(a - b) / Math.max(now, IMPACT_FLOOR);
+  return { helps: a > b ? g.homeId : g.awayId, impact: rel >= BIG ? "big" : rel >= SOME ? "some" : "small" };
+}
+
+/** A named pick's winner, kept only when the odds agree it's the better side for the team (or can't say). */
+function likelySide(winner: number | undefined, g: Game, h: HelpGame): number | null {
+  if (winner === undefined) return null;
+  const mine = winner === g.homeId ? h.oddsIfHomeWins : h.oddsIfAwayWins;
+  const theirs = winner === g.homeId ? h.oddsIfAwayWins : h.oddsIfHomeWins;
+  return mine === null || theirs === null || mine >= theirs ? winner : null;
+}
+
 function helpNote(help: HelpGame[], status: string, team: string, conference: string): string {
   if (help.length === 0) return `No other ${conference} games are left to play.`;
   if (status !== "open") {
@@ -430,7 +730,7 @@ function footnote(
   const notes: string[] = [];
   if (nonConf.length > 0) {
     const games = nonConf.map((g) => `${name(g.homeId === teamId ? g.awayId : g.homeId)} (${when(g)})`);
-    notes.push(`Not in the tree: ${list(games)}. Non-conference results don't change the ${conference} title-game race.`);
+    notes.push(`Not listed: ${list(games)}. Non-conference results don't change the ${conference} title-game race.`);
   }
   if (cut > 0) {
     notes.push(`The tree stops after ${plural(depth, "game", "games")}; ${plural(cut, `later ${conference} game isn't`, `later ${conference} games aren't`)} shown.`);

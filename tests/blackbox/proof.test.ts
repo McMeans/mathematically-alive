@@ -39,6 +39,26 @@ describe("proven clinch and elimination", () => {
     expect(teamPath(s, { ...o, teamId: 1, locks: { [upset1.id]: 1, [upset2.id]: 4 } }).titleGame).toBeGreaterThan(0);
   });
 
+  it("a team that only gets in as a tied team through the game-count rule is not out", () => {
+    nextId = 0;
+    // Team 1 is 2-0 in two games. Team 2 is 1-1 in three; beating Team 5 makes it 2-1, the same
+    // wins as Team 1, so the two are the "Tied Teams" and both go, past Teams 3 and 4 at 3-1.
+    const last = game(2, 5);
+    const games = [
+      game(1, 2, 1), game(1, 5, 1), game(2, 3, 2),
+      game(3, 5, 3), game(3, 6, 3), game(3, 7, 3),
+      game(4, 5, 4), game(4, 6, 4), game(4, 7, 4), game(6, 4, 6),
+      last,
+    ];
+    const s: Season = {
+      year: 2026, fetchedAt: "", games,
+      teams: [1, 2, 3, 4, 5, 6, 7].map((id) => ({ id, name: `Team${id}`, abbreviation: null, conference: "C", classification: "fbs" as const, color: null, altColor: null, rating: null })),
+    };
+    expect(pathTree(s, { ...o, teamId: 2 }).root.verdict).not.toBe("Out");
+    expect(pathTree(s, { ...o, teamId: 2, locks: { [last.id]: 2 } }).root.verdict).toBe("In");
+    expect(pathTree(s, { ...o, teamId: 2, locks: { [last.id]: 5 } }).root.verdict).toBe("Out");
+  });
+
   it("a team no combination can put in is out, and one no combination can keep out is in", () => {
     const { s, upset1, upset2 } = longshot();
     const out = { ...o, teamId: 1, locks: { [upset1.id]: 3, [upset2.id]: 2 } };

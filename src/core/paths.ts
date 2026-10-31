@@ -57,6 +57,13 @@ export function formatChance(p: number, status: PathStatus): string {
   return formatOdds(p);
 }
 
+/** Odds with one decimal under 1%, so long shots can be told apart: "0.4%", "<0.1%"; whole percents otherwise. */
+export function formatFine(p: number): string {
+  if (p > 0 && p < 0.001) return "<0.1%";
+  if (p >= 0.001 && p < 0.0095) return `${(Math.round(p * 1000) / 10).toFixed(1)}%`;
+  return formatOdds(p);
+}
+
 /** Whole-percent odds. "<1%" and ">99%" stand in for 0 or 100 when the true value isn't exact. */
 export function formatOdds(p: number): string {
   const r = Math.round(p * 100);
@@ -93,9 +100,9 @@ export function teamPath(season: Season, opts: PathOptions, shared?: SimResult):
   let outN = 0;
   let outIn = 0;
 
-  sim.forEachIteration((iteration, winnerAt) => {
+  sim.forEachIteration((iteration, winnerAt, teams) => {
     const rand = mulberry32(mix(seed, iteration, 1));
-    const [a, b] = championshipFromData(data, conference, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: rand });
+    const [a, b] = championshipFromData(data, conference, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: rand, rank: teams.rank });
     const reached = a === teamId || b === teamId;
     if (reached) inTitle++;
     if (own.length > 0 && own.every(({ i }) => winnerAt(i) === teamId)) {
