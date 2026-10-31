@@ -110,7 +110,7 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
   );
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col overflow-x-hidden md:h-dvh md:overflow-hidden">
       <header className="flex items-center justify-between gap-3 border-b border-ink-muted/25 px-4 py-3">
         <div className="flex items-center gap-2">
           <Logo size={32} decorative />
@@ -150,12 +150,12 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
         </div>
       </div>
 
-      <div className="grid flex-1 md:grid-cols-[260px_minmax(0,1fr)_340px]">
-        <nav aria-label="ACC teams" className="hidden border-r border-ink-muted/25 md:block">
+      <div className="grid flex-1 md:min-h-0 md:grid-cols-[260px_minmax(0,1fr)_340px]">
+        <nav aria-label="ACC teams" className="hidden border-r border-ink-muted/25 md:block md:min-h-0 md:overflow-y-auto">
           {list}
         </nav>
 
-        <main className="min-w-0 p-4 md:p-6">
+        <main className="min-w-0 p-4 md:min-h-0 md:overflow-y-auto md:p-6">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="font-display text-xl font-bold">
               <span className="hidden md:inline">Paths to the title game</span>
@@ -202,7 +202,7 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
           </div>
         </main>
 
-        <aside aria-label="Summary" className={`hidden border-l border-ink-muted/25 p-6 md:block ${busy ? "opacity-70" : ""}`}>
+        <aside aria-label="Summary" className={`hidden border-l border-ink-muted/25 p-6 md:block md:min-h-0 md:overflow-y-auto ${busy ? "opacity-70" : ""}`}>
           <Stats team={team} outlook={outlook} me={me} path={path} teamId={teamId} own={own} names={names} />
         </aside>
       </div>

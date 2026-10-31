@@ -74,3 +74,9 @@ body {
 .tree .kid.likely::after {
   border-color: var(--line-likely);
 }
+
+/* Desktop: the page is the viewport; each column scrolls on its own. Mobile keeps page scrolling. */
+html, body { overflow-x: hidden; }
+@media (min-width: 48rem) {
+  html, body { height: 100%; overflow-y: hidden; }
+}
