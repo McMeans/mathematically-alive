@@ -8,7 +8,7 @@ Next.js (TypeScript) site: pick a college football team, see what has to happen 
 - `tests/unit`: optional white-box tests. Keep them, but they don't count toward the gate.
 - `fixtures/`: test data (schedules, results) and the scripts that generate them.
 
-Dev: `npm run dev`. Lint: `npm run lint`. Types: `npm run typecheck`. Test: `npm test`. Build: `npm run build`.
+Package manager: pnpm (`corepack enable` once; npm's lockfile drops other platforms' native bindings, which broke CI). Dev: `pnpm dev`. Lint: `pnpm lint`. Types: `pnpm typecheck`. Test: `pnpm test`. Build: `pnpm build`.
 
 ## Black-box testing as we go
 
@@ -25,7 +25,7 @@ Every change to `src/core` behavior ships with black-box tests in the same chang
 
 ## Before calling a change done
 
-1. `npm run lint`, `npm run typecheck` and `npm test` pass.
+1. `pnpm lint`, `pnpm typecheck` and `pnpm test` pass.
 2. Run the `coverage-gate` skill (`.claude/skills/coverage-gate/gate.sh`). It must pass at the threshold in the script. Never lower the threshold without asking.
 3. For a branch or PR, run the `pr-review` skill.
 
