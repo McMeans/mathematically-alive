@@ -4,6 +4,7 @@
 // 0 in the sample, not that they are mathematically proven.
 import { mix, mulberry32, simulateSeason } from "./sim";
 import type { Game, Season } from "./season";
+import { OVERALL, isClear } from "./signal";
 import { championshipFromData, conferenceData } from "./tiebreak";
 
 export type PathOptions = {
@@ -37,14 +38,13 @@ export type TeamPath = {
   titleGame: number;
   /** Title-game odds given the team wins all its remaining games; null if that never happened or none remain. */
   ifWinOut: number | null;
-  /** Up to 5 remaining games that move the odds most (swing of at least 1 point), biggest first. */
+  /** Up to 5 remaining conference games that move the odds most (at least 1 point and clear of sampling noise), biggest first. */
   keyGames: KeyGame[];
   summary: string;
   steps: string[];
 };
 
 const MAX_KEY_GAMES = 5;
-const MIN_SWING = 0.01;
 const DATE_FORMAT = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
 
 /** Whole-percent odds. "<1%" and ">99%" stand in for 0 or 100 when the true value isn't exact. */
@@ -65,13 +65,12 @@ export function teamPath(season: Season, opts: PathOptions): TeamPath {
   const gameIndex = new Map<number, number>(season.games.map((g, i) => [g.id, i]));
   const name = (id: number): string => season.teams.find((t) => t.id === id)?.name ?? `Team ${id}`;
 
-  // Remaining games that can matter: conference games and the team's own.
-  const remaining = season.games
+  // Remaining games that can matter: the conference's own games. The title game is
+  // decided by conference results alone, so a non-conference game can't move it.
+  const confGames = new Set(data.games);
+  const candidates = season.games
     .map((g, i) => ({ g, i }))
-    .filter(({ g }) => !g.completed && !(opts.locks && g.id in opts.locks));
-  const candidates = remaining.filter(
-    ({ g }) => data.games.includes(g) || g.homeId === teamId || g.awayId === teamId,
-  );
+    .filter(({ g }) => !g.completed && !(opts.locks && g.id in opts.locks) && confGames.has(g));
   const own = season.games
     .map((g, i) => ({ g, i }))
     .filter(({ g }) => !g.completed && (g.homeId === teamId || g.awayId === teamId));
@@ -116,7 +115,7 @@ export function teamPath(season: Season, opts: PathOptions): TeamPath {
     const oddsIfHomeWins = homeIn[k] / homeN[k];
     const oddsIfAwayWins = awayIn[k] / awayN;
     const swing = Math.abs(oddsIfHomeWins - oddsIfAwayWins);
-    if (swing < MIN_SWING) return;
+    if (!isClear(homeN[k], homeIn[k], awayN, awayIn[k], OVERALL)) return;
     keyGames.push({
       gameId: g.id, homeId: g.homeId, awayId: g.awayId, oddsIfHomeWins, oddsIfAwayWins, swing,
       rooting: oddsIfHomeWins >= oddsIfAwayWins ? g.homeId : g.awayId,

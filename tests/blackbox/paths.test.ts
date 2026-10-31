@@ -11,13 +11,13 @@ function team(id: number, conference: string) {
 }
 
 let nextId = 0;
-function game(home: number, away: number, winner?: number): Game {
+function game(home: number, away: number, winner?: number, extra: Partial<Game> = {}): Game {
   return {
     id: nextId++, week: 1, start: "2026-11-22T18:00:00Z", neutralSite: false, conferenceGame: true,
     homeId: home, awayId: away,
     homePoints: winner === undefined ? null : winner === home ? 21 : 14,
     awayPoints: winner === undefined ? null : winner === away ? 21 : 14,
-    completed: winner !== undefined, spread: null,
+    completed: winner !== undefined, spread: null, ...extra,
   };
 }
 const season = (games: Game[], n = 4): Season => ({
@@ -141,6 +141,33 @@ describe("team path", () => {
     expect(open).toBe(true);
     third.spread = -60;
     expect(path(s, 2).keyGames.some((k) => k.gameId === third.id)).toBe(false);
+  });
+
+  it("a non-conference game is never a key game, even the team's own", () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const { s } = scenario();
+      s.teams.push({ ...s.teams[0], id: 9, name: "Team9", conference: "Other" });
+      const nc = game(2, 9, undefined, { conferenceGame: false, spread: 0 });
+      s.games.push(nc);
+      expect(path(s, 2, seed).keyGames.some((k) => k.gameId === nc.id)).toBe(false);
+    }
+  });
+
+  it("a conference game whose result can't change the odds is never a key game", () => {
+    nextId = 0;
+    // Team 2's spot hangs on 2 v 3 and 3 v 4. Teams 5 and 6 are 0-2 and can't reach it.
+    const lopsided = game(5, 6, undefined, { spread: -24 });
+    const s = season([
+      game(1, 2, 1), game(1, 3, 1), game(1, 4, 1), game(2, 4, 2), game(1, 5, 1), game(1, 6, 1),
+      game(2, 5, 2), game(2, 6, 2), game(2, 3), game(3, 4), lopsided,
+    ], 6);
+    const lock = (w: number) => teamPath(s, { conference: "C", teamId: 2, iterations: 3000, seed: 3, locks: { [lopsided.id]: w } });
+    expect(lock(5).titleGame).toBe(lock(6).titleGame);
+    expect(lock(5).titleGame).toBeGreaterThan(0.3);
+    expect(lock(5).titleGame).toBeLessThan(0.95);
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      expect(path(s, 2, seed).keyGames.some((k) => k.gameId === lopsided.id)).toBe(false);
+    }
   });
 
   it("is deterministic for a seed", () => {

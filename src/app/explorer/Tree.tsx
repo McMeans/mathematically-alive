@@ -1,6 +1,7 @@
 "use client";
+import { useState } from "react";
 import type { PathTree, TreeNode } from "@/core";
-import { oddsTone, pct, type Locks } from "./Explorer";
+import { oddsTone, type Locks } from "./Explorer";
 
 type Ctx = {
   locks: Locks;
@@ -10,27 +11,56 @@ type Ctx = {
 };
 
 const winnerOf = (n: TreeNode, c: Ctx) => (n.win ? c.teamId : c.oppOf(n.gameId!));
+const isLocked = (n: TreeNode, c: Ctx) => n.gameId !== undefined && c.locks[n.gameId] === winnerOf(n, c);
 
-function Branch({ node, ctx, off }: { node: TreeNode; ctx: Ctx; off: boolean }) {
-  const leaf = node.children.length === 0;
+/** Verdict color: settled In/Out in turf/orange, rare and ruled-out muted, open odds by size. */
+const verdictTone = (n: TreeNode) =>
+  n.outcome === "in" ? "text-turf" : n.outcome === "out" ? "text-marker-text" : n.outcome ? "text-ink-muted" : oddsTone(n.odds);
+
+const countLeaves = (n: TreeNode): number => (n.children.length ? n.children.reduce((a, c) => a + countLeaves(c), 0) : 1);
+
+type View = Ctx & {
+  isOpen: (key: string, n: TreeNode, level: number) => boolean;
+  /** True when the user opened this branch (so it gets a collapse control). */
+  userOpened: (key: string) => boolean;
+  toggle: (key: string, n: TreeNode, level: number) => void;
+};
+
+function Branch({ node, ctx, off, path, level }: { node: TreeNode; ctx: View; off: boolean; path: string; level: number }) {
+  const hasKids = node.children.length > 0;
   const root = node.gameId === undefined;
+  const open = hasKids && ctx.isOpen(path, node, level);
+  const toggle = (label: string, expanded: boolean) => (
+    <button
+      type="button"
+      onClick={() => ctx.toggle(path, node, level)}
+      aria-expanded={expanded}
+      aria-label={`${expanded ? "Hide" : "Show"} what follows ${node.label}`}
+      className="ml-2 min-h-11 shrink-0 whitespace-nowrap rounded-full border border-dashed border-ink-muted/60 px-3 text-xs font-bold text-ink-soft hover:bg-mist focus-visible:outline-2 focus-visible:outline-navy md:min-h-8"
+    >
+      {label}
+    </button>
+  );
   return (
     <div className="branch">
       {root ? (
-        <div className="rounded-full bg-navy px-4 py-2 text-white">
+        <div className="rounded-full bg-navy px-4 py-2 text-white" title={node.note ?? undefined}>
           <span className="text-sm font-bold">{node.label}</span>{" "}
-          <span className="font-display text-xl">{pct(node.odds)}</span>
+          <span className="font-display text-xl">{node.verdict}</span>
         </div>
       ) : (
-        <NodePill node={node} ctx={ctx} off={off} leaf={leaf} />
+        <NodePill node={node} ctx={ctx} off={off} leaf={!hasKids} />
       )}
-      {!leaf && (
+      {hasKids && !open && toggle(`+ ${countLeaves(node)} outcomes`, false)}
+      {open && !root && ctx.userOpened(path) && toggle("−", true)}
+      {open && (
         <div className={`kids ${node.likely ? "likely" : ""}`}>
           {node.children.map((c) => {
-            const contradicted = c.gameId !== undefined && ctx.locks[c.gameId] !== undefined && ctx.locks[c.gameId] !== winnerOf(c, ctx);
+            const contradicted = c.gameId !== undefined && ctx.locks[c.gameId] !== undefined && !isLocked(c, ctx);
+            const key = path + (c.win ? "W" : "L");
             return (
-              <div key={c.label} className={`kid ${c.likely ? "likely" : ""}`}>
-                <Branch node={c} ctx={ctx} off={off || contradicted} />
+              <div key={key} className={`kid ${c.likely ? "likely" : ""}`}>
+                <Branch node={c} ctx={ctx} off={off || contradicted || c.outcome === "never"} path={key} level={level + 1} />
               </div>
             );
           })}
@@ -41,14 +71,16 @@ function Branch({ node, ctx, off }: { node: TreeNode; ctx: Ctx; off: boolean }) 
 }
 
 function NodePill({ node, ctx, off, leaf }: { node: TreeNode; ctx: Ctx; off: boolean; leaf: boolean }) {
-  const locked = ctx.locks[node.gameId!] === winnerOf(node, ctx);
+  const locked = isLocked(node, ctx);
   const border = node.likely ? "border-2 border-turf" : "border border-ink-muted/40";
+  const extra = [node.record, node.note].filter(Boolean).join(". ");
   return (
     <button
       type="button"
       disabled={off}
       aria-pressed={locked}
-      aria-label={`${node.label}, ${node.detail}${node.record ? `, ${node.record}` : ""}, ${pct(node.odds)}`}
+      title={node.note ?? undefined}
+      aria-label={`${node.label}, ${node.detail}, ${node.verdict}${extra ? `. ${extra}` : ""}`}
       onClick={() => ctx.onPick(node.gameId!, winnerOf(node, ctx))}
       className={`${border} group text-left transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:cursor-not-allowed disabled:opacity-40 aria-pressed:bg-navy aria-pressed:text-white ${
         leaf ? "flex items-baseline gap-2 whitespace-nowrap rounded-full px-3 py-1.5" : "w-44 rounded-xl px-3 py-2 hover:bg-mist aria-pressed:hover:bg-navy"
@@ -63,28 +95,37 @@ function NodePill({ node, ctx, off, leaf }: { node: TreeNode; ctx: Ctx; off: boo
           {node.detail}
         </span>
       )}
-      <span
-        aria-hidden
-        className={`font-display font-bold group-aria-pressed:text-white ${leaf ? "text-base" : "block text-2xl"} ${oddsTone(node.odds)}`}
-      >
-        {pct(node.odds)}
+      <span aria-hidden className={`font-display font-bold group-aria-pressed:text-white ${leaf ? "text-base" : "block text-2xl"} ${verdictTone(node)}`}>
+        {node.verdict}
       </span>
     </button>
   );
 }
 
 export function TreeView({ tree, locks, teamId, oppOf, onPick }: { tree: PathTree } & Ctx) {
-  const ctx = { locks, teamId, oppOf, onPick };
+  // Open by default: the first two levels, the most likely path and the locked path. Clicks override.
+  const [toggled, setToggled] = useState<Record<string, boolean>>({});
+  const base: Ctx = { locks, teamId, oppOf, onPick };
+  const byDefault = (n: TreeNode, level: number) => level < 2 || n.likely || n.children.some((c) => isLocked(c, base));
+  const ctx: View = {
+    ...base,
+    isOpen: (key, n, level) => toggled[key] ?? byDefault(n, level),
+    userOpened: (key) => toggled[key] === true,
+    toggle: (key, n, level) => setToggled((t) => ({ ...t, [key]: !(t[key] ?? byDefault(n, level)) })),
+  };
   return (
     <div>
       <div className="tree overflow-x-auto py-4">
         <div className="inline-block min-w-max pr-2">
-          <Branch node={tree.root} ctx={ctx} off={false} />
+          <Branch node={tree.root} ctx={ctx} off={false} path="" level={0} />
         </div>
       </div>
-      <p className="flex items-center gap-2 text-xs text-ink-muted">
-        <span aria-hidden className="inline-block h-0.5 w-6 bg-turf" /> Most likely path
+      <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
+        <span className="flex items-center gap-2">
+          <span aria-hidden className="inline-block h-0.5 w-6 bg-turf" /> Most likely path
+        </span>
       </p>
+      {tree.footnote && <p className="mt-2 text-xs text-ink-muted">{tree.footnote}</p>}
     </div>
   );
 }
@@ -94,12 +135,13 @@ export function Drill({ tree, locks, teamId, oppOf, onPick, onUnlock }: { tree: 
   const ctx = { locks, teamId, oppOf, onPick };
   const crumbs: TreeNode[] = [tree.root];
   for (let cur = tree.root; ; ) {
-    const next = cur.children.find((c) => locks[c.gameId!] === winnerOf(c, ctx));
+    const next = cur.children.find((c) => isLocked(c, ctx));
     if (!next) break;
     crumbs.push(next);
     cur = next;
   }
   const current = crumbs[crumbs.length - 1];
+  const end = current.note ?? (current.record ? `Final record ${current.record}.` : crumbs.length === 1 ? "No conference games left to play." : "");
   return (
     <div className="mt-3">
       <ol className="flex flex-wrap items-center gap-x-1 text-sm">
@@ -110,7 +152,7 @@ export function Drill({ tree, locks, teamId, oppOf, onPick, onUnlock }: { tree: 
               {i > 0 && <span aria-hidden className="text-ink-muted">›</span>}
               {last ? (
                 <span aria-current="step" className="py-2 font-bold">
-                  {c.label} <span className={oddsTone(c.odds)}>{pct(c.odds)}</span>
+                  {c.label} <span className={verdictTone(c)}>{c.verdict}</span>
                 </span>
               ) : (
                 <button
@@ -118,7 +160,7 @@ export function Drill({ tree, locks, teamId, oppOf, onPick, onUnlock }: { tree: 
                   onClick={() => onUnlock(crumbs.slice(i + 1).map((n) => n.gameId!))}
                   className="min-h-11 text-ink-soft underline"
                 >
-                  {c.label} {pct(c.odds)}
+                  {c.label} {c.verdict}
                 </button>
               )}
             </li>
@@ -127,9 +169,7 @@ export function Drill({ tree, locks, teamId, oppOf, onPick, onUnlock }: { tree: 
       </ol>
 
       {current.children.length === 0 ? (
-        <p className="mt-3 text-sm text-ink-muted">
-          {crumbs.length > 1 ? `Final record ${current.record ?? "—"}` : "No games left to play."}
-        </p>
+        end && <p className="mt-3 text-sm text-ink-muted">{end}</p>
       ) : (
         <>
           <p className="mt-2 text-xs text-ink-muted">
@@ -140,16 +180,18 @@ export function Drill({ tree, locks, teamId, oppOf, onPick, onUnlock }: { tree: 
               <button
                 key={c.label}
                 type="button"
+                disabled={c.outcome === "never"}
                 onClick={() => onPick(c.gameId!, winnerOf(c, ctx))}
-                className={`min-h-11 rounded-xl bg-mist p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy ${c.likely ? "border-2 border-turf" : "border border-ink-muted/40"}`}
+                className={`min-h-11 rounded-xl bg-mist p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:opacity-40 ${c.likely ? "border-2 border-turf" : "border border-ink-muted/40"}`}
               >
                 <span className="block text-sm font-bold">{c.label}</span>
                 <span className="block text-xs text-ink-muted">{c.detail}</span>
-                <span className={`block font-display text-3xl font-bold ${oddsTone(c.odds)}`}>{pct(c.odds)}</span>
+                <span className={`block font-display text-3xl font-bold ${verdictTone(c)}`}>{c.verdict}</span>
+                {c.note && c.outcome !== "never" && <span className="mt-1 block text-xs text-ink-muted">{c.note}</span>}
               </button>
             ))}
           </div>
-          {current.children[0].children.length > 0 && (
+          {current.children.some((c) => c.children.length > 0) && (
             <div className="mt-4">
               <h3 className="text-xs font-bold uppercase tracking-wide text-ink-muted">Then</h3>
               <ul className="mt-1 divide-y divide-ink-muted/20 text-sm">
@@ -159,7 +201,7 @@ export function Drill({ tree, locks, teamId, oppOf, onPick, onUnlock }: { tree: 
                       <span className="text-ink-soft">
                         {c.win ? "Win" : "Loss"}, {g.label.charAt(0).toLowerCase() + g.label.slice(1)}
                       </span>
-                      <span className={`font-bold tabular-nums ${oddsTone(g.odds)}`}>{pct(g.odds)}</span>
+                      <span className={`font-bold tabular-nums ${verdictTone(g)}`}>{g.verdict}</span>
                     </li>
                   )),
                 )}
@@ -168,6 +210,7 @@ export function Drill({ tree, locks, teamId, oppOf, onPick, onUnlock }: { tree: 
           )}
         </>
       )}
+      {tree.footnote && <p className="mt-3 text-xs text-ink-muted">{tree.footnote}</p>}
     </div>
   );
 }

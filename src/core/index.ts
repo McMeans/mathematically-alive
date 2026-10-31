@@ -23,4 +23,4 @@ export type { OutlookOptions, SeasonOutlook, TeamOutlook } from "./outlook";
 export { formatOdds, teamPath } from "./paths";
 export type { KeyGame, PathOptions, PathStatus, TeamPath } from "./paths";
 export { pathTree } from "./tree";
-export type { PathTree, TreeNode, TreeOptions } from "./tree";
+export type { HelpGame, PathTree, TreeNode, TreeOptions, TreeOutcome } from "./tree";

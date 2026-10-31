@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatOdds, type PathTree, type TeamOutlook, type TeamPath } from "@/core";
+import { formatOdds, type HelpGame, type PathTree, type TeamOutlook, type TeamPath } from "@/core";
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
 import { Logo } from "@/app/Logo";
 import { HelpList } from "./HelpList";
@@ -8,7 +8,6 @@ import { Drill, TreeView } from "./Tree";
 import { Stats, StatTiles, TeamList } from "./Panels";
 
 export type GameInfo = { id: number; homeId: number; awayId: number; week: number; start: string };
-export type HelpGame = GameInfo & { oddsIfHome: number; oddsIfAway: number };
 export type TeamInfo = { id: number; name: string; color: string | null };
 export type Result = { outlook: TeamOutlook[]; path: TeamPath; tree: PathTree };
 export type Locks = Record<number, number>;
@@ -19,7 +18,7 @@ type Props = {
   names: Record<number, string>;
   /** The team's own unplayed games. */
   own: GameInfo[];
-  /** Frozen for this team: top non-own key games from the run with no locks. */
+  /** Frozen for this team: the other conference games that matter (now or in a scenario), from the run with no locks. */
   help: HelpGame[];
   year: number;
   lastWeek: number;
@@ -93,9 +92,6 @@ export function Explorer({ teamId, teams, names, own, help, year, lastWeek, init
 
   const list = (
     <TeamList teams={teams} order={order} outlook={outlook} selectedId={teamId} />
-  );
-  const help3 = (
-    <HelpList help={help} names={names} locks={locks} path={path} baseTitle={initial.path.titleGame} onPick={pick} />
   );
 
   return (
@@ -174,7 +170,7 @@ export function Explorer({ teamId, teams, names, own, help, year, lastWeek, init
             </div>
 
             <h2 className="mt-8 font-display text-xl font-bold">Help from elsewhere</h2>
-            {help.length === 0 ? <p className="mt-2 text-sm text-ink-muted">Nothing else moves the needle.</p> : help3}
+            <HelpList help={help} base={initial.tree} live={tree} names={names} locks={locks} onPick={pick} />
           </div>
         </main>
 
