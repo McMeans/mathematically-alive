@@ -8,7 +8,7 @@ import { Drill, TreeView } from "./Tree";
 import { Stats, StatTiles, TeamList } from "./Panels";
 
 export type GameInfo = { id: number; homeId: number; awayId: number; week: number; start: string };
-export type TeamInfo = { id: number; name: string; color: string | null };
+export type TeamInfo = { id: number; name: string; color: string | null; altColor: string | null };
 export type Result = { outlook: TeamOutlook[]; path: TeamPath; tree: PathTree };
 export type Locks = Record<number, number>;
 
@@ -106,7 +106,7 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
   const status = busy ? "Updating…" : failed ? "Couldn’t update. Showing the last result." : "";
 
   const list = (
-    <TeamList teams={teams} order={order} outlook={outlook} selectedId={teamId} />
+    <TeamList teams={teams} order={order} outlook={initial.outlook} selectedId={teamId} />
   );
 
   return (

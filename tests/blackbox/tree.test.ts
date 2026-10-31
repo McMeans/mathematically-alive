@@ -403,6 +403,26 @@ describe("help from elsewhere", () => {
     expect(locked.likeliest).toBeNull();
   });
 
+  it("the likeliest way in picks a result for every other conference game left", () => {
+    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const full = seasonFromCfbd(snap);
+    const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
+    const cut: Season = {
+      ...full,
+      games: full.games.map((g) => (g.week > last - 3 ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
+    };
+    let checked = 0;
+    for (const t of cut.teams.filter((x) => x.conference === "ACC")) {
+      const tree = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 2000, seed: 1 });
+      if (!tree.likeliest) continue;
+      const picked = new Set(tree.likeliest.picks.map((p) => p.gameId));
+      for (const h of tree.help) expect(picked.has(h.gameId)).toBe(true);
+      expect(tree.likeliest.share).toBeGreaterThan(0);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
   it("a locked game drops out of the help list", () => {
     const { s, other } = needsHelp();
     const t = pathTree(s, { ...base, teamId: 1, locks: { [other.id]: 3 } });

@@ -13,7 +13,7 @@ export function ExplorerPage({ teamId }: { teamId: number }) {
   const kickoff = new Map(season.games.map((g) => [g.id, Date.parse(g.start) || 0]));
   const help = [...tree.help].sort((a, b) => kickoff.get(a.gameId)! - kickoff.get(b.gameId)! || a.gameId - b.gameId);
 
-  const teams: TeamInfo[] = accTeams.map((t) => ({ id: t.id, name: t.name, color: t.color }));
+  const teams: TeamInfo[] = accTeams.map((t) => ({ id: t.id, name: t.name, color: t.color, altColor: t.altColor }));
   return (
     <Explorer
       key={teamId}

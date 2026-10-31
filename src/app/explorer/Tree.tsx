@@ -87,7 +87,7 @@ function NodePill({ node, ctx, off, leaf, way }: { node: TreeNode; ctx: Ctx; off
       aria-label={`${node.label}, ${node.detail}, ${node.verdict}${extra ? `. ${extra}` : ""}`}
       onClick={() => ctx.onPick(node.gameId!, winnerOf(node, ctx))}
       className={`${border} group text-left transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:cursor-not-allowed disabled:opacity-40 aria-pressed:bg-navy aria-pressed:text-white ${
-        leaf ? "flex items-baseline gap-2 whitespace-nowrap rounded-full px-3 py-1.5" : "w-44 rounded-xl px-3 py-2 hover:bg-mist aria-pressed:hover:bg-navy"
+        leaf ? "flex w-44 items-baseline justify-between gap-2 rounded-xl px-3 py-1.5 hover:bg-mist aria-pressed:hover:bg-navy" : "w-44 rounded-xl px-3 py-2 hover:bg-mist aria-pressed:hover:bg-navy"
       } bg-white`}
     >
       <span className={`text-sm font-bold ${leaf ? "" : "block"}`} aria-hidden>
@@ -120,8 +120,8 @@ export function TreeView({ tree, locks, way, teamId, oppOf, onPick }: { tree: Pa
   };
   return (
     <div>
-      <div className="tree overflow-x-auto py-4">
-        <div className="inline-block min-w-max pr-2">
+      <div className="tree -mx-4 overflow-x-auto px-4 py-4 md:-mx-6 md:px-6">
+        <div className="inline-block min-w-max">
           <Branch node={tree.root} ctx={ctx} off={false} path="" level={0} way={!!way} />
         </div>
       </div>

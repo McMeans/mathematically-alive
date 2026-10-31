@@ -100,9 +100,9 @@ export type HelpGame = {
 
 /** The single most common full scenario among simulated seasons where the team makes the title game. */
 export type Likeliest = {
-  /** The team's own conference results, then the results elsewhere that clearly matter now. */
+  /** The team's own conference results, then a result for every other remaining conference game (its likelier side in those seasons). */
   picks: { gameId: number; winner: number }[];
-  /** Fraction of all simulated seasons that play out exactly this way (on these games). */
+  /** Fraction of all simulated seasons that play out this way on the team's games and the games elsewhere that matter. */
   share: number;
   /** "Likeliest way in (4% of simulated seasons): Virginia beats ..., and Duke beats Wake Forest." */
   line: string;
@@ -316,20 +316,32 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     h.ifAwayWins = proveIf(h.oddsIfAwayWins, h.awayId);
   }
 
-  // Likeliest way in: the most common (own results + results elsewhere that matter now) among seasons that reach.
+  // Likeliest way in: the team's most common own results among seasons that reach, then, for every
+  // game elsewhere that matters, the result that happens most often in those seasons.
   let likeliest: Likeliest | null = null;
   if (root.outcome === null && sum(inTitle, 0, size) > 0) {
-    const loud = others.map((o, h) => ({ ...o, h })).filter(({ g }) => help.find((x) => x.gameId === g.id)!.now);
-    const counts = new Map<string, number>();
-    sim.forEachIteration((it, winnerAt) => {
-      if (!reachedAt[it]) return;
-      const key = `${bucketAt[it]}|${loud.map(({ g, i }) => (winnerAt(i) === g.homeId ? 1 : 0)).join("")}`;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+    const matters = new Set(help.filter((x) => x.now || x.scenario !== null).map((x) => x.gameId));
+    // Every other game gets a pick (so the whole scenario can be locked); the line names only those that matter.
+    const loud = others.map((o, h) => ({ ...o, h }));
+    const byBucket = new Map<number, number>();
+    sim.forEachIteration((it) => {
+      if (reachedAt[it]) byBucket.set(bucketAt[it], (byBucket.get(bucketAt[it]) ?? 0) + 1);
     });
-    let best = "";
+    let bucket = -1;
+    let bucketN = 0;
+    for (const [k, n] of byBucket) if (n > bucketN || (n === bucketN && k < bucket)) [bucket, bucketN] = [k, n];
+    const homeWins = new Array<number>(loud.length).fill(0);
+    sim.forEachIteration((it, winnerAt) => {
+      if (!reachedAt[it] || bucketAt[it] !== bucket) return;
+      loud.forEach(({ g, i }, j) => { if (winnerAt(i) === g.homeId) homeWins[j]++; });
+    });
+    const bits = homeWins.map((n) => (n * 2 >= bucketN ? "1" : "0")).join("");
     let bestN = 0;
-    for (const [k, n] of counts) if (n > bestN || (n === bestN && k < best)) [best, bestN] = [k, n];
-    if (bestN > 0) {
+    sim.forEachIteration((it, winnerAt) => {
+      if (reachedAt[it] && bucketAt[it] === bucket && loud.every(({ g, i }, j) => !matters.has(g.id) || (winnerAt(i) === g.homeId) === (bits[j] === "1"))) bestN++;
+    });
+    const best = `${bucket}|${bits}`;
+    if (bucketN > 0) {
       const [b, bits] = best.split("|");
       const picks: Likeliest["picks"] = [];
       const own: string[] = [];
@@ -339,10 +351,11 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
         picks.push({ gameId: g.id, winner: won ? teamId : opp });
         own.push(`${won ? "beats" : "loses to"} ${name(opp)}`);
       });
-      const elsewhere = loud.map(({ g }, j) => {
+      const elsewhere: string[] = [];
+      loud.forEach(({ g }, j) => {
         const w = bits[j] === "1" ? g.homeId : g.awayId;
         picks.push({ gameId: g.id, winner: w });
-        return `${name(w)} beats ${name(w === g.homeId ? g.awayId : g.homeId)}`;
+        if (matters.has(g.id)) elsewhere.push(`${name(w)} beats ${name(w === g.homeId ? g.awayId : g.homeId)}`);
       });
       const share = bestN / total;
       const parts = [own.length ? `${team} ${list(own)}` : "", elsewhere.length ? list(elsewhere) : ""].filter(Boolean);
