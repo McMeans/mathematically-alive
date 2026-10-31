@@ -1,6 +1,7 @@
 // Season outlook for one conference: how likely each team is to reach the
 // conference championship game, win it, and (experimentally) make the playoff.
-import { gameWinProbability, mix, mulberry32, simulateSeason } from "./sim";
+import { gameWinProbability, mix, mulberry32, simulateSeason, type SimResult } from "./sim";
+import { provenStatus } from "./proof";
 import { teamRecord } from "./season";
 import type { Game, Season, TeamRecord } from "./season";
 import { championshipFromData, conferenceData } from "./tiebreak";
@@ -24,6 +25,8 @@ export type TeamOutlook = {
   champion: number;
   /** EXPERIMENTAL rough estimate of making the playoff; see PLAYOFF_FIELD. */
   playoff: number;
+  /** Proven over every combination of remaining results: "clinched" / "eliminated" a title-game spot, else "alive". */
+  status: "clinched" | "alive" | "eliminated";
 };
 
 export type SeasonOutlook = { iterations: number; teams: TeamOutlook[] };
@@ -36,15 +39,17 @@ export type SeasonOutlook = { iterations: number; teams: TeamOutlook[] };
 const PLAYOFF_FIELD = 11;
 const MISSING_RATING = 0;
 
-export function seasonOutlook(season: Season, opts: OutlookOptions): SeasonOutlook {
+/** `shared`: a simulation of the same season, iterations, seed and locks to reuse. */
+export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: SimResult): SeasonOutlook {
   const { conference, iterations, seed } = opts;
   const data = conferenceData(season, conference);
   if (data.ids.size < 2) throw new Error(`${conference} has fewer than two teams`);
 
-  const sim = simulateSeason(season, { iterations, seed, locks: opts.locks });
+  const sim = shared ?? simulateSeason(season, { iterations, seed, locks: opts.locks });
   const gameIndex = new Map<number, number>(season.games.map((g, i) => [g.id, i]));
   const fbs = season.teams.filter((t) => t.classification === "fbs");
-  const ratingOf = new Map(season.teams.map((t) => [t.id, t.rating ?? MISSING_RATING]));
+  // Playoff spots for a non-FBS champion (not in the FBS arrays).
+  const outside = new Map<number, number>();
   const inConf = [...data.ids];
 
   // Title-game win probability on a neutral site, per ordered pair, computed lazily.
@@ -68,10 +73,34 @@ export function seasonOutlook(season: Season, opts: OutlookOptions): SeasonOutlo
   // how many draws earlier iterations used and what-if runs stay paired.
   const titleGame = new Map<number, number>(inConf.map((id) => [id, 0]));
   const champion = new Map<number, number>(inConf.map((id) => [id, 0]));
-  const playoff = new Map<number, number>(fbs.map((t) => [t.id, 0]));
-  const score = new Map<number, number>();
-  const w = new Map<number, number>();
-  const l = new Map<number, number>();
+  // Playoff ordering, by FBS team index. Completed games are the same in every iteration, so their
+  // wins and losses are counted once; each iteration adds only the unplayed games.
+  const F = fbs.length;
+  const fbsIndex = new Map<number, number>(fbs.map((t, k) => [t.id, k]));
+  const tenth = Float64Array.from(fbs, (t) => (t.rating ?? MISSING_RATING) / 10);
+  const fbsIdOf = Int32Array.from(fbs, (t) => t.id);
+  const idx = (id: number): number => fbsIndex.get(id) ?? -1;
+  const gameHome = Int32Array.from(season.games, (g) => idx(g.homeId));
+  const gameAway = Int32Array.from(season.games, (g) => idx(g.awayId));
+  const unplayed = Int32Array.from(season.games.flatMap((g, i) => (g.completed ? [] : [i])));
+  const baseW = new Int32Array(F);
+  const baseL = new Int32Array(F);
+  let based = false;
+  const w = new Int32Array(F);
+  const l = new Int32Array(F);
+  const playoff = new Float64Array(F);
+  const top = new Int32Array(PLAYOFF_FIELD);
+  const topScore = new Float64Array(PLAYOFF_FIELD);
+  /** Credit one game's winner and loser (by FBS index, -1 for non-FBS). */
+  const tally = (W: Int32Array, L: Int32Array, i: number, winnerId: number) => {
+    const homeWon = winnerId === season.games[i].homeId;
+    const win = homeWon ? gameHome[i] : gameAway[i];
+    const lose = homeWon ? gameAway[i] : gameHome[i];
+    if (win >= 0) W[win]++;
+    if (lose >= 0) L[lose]++;
+  };
+  // Strict order (score high first, then team id low first), so the top PLAYOFF_FIELD is unique.
+  const ahead = (sa: number, a: number, sb: number, b: number) => sa > sb || (sa === sb && fbsIdOf[a] < fbsIdOf[b]);
 
   sim.forEachIteration((iteration, winnerAt) => {
     const rand = mulberry32(mix(seed, iteration, 1));
@@ -82,31 +111,50 @@ export function seasonOutlook(season: Season, opts: OutlookOptions): SeasonOutlo
     const champ = mulberry32(mix(seed, iteration, 2))() < tgProb(a, b) ? a : b;
     champion.set(champ, champion.get(champ)! + 1);
 
-    w.clear();
-    l.clear();
-    for (let i = 0; i < season.games.length; i++) {
-      const g = season.games[i];
-      const win = winnerAt(i);
-      const lose = win === g.homeId ? g.awayId : g.homeId;
-      w.set(win, (w.get(win) ?? 0) + 1);
-      l.set(lose, (l.get(lose) ?? 0) + 1);
+    if (!based) {
+      season.games.forEach((g, i) => { if (g.completed) tally(baseW, baseL, i, winnerAt(i)); });
+      based = true;
     }
+    w.set(baseW);
+    l.set(baseL);
+    for (let j = 0; j < unplayed.length; j++) tally(w, l, unplayed[j], winnerAt(unplayed[j]));
     // The title game is itself a game; its result counts toward the ordering.
-    w.set(champ, (w.get(champ) ?? 0) + 1);
-    const loser = champ === a ? b : a;
-    l.set(loser, (l.get(loser) ?? 0) + 1);
+    const champIdx = idx(champ);
+    const loserIdx = idx(champ === a ? b : a);
+    if (champIdx >= 0) w[champIdx]++;
+    if (loserIdx >= 0) l[loserIdx]++;
 
-    score.clear();
-    for (const t of fbs) {
-      score.set(t.id, (w.get(t.id) ?? 0) - 1.5 * (l.get(t.id) ?? 0) + ratingOf.get(t.id)! / 10);
+    // Top PLAYOFF_FIELD by score, kept sorted by insertion (same set as sorting every team).
+    let filled = 0;
+    for (let k = 0; k < F; k++) {
+      const sc = w[k] - 1.5 * l[k] + tenth[k];
+      if (filled === PLAYOFF_FIELD && !ahead(sc, k, topScore[filled - 1], top[filled - 1])) continue;
+      let at = filled < PLAYOFF_FIELD ? filled++ : filled - 1;
+      while (at > 0 && ahead(sc, k, topScore[at - 1], top[at - 1])) {
+        top[at] = top[at - 1];
+        topScore[at] = topScore[at - 1];
+        at--;
+      }
+      top[at] = k;
+      topScore[at] = sc;
     }
-    const ranked = fbs.map((t) => t.id).sort((x, y) => score.get(y)! - score.get(x)! || x - y);
-    const inField = new Set(ranked.slice(0, PLAYOFF_FIELD));
-    inField.add(champ);
-    for (const id of inField) playoff.set(id, (playoff.get(id) ?? 0) + 1);
+    let champIn = false;
+    for (let k = 0; k < filled; k++) {
+      playoff[top[k]]++;
+      if (top[k] === champIdx) champIn = true;
+    }
+    if (!champIn) {
+      if (champIdx >= 0) playoff[champIdx]++;
+      else outside.set(champ, (outside.get(champ) ?? 0) + 1);
+    }
   });
 
   const n = sim.iterations;
+  const statusOf = (p: number, id: number): TeamOutlook["status"] => {
+    if (p !== 0 && p !== 1) return "alive";
+    const s = provenStatus(season, conference, id, opts.locks);
+    return s === "open" ? "alive" : s;
+  };
   return {
     iterations: n,
     teams: inConf.map((id) => ({
@@ -116,7 +164,8 @@ export function seasonOutlook(season: Season, opts: OutlookOptions): SeasonOutlo
       expectedConferenceWins: sim.teams[id].expectedConferenceWins,
       titleGame: titleGame.get(id)! / n,
       champion: champion.get(id)! / n,
-      playoff: (playoff.get(id) ?? 0) / n,
+      playoff: (fbsIndex.has(id) ? playoff[fbsIndex.get(id)!] : (outside.get(id) ?? 0)) / n,
+      status: statusOf(titleGame.get(id)! / n, id),
     })),
   };
 }

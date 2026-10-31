@@ -20,3 +20,57 @@ body {
   color: var(--color-navy);
   font-family: var(--font-sans), system-ui, sans-serif;
 }
+
+/* Path tree: each .kid draws its own connector (a stub into its pill and half of the spine). */
+.tree {
+  --line: #9aa3b5;
+  --line-likely: var(--color-turf);
+}
+.tree .branch {
+  display: flex;
+  align-items: center;
+}
+.tree .kids {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin-left: 16px;
+}
+.tree .kid {
+  position: relative;
+  padding: 4px 0 4px 16px;
+}
+.tree .kids::before,
+.tree .kid::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  border-top: 2px solid var(--line);
+}
+.tree .kids::before {
+  left: -16px;
+  width: 17px;
+}
+.tree .kid::before {
+  left: 0;
+  width: 16px;
+}
+.tree .kid::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  border-left: 2px solid var(--line);
+}
+.tree .kid:first-child::after {
+  top: 50%;
+  bottom: 0;
+}
+.tree .kid:last-child::after {
+  top: 0;
+  bottom: 50%;
+}
+.tree .kids.likely::before,
+.tree .kid.likely::before,
+.tree .kid.likely::after {
+  border-color: var(--line-likely);
+}
