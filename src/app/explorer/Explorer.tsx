@@ -71,6 +71,7 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
     setLocks(next);
     if (Object.keys(next).length === 0) {
       latest.current++; // drop any pending result
+      setWayPicks(null);
       setResult(initial);
       setBusy(false);
       setFailed(false);
