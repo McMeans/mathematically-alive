@@ -21,18 +21,42 @@ export type TiebreakOptions = {
 
 type Row = ConferenceStanding & { games: number };
 
-function conferenceGames(season: Season, conference: string): { ids: Set<number>; games: Game[] } {
+/** Per-conference data that doesn't change between simulated seasons. */
+export type ConferenceData = {
+  ids: Set<number>;
+  games: Game[];
+  /** Conference games between each pair of teams, keyed by pairKey. */
+  pairs: Map<number, Game[]>;
+  ratings: Map<number, number | null>;
+};
+
+const pairKey = (a: number, b: number): number => (a < b ? a * 4294967296 + b : b * 4294967296 + a);
+
+export function conferenceData(season: Season, conference: string): ConferenceData {
   const ids = new Set(season.teams.filter((t) => t.conference === conference).map((t) => t.id));
   const games = season.games.filter((g) => g.conferenceGame && ids.has(g.homeId) && ids.has(g.awayId));
-  return { ids, games };
+  const pairs = new Map<number, Game[]>();
+  for (const g of games) {
+    const k = pairKey(g.homeId, g.awayId);
+    const list = pairs.get(k);
+    if (list) list.push(g);
+    else pairs.set(k, [g]);
+  }
+  return { ids, games, pairs, ratings: new Map(season.teams.map((t) => [t.id, t.rating])) };
 }
 
-function rows(season: Season, conference: string, winnerOf: (game: Game) => number): Row[] {
-  const { ids, games } = conferenceGames(season, conference);
+function winnerIn(g: Game, winnerOf: (game: Game) => number): number {
+  const w = winnerOf(g);
+  if (w !== g.homeId && w !== g.awayId) throw new Error(`winnerOf returned team ${w}, who is not in game ${g.id}`);
+  return w;
+}
+
+function rows(data: ConferenceData, winnerOf: (game: Game) => number): Row[] {
+  const { ids, games } = data;
   const byId = new Map<number, Row>();
   for (const id of ids) byId.set(id, { teamId: id, wins: 0, losses: 0, pct: 0, games: 0 });
   for (const g of games) {
-    const w = winnerOf(g);
+    const w = winnerIn(g, winnerOf);
     const l = w === g.homeId ? g.awayId : g.homeId;
     byId.get(w)!.wins++;
     byId.get(l)!.losses++;
@@ -50,7 +74,7 @@ export function conferenceStandings(
   conference: string,
   winnerOf: (game: Game) => number,
 ): ConferenceStanding[] {
-  return rows(season, conference, winnerOf)
+  return rows(conferenceData(season, conference), winnerOf)
     .sort((a, b) => b.pct - a.pct || b.wins - a.wins || a.losses - b.losses || a.teamId - b.teamId)
     .map(({ teamId, wins, losses, pct }) => ({ teamId, wins, losses, pct }));
 }
@@ -62,23 +86,27 @@ export function championshipParticipants(
   winnerOf: (game: Game) => number,
   opts: TiebreakOptions,
 ): [number, number] {
-  const table = rows(season, conference, winnerOf);
-  if (table.length < 2) throw new Error(`${conference} has fewer than two teams`);
-  const teamRating = new Map(season.teams.map((t) => [t.id, t.rating]));
-  const rank = opts.rank ?? ((id: number) => teamRating.get(id) ?? -Infinity);
-  const { games } = conferenceGames(season, conference);
+  return championshipFromData(conferenceData(season, conference), conference, winnerOf, opts);
+}
+
+/** Same as championshipParticipants with the per-conference data precomputed. Not part of the public API. */
+export function championshipFromData(
+  data: ConferenceData,
+  conference: string,
+  winnerOf: (game: Game) => number,
+  opts: TiebreakOptions,
+): [number, number] {
+  if (data.ids.size < 2) throw new Error(`${conference} has fewer than two teams`);
+  const table = rows(data, winnerOf);
+  const rank = opts.rank ?? ((id: number) => data.ratings.get(id) ?? -Infinity);
 
   // net head-to-head result of a over b among conference games: >0 a won more.
   const h2h = (a: number, b: number): number => {
     let net = 0;
-    for (const g of games) {
-      if (!((g.homeId === a && g.awayId === b) || (g.homeId === b && g.awayId === a))) continue;
-      net += winnerOf(g) === a ? 1 : -1;
-    }
+    for (const g of data.pairs.get(pairKey(a, b)) ?? []) net += winnerIn(g, winnerOf) === a ? 1 : -1;
     return net;
   };
-  const played = (a: number, b: number): boolean =>
-    games.some((g) => (g.homeId === a && g.awayId === b) || (g.homeId === b && g.awayId === a));
+  const played = (a: number, b: number): boolean => data.pairs.has(pairKey(a, b));
 
   const best = <T>(items: T[], score: (x: T) => number): T[] => {
     const top = Math.max(...items.map(score));
