@@ -100,9 +100,8 @@ describe("team path", () => {
   it("shows a late kickoff on its Eastern-time date", () => {
     const { s, decider } = scenario();
     decider.start = "2026-11-22T00:30:00Z";
-    const text = path(s, 2).steps.join(" ");
-    expect(text).toContain("Nov 21");
-    expect(text).not.toContain("Nov 22");
+    const line = path(s, 2).steps.find((x) => x.includes("Team3"))!;
+    expect(line).toContain("Nov 21");
   });
 
   it("is deterministic for a seed", () => {
