@@ -45,7 +45,7 @@ export type TeamPath = {
 
 const MAX_KEY_GAMES = 5;
 const MIN_SWING = 0.01;
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const DATE_FORMAT = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
 
 /** Whole-percent odds. "<1%" and ">99%" stand in for 0 or 100 when the true value isn't exact. */
 export function formatOdds(p: number): string {
@@ -126,7 +126,7 @@ export function teamPath(season: Season, opts: PathOptions): TeamPath {
   const title = `${conference} Championship Game`;
   const when = (g: Game): string => {
     const d = new Date(g.start);
-    return Number.isNaN(d.getTime()) ? `week ${g.week}` : `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+    return Number.isNaN(d.getTime()) ? `week ${g.week}` : DATE_FORMAT.format(d);
   };
   const rootLine = (k: KeyGame): string => {
     const g = season.games[gameIndex.get(k.gameId)!];
