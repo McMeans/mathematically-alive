@@ -1,3 +1,16 @@
 // Public API of the simulation core. Everything the app, scripts and MCP
 // server use goes through here, and black-box tests import only this file.
 export { winProbability } from "./odds";
+export { seasonFromCfbd, teamRecord } from "./season";
+export type {
+  CfbdGame,
+  CfbdLines,
+  CfbdRating,
+  CfbdSnapshot,
+  CfbdTeam,
+  Classification,
+  Game,
+  TeamRecord,
+  Season,
+  Team,
+} from "./season";
