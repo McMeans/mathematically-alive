@@ -103,11 +103,12 @@ export function teamPath(season: Season, opts: PathOptions): TeamPath {
 
   const n = sim.iterations;
   const titleGame = inTitle / n;
-  const ifWinOut = own.length > 0 && outN > 0 ? outIn / outN : null;
   const status: PathStatus = titleGame === 1 ? "clinched" : titleGame === 0 ? "eliminated" : "alive";
 
   // Each outcome needs enough iterations for its conditional odds to mean anything.
+  // Conditional odds need enough simulated seasons on that side to mean anything.
   const minSample = Math.max(30, Math.ceil(n * 0.01));
+  const ifWinOut = own.length > 0 && outN >= minSample ? outIn / outN : null;
   const keyGames: KeyGame[] = [];
   candidates.forEach(({ g }, k) => {
     const awayN = n - homeN[k];

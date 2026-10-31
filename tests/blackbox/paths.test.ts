@@ -63,6 +63,16 @@ describe("team path", () => {
     expect(p.ifWinOut!).toBe(1);
   });
 
+  it("a win-out seen in too few simulated seasons gives no win-out odds", () => {
+    nextId = 0;
+    // Team 4 is a ~40-point underdog in both remaining games, so it almost never wins out.
+    const long = (home: number, away: number) => ({ ...game(home, away), spread: away === 4 ? -40 : 40 });
+    const s = season([game(1, 2, 1), game(1, 3, 1), game(2, 3, 2), long(1, 4), long(4, 2)]);
+    const p = path(s, 4);
+    expect(p.ifWinOut).toBeNull();
+    expect(p.summary).not.toMatch(/Win out/);
+  });
+
   it("ifWinOut is null when no games remain", () => {
     nextId = 0;
     const s = season([game(1, 2, 1), game(1, 3, 1), game(2, 3, 2)], 3);
