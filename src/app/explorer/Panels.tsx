@@ -44,7 +44,7 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
       </div>
       <div aria-hidden className="flex items-center gap-2 px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-ink-muted">
         <span className="w-2.5" />
-        <span className="flex-1">ACC · All · Conf</span>
+        <span className="flex-1">Team</span>
         <span className="text-right">Odds</span>
       </div>
       <ul>
@@ -70,7 +70,7 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate leading-5">{t.name}</span>
                   <span className={`block text-[11px] leading-4 tabular-nums ${selected ? "font-normal" : "text-ink-muted"}`}>
-                    {o.record.wins}-{o.record.losses} · {o.record.conferenceWins}-{o.record.conferenceLosses}
+                    {o.record.wins}-{o.record.losses} ({o.record.conferenceWins}-{o.record.conferenceLosses} ACC)
                   </span>
                 </span>
                 <span className={`w-10 text-right tabular-nums ${o.status === "eliminated" && !selected ? "font-normal text-ink-muted" : ""}`}>
@@ -132,7 +132,7 @@ export function Stats({ team, outlook, me, path, teamId, own, names }: {
           <h2 className="font-display text-2xl font-bold">{team.name}</h2>
         </div>
         <p className="mt-1 text-sm text-ink-soft">
-          {me.record.wins}-{me.record.losses} · {me.record.conferenceWins}-{me.record.conferenceLosses} ACC
+          {me.record.wins}-{me.record.losses} ({me.record.conferenceWins}-{me.record.conferenceLosses} ACC)
         </p>
       </div>
       <StatTiles outlook={me} ifWinOut={path.ifWinOut} />

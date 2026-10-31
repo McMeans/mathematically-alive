@@ -105,6 +105,9 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
       update({ ...locks, ...Object.fromEntries(likeliest.picks.map((p) => [p.gameId, p.winner])) });
     }
   }
+  // Settled In or Out by the team's own results: nothing elsewhere can change it (unless a help game is locked, so it can be undone).
+  const ownIds = new Set(own.map((g) => g.id));
+  const showHelp = tree.root.outcome === null || Object.keys(locks).some((id) => !ownIds.has(Number(id)));
   const status = busy ? "Updating…" : failed ? "Couldn’t update. Showing the last result." : "";
 
   const list = (
@@ -209,8 +212,12 @@ export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Pro
               }} />
             </div>
 
-            <h2 className="mt-8 font-display text-xl font-bold">Help from elsewhere</h2>
-            <HelpList help={help} base={initial.tree} live={tree} names={names} locks={locks} onPick={pick} way={way} />
+            {showHelp && (
+              <>
+                <h2 className="mt-8 font-display text-xl font-bold">Help from elsewhere</h2>
+                <HelpList help={help} base={initial.tree} live={tree} names={names} locks={locks} onPick={pick} way={way} />
+              </>
+            )}
           </div>
         </main>
 

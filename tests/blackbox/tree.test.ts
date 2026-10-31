@@ -135,13 +135,14 @@ describe("path tree", () => {
     }
   });
 
-  it("a team that is in whatever happens gets a single settled root", () => {
+  it("a team that is in whatever happens keeps its tree, every branch in", () => {
     nextId = 0;
     const s = season([game(1, 3, 1), game(1, 4, 1), game(2, 3, 2), game(2, 4, 2), game(1, 2), game(3, 4)]);
     const t = pathTree(s, { ...base, teamId: 1 }).root;
     expect(t.outcome).toBe("in");
-    expect(t.children).toEqual([]);
-    expect(t.rest).toBe(1);
+    expect(t.verdict).toBe("In");
+    expect(t.children.map((c) => c.label)).toEqual(["Beat Team2", "Lose to Team2"]);
+    expect(t.children.every((c) => c.outcome === "in")).toBe(true);
   });
 
   it("non-conference games stay out of the tree and the footnote names them", () => {
@@ -256,13 +257,13 @@ describe("path tree", () => {
     expect(() => pathTree(s, { ...base, teamId: 1, depth: -1 })).toThrow(RangeError);
   });
 
-  it("builds a tree for every team in the 2025 ACC fixture with the last two weeks unplayed", () => {
+  it("builds a tree for every team in the 2025 ACC fixture with the last three weeks unplayed", () => {
     const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     const cut: Season = {
       ...full,
-      games: full.games.map((g) => (g.week > last - 2 ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
+      games: full.games.map((g) => (g.week > last - 3 ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
     };
     let early = 0;
     for (const t of cut.teams.filter((x) => x.conference === "ACC")) {
@@ -403,7 +404,7 @@ describe("help from elsewhere", () => {
     expect(locked.likeliest).toBeNull();
   });
 
-  it("the likeliest way in picks a result for every other conference game left", () => {
+  it("the likeliest way in picks only games elsewhere that matter, each one in the help list", () => {
     const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
@@ -416,7 +417,10 @@ describe("help from elsewhere", () => {
       const tree = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 2000, seed: 1 });
       if (!tree.likeliest) continue;
       const picked = new Set(tree.likeliest.picks.map((p) => p.gameId));
-      for (const h of tree.help) expect(picked.has(h.gameId)).toBe(true);
+      const own = new Set(cut.games.filter((g) => g.homeId === t.id || g.awayId === t.id).map((g) => g.id));
+      const mattering = new Set(tree.help.filter((h) => h.now || h.scenario !== null).map((h) => h.gameId));
+      for (const id of picked) if (!own.has(id)) expect(mattering.has(id)).toBe(true);
+      expect(picked.size).toBeLessThan(own.size + tree.help.length);
       expect(tree.likeliest.share).toBeGreaterThan(0);
       checked++;
     }
