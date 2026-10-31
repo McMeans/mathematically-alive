@@ -39,7 +39,7 @@ describe("team path", () => {
     const p = path(scenario().s, 1);
     expect(p.status).toBe("clinched");
     expect(p.titleGame).toBe(1);
-    expect(p.summary).toBe("Made the C title game in every simulated season.");
+    expect(p.summary).toBe("Team1 is in the C title game whatever happens.");
   });
 
   it("an eliminated team says eliminated", () => {
@@ -50,7 +50,7 @@ describe("team path", () => {
     ], 5);
     const p = path(s, 5);
     expect(p.status).toBe("eliminated");
-    expect(p.summary).toBe("Missed the C title game in every simulated season.");
+    expect(p.summary).toBe("Team5 can't make the C title game: no combination of remaining results gets it there.");
     expect(p.keyGames).toEqual([]);
   });
 

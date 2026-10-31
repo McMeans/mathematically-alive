@@ -1,6 +1,7 @@
 // Season outlook for one conference: how likely each team is to reach the
 // conference championship game, win it, and (experimentally) make the playoff.
-import { gameWinProbability, mix, mulberry32, simulateSeason } from "./sim";
+import { gameWinProbability, mix, mulberry32, simulateSeason, type SimResult } from "./sim";
+import { provenStatus } from "./proof";
 import { teamRecord } from "./season";
 import type { Game, Season, TeamRecord } from "./season";
 import { championshipFromData, conferenceData } from "./tiebreak";
@@ -24,6 +25,8 @@ export type TeamOutlook = {
   champion: number;
   /** EXPERIMENTAL rough estimate of making the playoff; see PLAYOFF_FIELD. */
   playoff: number;
+  /** Proven over every combination of remaining results: "clinched" / "eliminated" a title-game spot, else "alive". */
+  status: "clinched" | "alive" | "eliminated";
 };
 
 export type SeasonOutlook = { iterations: number; teams: TeamOutlook[] };
@@ -36,12 +39,13 @@ export type SeasonOutlook = { iterations: number; teams: TeamOutlook[] };
 const PLAYOFF_FIELD = 11;
 const MISSING_RATING = 0;
 
-export function seasonOutlook(season: Season, opts: OutlookOptions): SeasonOutlook {
+/** `shared`: a simulation of the same season, iterations, seed and locks to reuse. */
+export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: SimResult): SeasonOutlook {
   const { conference, iterations, seed } = opts;
   const data = conferenceData(season, conference);
   if (data.ids.size < 2) throw new Error(`${conference} has fewer than two teams`);
 
-  const sim = simulateSeason(season, { iterations, seed, locks: opts.locks });
+  const sim = shared ?? simulateSeason(season, { iterations, seed, locks: opts.locks });
   const gameIndex = new Map<number, number>(season.games.map((g, i) => [g.id, i]));
   const fbs = season.teams.filter((t) => t.classification === "fbs");
   const ratingOf = new Map(season.teams.map((t) => [t.id, t.rating ?? MISSING_RATING]));
@@ -107,6 +111,11 @@ export function seasonOutlook(season: Season, opts: OutlookOptions): SeasonOutlo
   });
 
   const n = sim.iterations;
+  const statusOf = (p: number, id: number): TeamOutlook["status"] => {
+    if (p !== 0 && p !== 1) return "alive";
+    const s = provenStatus(season, conference, id, opts.locks);
+    return s === "open" ? "alive" : s;
+  };
   return {
     iterations: n,
     teams: inConf.map((id) => ({
@@ -117,6 +126,7 @@ export function seasonOutlook(season: Season, opts: OutlookOptions): SeasonOutlo
       titleGame: titleGame.get(id)! / n,
       champion: champion.get(id)! / n,
       playoff: (playoff.get(id) ?? 0) / n,
+      status: statusOf(titleGame.get(id)! / n, id),
     })),
   };
 }

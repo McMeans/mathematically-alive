@@ -17,7 +17,8 @@ import { formatOdds, type PathOptions } from "./paths";
 import { teamRecord } from "./season";
 import type { Game, Season } from "./season";
 import { OVERALL, SCENARIO, isClear } from "./signal";
-import { mix, mulberry32, simulateSeason } from "./sim";
+import { mix, mulberry32, simulateSeason, type SimResult } from "./sim";
+import { provenStatus } from "./proof";
 import { championshipFromData, conferenceData } from "./tiebreak";
 
 export type TreeOptions = PathOptions & {
@@ -122,7 +123,8 @@ const plural = (n: number, one: string, many: string): string => `${n} ${n === 1
 type Step = { opp: string; win: boolean };
 type Peak = Omit<NonNullable<HelpGame["scenario"]>, "line">;
 
-export function pathTree(season: Season, opts: TreeOptions): PathTree {
+/** `shared`: a simulation of the same season, iterations, seed and locks to reuse. */
+export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult): PathTree {
   const { conference, teamId, iterations, seed } = opts;
   const data = conferenceData(season, conference);
   if (data.ids.size < 2) throw new Error(`${conference} has fewer than two teams`);
@@ -130,7 +132,7 @@ export function pathTree(season: Season, opts: TreeOptions): PathTree {
   const wanted = opts.depth ?? MAX_DEPTH;
   if (!Number.isInteger(wanted) || wanted < 0) throw new RangeError("depth must be a non-negative integer");
 
-  const sim = simulateSeason(season, { iterations, seed, locks: opts.locks });
+  const sim = shared ?? simulateSeason(season, { iterations, seed, locks: opts.locks });
   const gameIndex = new Map<number, number>(season.games.map((g, i) => [g.id, i]));
   const name = (id: number): string => season.teams.find((t) => t.id === id)?.name ?? `Team ${id}`;
   const team = name(teamId);
@@ -214,14 +216,25 @@ export function pathTree(season: Season, opts: TreeOptions): PathTree {
     }
   };
 
-  const settle = (node: TreeNode, level: number): TreeNode => {
+  const prefixLocks = (path: Step[]): Record<number, number> => {
+    const l: Record<number, number> = { ...opts.locks };
+    path.forEach((p, k) => {
+      const g = levels[k].g;
+      l[g.id] = p.win ? teamId : g.homeId === teamId ? g.awayId : g.homeId;
+    });
+    return l;
+  };
+  const settle = (node: TreeNode, level: number, path: Step[]): TreeNode => {
     const rest = depth - level;
     const left = rest > 0 ? ` ${rest === 1 ? "The last game" : `The last ${rest} games`} can't change that.` : "";
     const stop = (outcome: TreeOutcome, verdict: string, note: string): TreeNode => ({ ...node, outcome, verdict, note, rest });
     if (node.reach === 0) return stop("never", "—", "A locked result rules this out.");
     if (node.odds === null) return level === 0 ? node : stop("rare", "Rare", "Too few simulated seasons go this way to put odds on it.");
-    if (node.odds === 1) return stop("in", "In", `Makes the title game in every simulated season that goes this way.${left}`);
-    if (node.odds === 0) return stop("out", "Out", `Misses the title game in every simulated season that goes this way.${left}`);
+    const proof = node.odds === 1 || node.odds === 0 ? provenStatus(season, conference, teamId, prefixLocks(path)) : "open";
+    if (proof === "open" && node.odds === 1) return { ...node, verdict: ">99%" };
+    if (proof === "open" && node.odds === 0) return { ...node, verdict: "<1%" };
+    if (node.odds === 1) return stop("in", "In", `In the title game whatever else happens.${left}`);
+    if (node.odds === 0) return stop("out", "Out", `Can't make the title game from here: no combination of other results gets there.${left}`);
     return node;
   };
 
@@ -244,7 +257,7 @@ export function pathTree(season: Season, opts: TreeOptions): PathTree {
         : null,
       likely: false,
       children: [],
-    }, level);
+    }, level, path);
     if (node.outcome !== null) return node;
     if (level > 0) considerScenario(lo, hi, path);
     if (last) return node;
@@ -280,7 +293,7 @@ export function pathTree(season: Season, opts: TreeOptions): PathTree {
     root,
     footnote: footnote(ownAll.filter(({ g }) => !confGames.has(g)).map(({ g }) => g), ownConf.length - depth, depth, teamId, conference, name),
     help,
-    helpNote: helpNote(help, titleGame, team, conference),
+    helpNote: helpNote(help, root.outcome === "in" ? "clinched" : root.outcome === "out" ? "eliminated" : "open", team, conference),
   };
 }
 
@@ -321,10 +334,10 @@ function helpGames(
   return help.sort((x, y) => tier(x) - tier(y) || weight(y) - weight(x) || order.get(x.gameId)! - order.get(y.gameId)!);
 }
 
-function helpNote(help: HelpGame[], titleGame: number, team: string, conference: string): string {
+function helpNote(help: HelpGame[], status: string, team: string, conference: string): string {
   if (help.length === 0) return `No other ${conference} games are left to play.`;
-  if (titleGame === 1 || titleGame === 0) {
-    return `${team} ${titleGame === 1 ? "makes" : "misses"} the title game in every simulated season, so no result elsewhere changes that.`;
+  if (status !== "open") {
+    return `${team} is ${status === "clinched" ? "in" : "out"} whatever happens, so no result elsewhere changes that.`;
   }
   const quiet = help.filter((x) => tier(x) === 2).length;
   if (quiet === help.length) {

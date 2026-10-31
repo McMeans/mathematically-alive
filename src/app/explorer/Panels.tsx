@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import type { TeamOutlook, TeamPath } from "@/core";
+import { formatChance, type TeamOutlook, type TeamPath } from "@/core";
 import { NAVY, pct, type GameInfo, type TeamInfo } from "./Explorer";
 
 export function TeamList({ teams, order, outlook, selectedId }: { teams: TeamInfo[]; order: number[]; outlook: TeamOutlook[]; selectedId: number }) {
@@ -42,8 +42,8 @@ export function TeamList({ teams, order, outlook, selectedId }: { teams: TeamInf
                 <span className="text-xs font-normal text-ink-muted">
                   {o.record.wins}-{o.record.losses}
                 </span>
-                <span className={`w-10 text-right tabular-nums ${o.titleGame === 0 ? "font-normal text-ink-muted" : ""}`}>
-                  {o.titleGame === 0 ? "Out" : pct(o.titleGame)}
+                <span className={`w-10 text-right tabular-nums ${o.status === "eliminated" ? "font-normal text-ink-muted" : ""}`}>
+                  {formatChance(o.titleGame, o.status)}
                 </span>
               </Link>
             </li>
@@ -70,7 +70,7 @@ function Tile({ label, value, tone, badge }: { label: string; value: string; ton
 export function StatTiles({ outlook, ifWinOut, compact }: { outlook: TeamOutlook; ifWinOut: number | null; compact?: boolean }) {
   return (
     <dl className={`grid gap-2 ${compact ? "grid-cols-3" : "grid-cols-2"}`}>
-      <Tile label="Title game" value={pct(outlook.titleGame)} tone="text-turf" />
+      <Tile label="Title game" value={formatChance(outlook.titleGame, outlook.status)} tone="text-turf" />
       <Tile label="Win ACC" value={pct(outlook.champion)} tone="text-navy" />
       <Tile label="Playoff" value={pct(outlook.playoff)} tone="text-navy" badge />
       {!compact && <Tile label="Win out" value={pct(ifWinOut)} tone="text-navy" />}
@@ -127,7 +127,7 @@ export function Stats({ team, outlook, me, path, teamId, own, names }: {
               <span aria-hidden className="h-2 rounded-full bg-mist">
                 <span className="block h-full rounded-full" style={{ width: `${Math.round(o.titleGame * 100)}%`, background: o.teamId === teamId ? "#D9622B" : NAVY }} />
               </span>
-              <span className="text-right tabular-nums">{pct(o.titleGame)}</span>
+              <span className="text-right tabular-nums">{formatChance(o.titleGame, o.status)}</span>
             </li>
           ))}
         </ol>

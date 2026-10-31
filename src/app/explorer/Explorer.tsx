@@ -20,8 +20,7 @@ type Props = {
   own: GameInfo[];
   /** Frozen for this team: the other conference games that matter (now or in a scenario), from the run with no locks. */
   help: HelpGame[];
-  year: number;
-  lastWeek: number;
+  asOf: string;
   initial: Result;
 };
 
@@ -29,7 +28,7 @@ export const NAVY = "#14213D";
 export const pct = (p: number | null) => (p === null ? "—" : formatOdds(p));
 export const oddsTone = (p: number | null) => (p === null ? "text-navy" : p >= 0.5 ? "text-turf" : p < 0.1 ? "text-marker-text" : "text-navy");
 
-export function Explorer({ teamId, teams, names, own, help, year, lastWeek, initial }: Props) {
+export function Explorer({ teamId, teams, names, own, help, asOf, initial }: Props) {
   const [locks, setLocks] = useState<Locks>({});
   const [result, setResult] = useState<Result>(initial);
   const [busy, setBusy] = useState(false);
@@ -104,7 +103,7 @@ export function Explorer({ teamId, teams, names, own, help, year, lastWeek, init
         <div className="flex items-center gap-3">
           <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">ACC</span>
           <span className="hidden text-sm text-ink-muted sm:inline">
-            {year} · after Week {lastWeek}
+            {asOf}
           </span>
         </div>
       </header>

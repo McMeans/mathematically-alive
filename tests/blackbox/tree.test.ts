@@ -126,7 +126,7 @@ describe("path tree", () => {
     expect(early.label).toBe("Beat Team3");
     expect(early.outcome).toBe("in");
     expect(early.rest).toBe(1);
-    expect(early.note).toBe("Makes the title game in every simulated season that goes this way. The last game can't change that.");
+    expect(early.note).toBe("In the title game whatever else happens. The last game can't change that.");
     const open = nodes(root).filter((n) => n.outcome === null);
     for (const n of open) {
       expect(n.verdict).toBe(formatOdds(n.odds!));
@@ -317,7 +317,10 @@ describe("help from elsewhere", () => {
     const { s, other } = needsHelp();
     const t = pathTree(s, { ...base, teamId: 1 });
     const [win, loss] = t.root.children;
-    expect(loss.outcome).toBe("out");
+    // Out in every simulated season, but only through the rating tiebreak, which could go either way: not proven.
+    expect(loss.odds).toBe(0);
+    expect(loss.outcome).toBeNull();
+    expect(loss.verdict).toBe("<1%");
     expect(win.outcome).toBeNull();
     const h = t.help.find((x) => x.gameId === other.id)!;
     expect(h.now).toBe(true);
@@ -404,7 +407,7 @@ describe("help from elsewhere", () => {
     nextId = 100;
     const out = season([game(2, 1, 2), game(3, 1, 3), game(4, 1, 4), game(2, 3), game(2, 4)]);
     expect(pathTree(out, { ...base, teamId: 1 }).helpNote).toBe(
-      "Team1 misses the title game in every simulated season, so no result elsewhere changes that.",
+      "Team1 is out whatever happens, so no result elsewhere changes that.",
     );
     expect(pathTree(out, { ...base, teamId: 1 }).root.verdict).toBe("Out");
   });

@@ -2,7 +2,8 @@
 // Everything is Monte Carlo based: odds are counts over simulated seasons, so
 // "clinched" and "eliminated" mean the title-game odds came out as exactly 1 or
 // 0 in the sample, not that they are mathematically proven.
-import { mix, mulberry32, simulateSeason } from "./sim";
+import { mix, mulberry32, simulateSeason, type SimResult } from "./sim";
+import { provenStatus } from "./proof";
 import type { Game, Season } from "./season";
 import { OVERALL, isClear } from "./signal";
 import { championshipFromData, conferenceData } from "./tiebreak";
@@ -32,7 +33,7 @@ export type KeyGame = {
 };
 
 export type TeamPath = {
-  /** Monte Carlo based: "clinched" means the team made the title game in every simulated season, "eliminated" in none; neither is a proof. */
+  /** "clinched" / "eliminated" are proven over every combination of remaining results (rating and coin-flip tiebreak steps count either way). */
   status: PathStatus;
   /** Fraction of iterations the team plays in the title game. */
   titleGame: number;
@@ -47,6 +48,15 @@ export type TeamPath = {
 const MAX_KEY_GAMES = 5;
 const DATE_FORMAT = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
 
+/** Odds as shown: "In" / "Out" only when proven, otherwise whole percent, never 0% or 100% for a sample. */
+export function formatChance(p: number, status: PathStatus): string {
+  if (status === "clinched") return "In";
+  if (status === "eliminated") return "Out";
+  if (p <= 0) return "<1%";
+  if (p >= 1) return ">99%";
+  return formatOdds(p);
+}
+
 /** Whole-percent odds. "<1%" and ">99%" stand in for 0 or 100 when the true value isn't exact. */
 export function formatOdds(p: number): string {
   const r = Math.round(p * 100);
@@ -55,13 +65,14 @@ export function formatOdds(p: number): string {
   return `${r}%`;
 }
 
-export function teamPath(season: Season, opts: PathOptions): TeamPath {
+/** `shared`: a simulation of the same season, iterations, seed and locks to reuse. */
+export function teamPath(season: Season, opts: PathOptions, shared?: SimResult): TeamPath {
   const { conference, teamId, iterations, seed } = opts;
   const data = conferenceData(season, conference);
   if (data.ids.size < 2) throw new Error(`${conference} has fewer than two teams`);
   if (!data.ids.has(teamId)) throw new Error(`team ${teamId} is not in ${conference}`);
 
-  const sim = simulateSeason(season, { iterations, seed, locks: opts.locks });
+  const sim = shared ?? simulateSeason(season, { iterations, seed, locks: opts.locks });
   const gameIndex = new Map<number, number>(season.games.map((g, i) => [g.id, i]));
   const name = (id: number): string => season.teams.find((t) => t.id === id)?.name ?? `Team ${id}`;
 
@@ -102,7 +113,9 @@ export function teamPath(season: Season, opts: PathOptions): TeamPath {
 
   const n = sim.iterations;
   const titleGame = inTitle / n;
-  const status: PathStatus = titleGame === 1 ? "clinched" : titleGame === 0 ? "eliminated" : "alive";
+  // Clinched / eliminated only when proven over every combination of remaining results, not just the sample.
+  const proven = titleGame === 1 || titleGame === 0 ? provenStatus(season, conference, teamId, opts.locks) : "open";
+  const status: PathStatus = proven === "clinched" ? "clinched" : proven === "eliminated" ? "eliminated" : "alive";
 
   // Each outcome needs enough iterations for its conditional odds to mean anything.
   // Conditional odds need enough simulated seasons on that side to mean anything.
@@ -140,8 +153,8 @@ export function teamPath(season: Season, opts: PathOptions): TeamPath {
 
   let summary: string;
   const steps: string[] = [];
-  if (status === "clinched") summary = `Made the ${conference} title game in every simulated season.`;
-  else if (status === "eliminated") summary = `Missed the ${conference} title game in every simulated season.`;
+  if (status === "clinched") summary = `${team} is in the ${conference} title game whatever happens.`;
+  else if (status === "eliminated") summary = `${team} can't make the ${conference} title game: no combination of remaining results gets it there.`;
   else if (ifWinOut !== null) summary = `Win out and ${team} makes the ${conference} title game ${formatOdds(ifWinOut)} of the time.`;
   else if (keyGames.length > 0) summary = rootLine(keyGames[0]);
   else summary = `${team} has a ${formatOdds(titleGame)} chance of making the ${conference} title game.`;
