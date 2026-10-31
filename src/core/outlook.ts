@@ -63,9 +63,9 @@ export function seasonOutlook(season: Season, opts: OutlookOptions): SeasonOutlo
     return p;
   };
 
-  // Draws for tiebreaks and the title game come from their own stream, so
-  // they never disturb the game simulation's stream.
-  const rand = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+  // Tiebreak draws and the title-game roll come from fresh streams seeded per
+  // iteration (never a shared stream), so iteration k's draws don't depend on
+  // how many draws earlier iterations used and what-if runs stay paired.
   const titleGame = new Map<number, number>(inConf.map((id) => [id, 0]));
   const champion = new Map<number, number>(inConf.map((id) => [id, 0]));
   const playoff = new Map<number, number>(fbs.map((t) => [t.id, 0]));
@@ -73,12 +73,13 @@ export function seasonOutlook(season: Season, opts: OutlookOptions): SeasonOutlo
   const w = new Map<number, number>();
   const l = new Map<number, number>();
 
-  sim.forEachIteration((_, winnerAt) => {
+  sim.forEachIteration((iteration, winnerAt) => {
+    const rand = mulberry32(mix(seed, iteration, 1));
     const winnerOf = (g: Game): number => winnerAt(gameIndex.get(g.id)!);
     const [a, b] = championshipFromData(data, conference, winnerOf, { draw: rand });
     titleGame.set(a, titleGame.get(a)! + 1);
     titleGame.set(b, titleGame.get(b)! + 1);
-    const champ = rand() < tgProb(a, b) ? a : b;
+    const champ = mulberry32(mix(seed, iteration, 2))() < tgProb(a, b) ? a : b;
     champion.set(champ, champion.get(champ)! + 1);
 
     w.clear();
@@ -118,4 +119,15 @@ export function seasonOutlook(season: Season, opts: OutlookOptions): SeasonOutlo
       playoff: (playoff.get(id) ?? 0) / n,
     })),
   };
+}
+
+/** Hash (seed, iteration, salt) to a well-mixed 32-bit stream seed. */
+function mix(seed: number, iteration: number, salt: number): number {
+  let h = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(iteration + 1, 0xc2b2ae35) ^ Math.imul(salt, 0x27d4eb2f);
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return h >>> 0;
 }

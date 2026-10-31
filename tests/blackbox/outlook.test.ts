@@ -116,6 +116,28 @@ describe("season outlook", () => {
     expect(t.playoff).toBeLessThan(1);
   });
 
+  it("keeps what-if runs paired: locking a game outside the conference leaves its odds identical", () => {
+    const { season } = build();
+    const outside = season.games[12]; // 10 vs 11, no conference team involved
+    const base = run(season);
+    const locked = run(season, { locks: { [outside.id]: 11 } });
+    for (const t of base.teams) {
+      const l = byTeam(locked, t.teamId);
+      expect(l.titleGame).toBe(t.titleGame);
+      expect(l.champion).toBe(t.champion);
+    }
+  });
+
+  it("keeps a lock's effect local: locking 2 over 4 doesn't change team 5 or team 1's title game", () => {
+    const { season } = build();
+    const g = season.games[8]; // 2 vs 4
+    const locked = run(season, { locks: { [g.id]: 2 } });
+    const base = run(season);
+    expect(byTeam(locked, 1).titleGame).toBe(byTeam(base, 1).titleGame);
+    expect(byTeam(locked, 5).titleGame).toBe(0);
+    expect(byTeam(locked, 4).titleGame).toBeLessThan(byTeam(base, 4).titleGame);
+  });
+
   it("throws for a conference with no teams", () => {
     const { season } = build();
     expect(() => seasonOutlook(season, { conference: "Nope", iterations: 10, seed: 1 })).toThrow(/fewer than two teams/);
