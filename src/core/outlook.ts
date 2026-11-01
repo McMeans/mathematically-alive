@@ -16,6 +16,7 @@ export type OutlookOptions = {
 
 export type TeamOutlook = {
   teamId: number;
+  /** Record so far, counting locked results as played. */
   record: TeamRecord;
   expectedWins: number;
   expectedConferenceWins: number;
@@ -144,7 +145,7 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
     iterations: n,
     teams: inConf.map((id) => ({
       teamId: id,
-      record: teamRecord(season, id),
+      record: teamRecord(season, id, opts.locks),
       expectedWins: sim.teams[id].expectedWins,
       expectedConferenceWins: sim.teams[id].expectedConferenceWins,
       titleGame: titleGame.get(id)! / n,

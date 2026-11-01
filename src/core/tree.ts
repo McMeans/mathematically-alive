@@ -16,10 +16,10 @@
 import { formatFine, formatOdds, type PathOptions } from "./paths";
 import { teamRecord } from "./season";
 import type { Game, Season } from "./season";
-import { OVERALL, SCENARIO, isClear } from "./signal";
+import { FAINT, OVERALL, SCENARIO, isClear } from "./signal";
 import { gameWinProbability, mix, mulberry32, simulateSeason, type SimResult } from "./sim";
 import { likeliestWayIn, type WayIn } from "./likeliest";
-import { provenStatus } from "./proof";
+import { provenStatus, type ProvenStatus } from "./proof";
 import { championshipFromData, conferenceData } from "./tiebreak";
 
 export type TreeOptions = PathOptions & {
@@ -79,6 +79,8 @@ export type HelpGame = {
   swing: number;
   /** The result clearly moves the team's odds right now (at least 1 point and clear of sampling noise). */
   now: boolean;
+  /** The result moves the team's odds at all, past sampling noise: a lower bar than `now`, with no minimum size. */
+  leans: boolean;
   /**
    * The team's own-result scenario where this game swings the odds most, when that's clearly
    * bigger than now (at least 5 points more and clear of sampling noise). Null otherwise.
@@ -168,6 +170,8 @@ export type WayWeek = {
 export type Impact = "big" | "some" | "small";
 // Impact is the gap between the two sides' odds, relative to the team's odds now (floored at 2%, so a
 // long shot's noise doesn't read as big): at least half of it is big, a fifth some, anything else small.
+// Search nodes for proving the picks alone settle the team. More than one game side gets: when it works, every other proof is skipped.
+const ROOT_BUDGET = 150_000;
 const IMPACT_FLOOR = 0.02;
 const BIG = 0.5;
 const SOME = 0.2;
@@ -191,6 +195,12 @@ export type SeasonWeek = {
   } | null;
   /** The team's conference game that week when it's already final; null otherwise. */
   played: { gameId: number; opponent: string; site: "home" | "away" | "neutral"; won: boolean; score: string } | null;
+  /**
+   * The team's non-conference game that week: on the schedule, but not in the conference standings
+   * (it only feeds the ranking used to break a tie).
+   * `won` and `score` once it's final, else null.
+   */
+  nonConference: { gameId: number; opponent: string; site: "home" | "away" | "neutral"; date: string; won: boolean | null; score: string | null } | null;
   /**
    * Every game elsewhere that week: locked ones first, then those that matter, then the rest, biggest swing first.
    * `ifHome`/`ifAway`: the team's odds if that side wins, for display.
@@ -232,6 +242,8 @@ const MAX_DEPTH = 12;
 // Odds for the other side of a locked game: a small simulation each, for at most this many games per call.
 const SWAP_ITERATIONS = 2_000;
 const MAX_SWAP_SIMS = 12;
+// Search nodes for a swapped pick's first, quick proof.
+const QUICK_BUDGET = 3_000;
 const DATE_FORMAT = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
 
 const when = (g: Game): string => {
@@ -340,6 +352,20 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     }
   };
 
+  // Proofs are the slow part, and the same lock sets come up more than once (a branch of the tree and its game in the
+  // week list, a game side and its verdict). Once the locks alone settle the team, adding more can't change that (swapping one can).
+  const proofs = new Map<string, ProvenStatus>();
+  const baseKey = Object.entries(opts.locks ?? {}).sort().join();
+  const proven = (locks: Record<number, number>): ProvenStatus => {
+    const base = proofs.get(baseKey);
+    const more = Object.entries(opts.locks ?? {}).every(([id, w]) => locks[Number(id)] === w);
+    if (more && base !== undefined && base !== "open") return base;
+    const key = Object.entries(locks).sort().join();
+    let s = proofs.get(key);
+    if (s === undefined) proofs.set(key, (s = provenStatus(season, conference, teamId, locks, key === baseKey ? ROOT_BUDGET : undefined)));
+    return s;
+  };
+
   const prefixLocks = (path: Step[]): Record<number, number> => {
     const l: Record<number, number> = { ...opts.locks };
     path.forEach((p, k) => {
@@ -354,7 +380,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     const stop = (outcome: TreeOutcome, verdict: string, note: string): TreeNode => ({ ...node, outcome, verdict, note, rest });
     if (node.reach === 0) return stop("never", "—", "A locked result rules this out.");
     if (node.odds === null) return level === 0 ? node : stop("rare", "Rare", "Too few simulated seasons go this way to put odds on it.");
-    const proof = node.odds === 1 || node.odds === 0 ? provenStatus(season, conference, teamId, prefixLocks(path)) : "open";
+    const proof = node.odds === 1 || node.odds === 0 ? proven(prefixLocks(path)) : "open";
     if (proof === "open" && node.odds === 1) return { ...node, verdict: ">99%" };
     if (proof === "open" && node.odds === 0) return { ...node, verdict: "<1%" };
     if (node.odds === 1) return stop("in", "In", `In the title game whatever else happens.${left}`);
@@ -415,7 +441,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
   for (const h of help) {
     const proveIf = (p: number | null, winner: number): "in" | "out" | null => {
       if (p !== 0 && p !== 1) return null;
-      const s = provenStatus(season, conference, teamId, { ...opts.locks, [h.gameId]: winner });
+      const s = proven({ ...opts.locks, [h.gameId]: winner });
       return s === "clinched" ? "in" : s === "eliminated" ? "out" : null;
     };
     h.ifHomeWins = proveIf(h.oddsIfHomeWins, h.homeId);
@@ -480,19 +506,21 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
   let swapSims = 0;
   const swapped = (gameId: number, winner: number): string => {
     const swap = { ...opts.locks, [gameId]: winner };
-    const s = provenStatus(season, conference, teamId, swap);
-    if (s === "clinched") return "In";
-    if (s === "eliminated") return "Out";
-    if (swapSims++ >= MAX_SWAP_SIMS) return "—";
+    const settled = (s: ProvenStatus) => (s === "clinched" ? "In" : s === "eliminated" ? "Out" : null);
+    // A quick proof, then the simulation; the full proof only when the simulation is all one way.
+    const quick = settled(provenStatus(season, conference, teamId, swap, QUICK_BUDGET));
+    if (quick) return quick;
+    if (swapSims++ >= MAX_SWAP_SIMS) return settled(proven(swap)) ?? "—";
     const n = Math.min(SWAP_ITERATIONS, iterations);
     let hit = 0;
     simulateSeason(season, { iterations: n, seed, locks: swap }).forEachIteration((it, winnerAt, teams) => {
       const [x, y] = championshipFromData(data, conference, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: mulberry32(mix(seed, it, 1)), rank: teams.rank });
       if (x === teamId || y === teamId) hit++;
     });
-    return hit === 0 ? "<0.1%" : hit === n ? ">99%" : formatFine(hit / n);
+    if (hit > 0 && hit < n) return formatFine(hit / n);
+    return settled(proven(swap)) ?? (hit === 0 ? "<0.1%" : ">99%");
   };
-  const proofOf = (gameId: number, winner: number) => provenStatus(season, conference, teamId, { ...opts.locks, [gameId]: winner });
+  const proofOf = (gameId: number, winner: number) => proven({ ...opts.locks, [gameId]: winner });
   const verdict = (odds: number | null, gameId: number, winner: number): string => {
     if (odds === 1 || odds === 0) {
       const s = proofOf(gameId, winner);
@@ -510,7 +538,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
   const byWeek = new Map<number, SeasonWeek>();
   const weekOf = (g: Game): SeasonWeek => {
     let w = byWeek.get(g.week);
-    if (!w) byWeek.set(g.week, (w = { week: g.week, label: when(g), own: null, played: null, games: [], quiet: 0 }));
+    if (!w) byWeek.set(g.week, (w = { week: g.week, label: when(g), own: null, played: null, nonConference: null, games: [], quiet: 0 }));
     return w;
   };
   levels.forEach(({ g }, k) => {
@@ -565,6 +593,19 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
       won: mine > theirs, score: `${mine}-${theirs}`,
     };
   }
+  for (const g of season.games) {
+    const w = byWeek.get(g.week);
+    if (!w || g.conferenceGame || (g.homeId !== teamId && g.awayId !== teamId)) continue;
+    const home = g.homeId === teamId;
+    const mine = home ? g.homePoints : g.awayPoints;
+    const theirs = home ? g.awayPoints : g.homePoints;
+    const final = g.completed && mine != null && theirs != null;
+    if (!w.own && !w.played) w.label = when(g);
+    w.nonConference = {
+      gameId: g.id, opponent: name(home ? g.awayId : g.homeId), site: g.neutralSite ? "neutral" : home ? "home" : "away", date: when(g),
+      won: final ? mine > theirs : null, score: final ? `${mine}-${theirs}` : null,
+    };
+  }
   for (const w of byWeek.values()) w.games.sort((a, b) => Number(b.matters) - Number(a.matters) || b.swing - a.swing || a.gameId - b.gameId);
   const weeks = [...byWeek.values()].sort((a, b) => a.week - b.week);
 
@@ -607,7 +648,7 @@ function helpGames(
       gameId: g.id, homeId: g.homeId, awayId: g.awayId,
       label: `${name(g.awayId)} ${g.neutralSite ? "vs" : "at"} ${name(g.homeId)}`,
       detail: when(g),
-      oddsIfHomeWins, oddsIfAwayWins, swing, now, scenario,
+      oddsIfHomeWins, oddsIfAwayWins, swing, now, leans: both && isClear(hn, hIn, an, aIn, FAINT), scenario,
       rooting: from === null ? null : from[0] >= from[1] ? g.homeId : g.awayId,
       ifHomeWins: null, ifAwayWins: null,
     };
@@ -705,13 +746,18 @@ function wayParts(
   return { ownJob, ownChance, rivals, weeks };
 }
 
-/** Which side of a game elsewhere helps the team, and how much. Nothing when the sample can't say or the gap is noise. */
+/** Which side of a game elsewhere helps the team, and how much, however little. Nothing when neither side does (or the sample can't tell). */
 function helpsSide(g: Game, h: HelpGame, now: number): { helps: number | null; impact: Impact | null } {
   const a = h.oddsIfHomeWins;
   const b = h.oddsIfAwayWins;
-  if (a === null || b === null || a === b || (!h.now && !h.scenario)) return { helps: null, impact: null };
+  if (a === null || b === null) return { helps: null, impact: null };
+  // A proof settles it even when the sample can't tell the sides apart: "In" beats ">99%", "<0.1%" beats "Out".
+  const sure = (p: "in" | "out" | null) => (p === "in" ? 1 : p === "out" ? -1 : 0);
+  const proven = sure(h.ifHomeWins) - sure(h.ifAwayWins);
+  const edge = proven !== 0 ? Math.sign(proven) : h.leans || h.scenario ? Math.sign(a - b) : 0;
+  if (edge === 0) return { helps: null, impact: null };
   const rel = Math.abs(a - b) / Math.max(now, IMPACT_FLOOR);
-  return { helps: a > b ? g.homeId : g.awayId, impact: rel >= BIG ? "big" : rel >= SOME ? "some" : "small" };
+  return { helps: edge > 0 ? g.homeId : g.awayId, impact: rel >= BIG ? "big" : rel >= SOME ? "some" : "small" };
 }
 
 /** A named pick's winner, kept only when the odds agree it's the better side for the team (or can't say). */

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { formatFine, formatOdds, pathTree, seasonFromCfbd, teamPath, winProbability } from "@/core";
+import { explore, formatFine, formatOdds, pathTree, seasonFromCfbd, seasonOutlook, teamPath, teamRecord, winProbability } from "@/core";
 import type { CfbdSnapshot, Game, Season, TreeNode } from "@/core";
 
 function team(id: number, conference: string, rating: number | null = null) {
@@ -484,6 +484,13 @@ describe("help from elsewhere", () => {
       expect(tree.likeliest.named).toHaveLength(tree.likeliest.own.length + tree.likeliest.needs.length);
       const locks = Object.fromEntries(tree.likeliest.picks.map((p) => [p.gameId, p.winner]));
       expect(pathTree(cut, { ...opts, locks, depth: 0 }).root.verdict).toBe("In");
+      // Every pick is needed: swap any one of them and the team is no longer sure to be in.
+      const { tree: locked, outlook } = explore(cut, { ...opts, locks });
+      expect(outlook.find((o) => o.teamId === t.id)!.status).toBe("clinched");
+      for (const w of locked.weeks) {
+        if (w.own && w.own.gameId in locks) expect(locks[w.own.gameId] === t.id ? w.own.ifLose : w.own.ifWin).not.toBe("In");
+        for (const g of w.games.filter((x) => x.gameId in locks)) expect(locks[g.gameId] === g.homeId ? g.ifAway : g.ifHome).not.toBe("In");
+      }
       checked++;
     }
     expect(checked).toBeGreaterThan(3);
@@ -554,6 +561,55 @@ describe("help from elsewhere", () => {
     const first = t.weeks.find((w) => w.week !== other.week)!;
     expect(first.played).toMatchObject({ opponent: "Team3", site: "home", won: true, score: "21-14" });
     expect(first.own).not.toBeNull();
+  });
+
+  it("a week shows the team's non-conference game, so it doesn't read as a bye", () => {
+    const { s, other } = needsHelp();
+    const next = game(1, 5, undefined, { conferenceGame: false, week: other.week, start: "2026-11-15T18:00:00Z" });
+    const done = game(6, 1, 1, { conferenceGame: false, week: 1, start: "2026-11-06T18:00:00Z" });
+    const t = pathTree({ ...s, teams: [...s.teams, team(5, "X"), team(6, "X")], games: [...s.games, next, done] }, { ...base, teamId: 1 });
+    const week = t.weeks.find((w) => w.week === other.week)!;
+    expect(week.own).toBeNull();
+    // With no conference game of its own that week, the week goes by the team's game.
+    expect(week.label).toBe("Nov 15");
+    expect(week.nonConference).toEqual({ gameId: next.id, opponent: "Team5", site: "home", date: "Nov 15", won: null, score: null });
+    // Already played: the result, next to the conference game still to come that week.
+    const first = t.weeks.find((w) => w.week === 1)!;
+    expect(first.own).not.toBeNull();
+    expect(first.nonConference).toMatchObject({ opponent: "Team6", site: "away", won: true, score: "21-14" });
+  });
+
+  it("records count locked results as played", () => {
+    const { s, upset } = needsHelp();
+    const now = teamRecord(s, 1);
+    expect(teamRecord(s, 1, { [upset.id]: 1 })).toEqual({ ...now, wins: now.wins + 1, conferenceWins: now.conferenceWins + 1 });
+    expect(teamRecord(s, 2, { [upset.id]: 1 })).toMatchObject({ losses: teamRecord(s, 2).losses + 1 });
+    // A lock on a game already played changes nothing.
+    expect(teamRecord(s, 1, { [s.games[0].id]: 3 })).toEqual(now);
+    const picked = seasonOutlook(s, { ...base, locks: { [upset.id]: 2 } }).teams.find((o) => o.teamId === 1)!;
+    expect(picked.record).toEqual({ ...now, losses: now.losses + 1, conferenceLosses: now.conferenceLosses + 1 });
+  });
+
+  it("a side that helps even a little is marked, and one that can't is not", () => {
+    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const full = seasonFromCfbd(snap);
+    const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
+    const cut: Season = {
+      ...full,
+      games: full.games.map((g) => (g.week > last - 3 ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
+    };
+    let faint = 0;
+    for (const t of cut.teams.filter((x) => x.conference === "ACC")) {
+      const tree = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 1000, seed: 1 });
+      for (const g of tree.weeks.flatMap((w) => w.games)) {
+        const h = tree.help.find((x) => x.gameId === g.gameId)!;
+        // Proven the same either way (in or out whatever happens): neither side helps.
+        if (h.ifHomeWins !== null && h.ifHomeWins === h.ifAwayWins) expect(g.helps).toBeNull();
+        if (g.helps !== null && !h.now && !h.scenario) faint++;
+      }
+    }
+    // Some games lean too little to count as mattering, and still show which side helps.
+    expect(faint).toBeGreaterThan(0);
   });
 
   it("fine odds tell long shots apart below 1%", () => {

@@ -44,9 +44,11 @@ export function SeasonWeeks({ weeks, base, teamId, locks, likely, onPick }: {
 
 function Week({ w, base, teamId, locks, likely, onPick }: { w: SeasonWeek; base: SeasonWeek; teamId: number; locks: Locks; likely: Map<number, number>; onPick: PickFn }) {
   const [all, setAll] = useState(false);
-  // Listed: what mattered with no picks, plus anything locked. Odds come from the live run; the list doesn't change.
+  // Listed: what mattered with no picks, plus anything locked, in that order, so picks never add or move games.
+  // A game your picks have made neutral (either result, same odds) drops out of the list.
   const live = new Map(w.games.map((g) => [g.gameId, g]));
-  const listed = base.games.filter((g) => g.matters || locks[g.gameId] !== undefined).map((g) => g.gameId);
+  const neutral = (id: number) => { const g = live.get(id); return !g || (locks[id] === undefined && g.helps === null && g.likely === null); };
+  const listed = base.games.filter((g) => (g.matters || locks[g.gameId] !== undefined) && !neutral(g.gameId)).map((g) => g.gameId);
   const rest = base.games.filter((g) => !listed.includes(g.gameId)).map((g) => g.gameId);
   const games = (all ? [...listed, ...rest] : listed).flatMap((id) => live.get(id) ?? []);
   const hidden = all ? 0 : rest.length;
@@ -66,10 +68,11 @@ function Week({ w, base, teamId, locks, likely, onPick }: { w: SeasonWeek; base:
           <OwnButton text="Win" odds={own.ifWin} state={state(own.gameId, teamId)} onClick={() => onPick(own.gameId, teamId)} />
           <OwnButton text="Lose" odds={own.ifLose} state={state(own.gameId, own.opponentId)} onClick={() => onPick(own.gameId, own.opponentId)} />
         </div>
-      ) : w.played ? null : (
+      ) : w.played || w.nonConference ? null : (
         <span className="rounded-lg border border-dashed border-navy/20 px-2 py-2 text-xs text-ink-muted">No game this week</span>
       )}
       {w.played && <Final played={w.played} />}
+      {w.nonConference && <NonConference game={w.nonConference} />}
       <div className="flex grow flex-col gap-1 rounded-lg bg-mist p-1.5">
         <span className="px-0.5 text-[11px] font-semibold text-ink-muted">Elsewhere</span>
         {games.map((g) => (
@@ -106,10 +109,26 @@ function Final({ played }: { played: NonNullable<SeasonWeek["played"]> }) {
   );
 }
 
-/** Title-game odds for display: In or Out when proven; a team still alive at 0% in the sample shows as under 0.1%. */
+/** The team's non-conference game that week: shown so the week isn't mistaken for a bye. Not in the standings, so not pickable. */
+function NonConference({ game }: { game: NonNullable<SeasonWeek["nonConference"]> }) {
+  return (
+    <div className="flex flex-col gap-0.5 rounded-lg border border-dashed border-navy/20 px-2 py-1.5">
+      <span className="text-[11px] text-ink-muted">
+        {game.score ? "Final · " : `${game.date} · `}{game.site === "away" ? "at" : "vs"} {game.opponent}
+      </span>
+      {game.score ? (
+        <span className={`text-sm font-bold ${game.won ? "text-turf" : "text-marker-text"}`}>{game.won ? "Won" : "Lost"} {game.score}</span>
+      ) : (
+        <span className="text-xs text-ink-soft">Non-conference: not in the ACC standings</span>
+      )}
+    </div>
+  );
+}
+
 /** Any other odds of a team: a team still alive at 0% in the sample shows as under 0.1%, one that's out as 0%. */
 const sideOdds = (p: number, o: TeamOutlook) => (p === 0 && o.status !== "eliminated" ? "<0.1%" : formatFine(p));
 
+/** Title-game odds for display: In or Out when proven; a team still alive at 0% in the sample shows as under 0.1%. */
 const titleOdds = (o: TeamOutlook) =>
   o.status === "clinched" ? "In" : o.status === "eliminated" ? "Out" : o.titleGame === 0 ? "<0.1%" : formatFine(o.titleGame);
 
@@ -149,7 +168,7 @@ function SideButton({ team, odds, impact, state, onClick }: {
   );
 }
 
-/** The right column: odds with the picks so far, the picks themselves, and the race projected from them. */
+/** The right column: odds with the picks so far, the race projected from them, and the picks themselves. */
 export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, onPick, onReset }: {
   team: TeamInfo;
   me: TeamOutlook;
@@ -185,7 +204,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
       <div>
         <h2 className="font-display text-2xl font-bold">{team.name}</h2>
         <p className="text-sm text-ink-soft">
-          {me.record.wins}-{me.record.losses} ({me.record.conferenceWins}-{me.record.conferenceLosses} ACC)
+          {me.record.wins}-{me.record.losses} ({me.record.conferenceWins}-{me.record.conferenceLosses} ACC){has && " with your picks"}
         </p>
       </div>
 
@@ -203,6 +222,19 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
         </div>
       </section>
 
+      <section className="flex flex-col gap-1.5">
+        <div className="flex items-baseline justify-between">
+          <p className={label}>The race</p>
+          <p className="text-[11px] text-ink-muted">{has ? "Projected with your picks" : "Projected"}</p>
+        </div>
+        {top.map((o) => <RaceRow key={o.teamId} o={o} name={names[o.teamId]} me={o.teamId === teamId} />)}
+        {place >= top.length && (
+          <div className="mt-1 flex items-center gap-2">
+            <span className="w-5 text-xs text-ink-muted">{place + 1}</span>
+            <div className="min-w-0 flex-1"><RaceRow o={me} name={names[teamId]} me /></div>
+          </div>
+        )}
+      </section>
       <section className="flex flex-col gap-1.5">
         <div className="flex items-baseline justify-between">
           <p className={label}>Your picks</p>
@@ -227,19 +259,6 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
         )}
       </section>
 
-      <section className="flex flex-col gap-1.5">
-        <div className="flex items-baseline justify-between">
-          <p className={label}>The race</p>
-          <p className="text-[11px] text-ink-muted">{has ? "Projected with your picks" : "Projected"}</p>
-        </div>
-        {top.map((o) => <RaceRow key={o.teamId} o={o} name={names[o.teamId]} me={o.teamId === teamId} />)}
-        {place >= top.length && (
-          <div className="mt-1 flex items-center gap-2">
-            <span className="w-5 text-xs text-ink-muted">{place + 1}</span>
-            <div className="min-w-0 flex-1"><RaceRow o={me} name={names[teamId]} me /></div>
-          </div>
-        )}
-      </section>
     </div>
   );
 }
@@ -248,6 +267,7 @@ function RaceRow({ o, name, me }: { o: TeamOutlook; name: string; me: boolean })
   return (
     <div className={`flex items-center gap-2 rounded-md px-1.5 py-1 ${me ? "bg-mist" : ""}`}>
       <span className="w-28 truncate text-sm font-semibold">{name}</span>
+      <span className="w-8 text-xs text-ink-muted" title="ACC record, counting your picks">{o.record.conferenceWins}-{o.record.conferenceLosses}</span>
       <span className="h-1.5 flex-1 rounded-full bg-navy/10">
         <span className={`block h-1.5 rounded-full ${me ? "bg-marker" : "bg-navy"}`} style={{ width: `${Math.max(3, Math.round(o.titleGame * 100))}%` }} />
       </span>

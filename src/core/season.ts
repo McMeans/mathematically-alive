@@ -163,13 +163,15 @@ export type TeamRecord = {
   conferenceLosses: number;
 };
 
-/** A team's record from completed games only. */
-export function teamRecord(season: Season, teamId: number): TeamRecord {
+/** A team's record from completed games, plus any locked results (game id -> winner) of games not yet played. */
+export function teamRecord(season: Season, teamId: number, locks: Record<number, number> = {}): TeamRecord {
   const rec: TeamRecord = { wins: 0, losses: 0, conferenceWins: 0, conferenceLosses: 0 };
   for (const g of season.games) {
-    if (!g.completed || (g.homeId !== teamId && g.awayId !== teamId)) continue;
-    const isHome = g.homeId === teamId;
-    const won = isHome ? g.homePoints! > g.awayPoints! : g.awayPoints! > g.homePoints!;
+    if (g.homeId !== teamId && g.awayId !== teamId) continue;
+    let won: boolean;
+    if (g.completed) won = g.homeId === teamId ? g.homePoints! > g.awayPoints! : g.awayPoints! > g.homePoints!;
+    else if (g.id in locks) won = locks[g.id] === teamId;
+    else continue;
     if (won) rec.wins++;
     else rec.losses++;
     if (g.conferenceGame) {

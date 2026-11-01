@@ -11,8 +11,8 @@ const BUDGET = 4_000;
 const WITNESS_BUDGET = 50_000;
 // Trimming: each check gets CHECK_BUDGET nodes, all of them TRIM_BUDGET. A check that runs out
 // keeps its result, so the list still gets the team in; it may name a result it doesn't need.
-const CHECK_BUDGET = 3_000;
-const TRIM_BUDGET = 20_000;
+const CHECK_BUDGET = 30_000;
+const TRIM_BUDGET = 150_000;
 
 export type WayIn = {
   picks: { gameId: number; winner: number }[];
@@ -154,7 +154,10 @@ function trim(
     kept.delete(id);
     const check = { left: Math.min(CHECK_BUDGET, pool.left) };
     pool.left -= check.left;
-    const ok = guaranteed(data, conference, teamId, { ...locks, ...Object.fromEntries(kept) }, luck, check);
+    // The kept results already get the team in, so dropping this one is safe exactly when the other
+    // result gets it in too. Proving that one result leaves one game fewer to search than leaving it open.
+    const g = games[k].g;
+    const ok = guaranteed(data, conference, teamId, { ...locks, ...Object.fromEntries(kept), [id]: w === g.homeId ? g.awayId : g.homeId }, luck, check);
     pool.left += check.left;
     if (!ok) kept.set(id, w);
   }

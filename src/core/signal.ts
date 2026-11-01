@@ -15,6 +15,8 @@ export function swingZ(nA: number, inA: number, nB: number, inB: number): number
 
 /** Overall swing: at least 1 point and z >= 3 (no false positives among 176 null games). */
 export const OVERALL = { minSwing: 0.01, minZ: 3 };
+/** Any lean at all, however small: only the z-score bar, a little lower. For showing which side helps, not for ranking. */
+export const FAINT = { minSwing: 0, minZ: 2.5 };
 /** Swing within one of the team's own-result scenarios: many more comparisons, so a stricter bar. */
 export const SCENARIO = { minSwing: 0.05, minZ: 4 };
 
