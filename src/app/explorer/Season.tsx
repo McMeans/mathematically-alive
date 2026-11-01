@@ -125,6 +125,15 @@ function NonConference({ game }: { game: NonNullable<SeasonWeek["nonConference"]
   );
 }
 
+/**
+ * Best title-game odds first. Proven in goes above everything and proven out below everything, so a team
+ * still alive at 0% in the sample ("<0.1%") stays above every team that's out. Ties go alphabetical.
+ */
+export function byOdds(names: Record<number, string>) {
+  const key = (o: TeamOutlook) => (o.status === "clinched" ? 2 : o.status === "eliminated" ? -1 : o.titleGame);
+  return (a: TeamOutlook, b: TeamOutlook) => key(b) - key(a) || names[a.teamId].localeCompare(names[b.teamId]);
+}
+
 /** Any other odds of a team: a team still alive at 0% in the sample shows as under 0.1%, one that's out as 0%. */
 const sideOdds = (p: number, o: TeamOutlook) => (p === 0 && o.status !== "eliminated" ? "<0.1%" : formatFine(p));
 
@@ -195,7 +204,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
     return out;
   });
   const has = picks.length > 0;
-  const race = [...outlook].sort((a, b) => b.titleGame - a.titleGame || a.teamId - b.teamId);
+  const race = [...outlook].sort(byOdds(names));
   const top = race.slice(0, 5);
   const place = race.findIndex((o) => o.teamId === teamId);
   const verdict = titleOdds(me);

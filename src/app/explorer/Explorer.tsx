@@ -4,7 +4,7 @@ import { formatOdds, type PathTree, type TeamOutlook, type TeamPath } from "@/co
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
 import { Logo } from "@/app/Logo";
 import { WayCard } from "./WayIn";
-import { SeasonWeeks, WhatIf } from "./Season";
+import { byOdds, SeasonWeeks, WhatIf } from "./Season";
 import { StatTiles, TeamList } from "./Panels";
 
 export type GameInfo = { id: number; homeId: number; awayId: number; week: number; start: string };
@@ -89,13 +89,8 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
   const { outlook, path, tree } = result;
   const me = outlook.find((o) => o.teamId === teamId)!;
   const team = teams.find((t) => t.id === teamId)!;
-  // Best odds first, by the odds the list shows (today's, before any picks). A team still alive at 0% in
-  // the sample ("<1%") stays above every team that's out; ties go alphabetical.
-  const order = useMemo(() => {
-    const by = new Map(initial.outlook.map((o) => [o.teamId, o]));
-    const key = (id: number) => (by.get(id)!.status === "eliminated" ? -1 : by.get(id)!.titleGame);
-    return [...teams].sort((a, b) => key(b.id) - key(a.id) || a.name.localeCompare(b.name)).map((t) => t.id);
-  }, [initial, teams]);
+  // Best odds first, by the odds the list shows (today's, before any picks).
+  const order = useMemo(() => [...initial.outlook].sort(byOdds(names)).map((o) => o.teamId), [initial, names]);
   const hasLocks = Object.keys(locks).length > 0;
   const likeliest = tree.likeliest;
   // Outline only what the card names: the team's own results and the non-favorites it needs.
