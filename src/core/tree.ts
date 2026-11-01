@@ -18,7 +18,7 @@ import { teamRecord } from "./season";
 import type { Game, Season } from "./season";
 import { FAINT, OVERALL, SCENARIO, isClear } from "./signal";
 import { gameWinProbability, mix, mulberry32, simulateSeason, type SimResult } from "./sim";
-import { likeliestWayIn, type WayIn } from "./likeliest";
+import { likeliestWayIn, trimWay, type WayIn } from "./likeliest";
 import { provenStatus, type ProvenStatus } from "./proof";
 import { championshipFromData, conferenceData } from "./tiebreak";
 
@@ -114,9 +114,13 @@ export type Likeliest = {
   chance: number;
   /** Picked results that go against the likelier side. */
   upsets: number;
-  /** True when every way in needs the team to win a ranking or draw tiebreak step. */
+  /** True when the picks get the team in only if it also wins the ranking tiebreak. */
   needsTiebreak: boolean;
-  /** "Likeliest way in (4% chance): Virginia beats Duke; and Miami beats Pitt." */
+  /** With `needsTiebreak`, how often the team gets in with the picks locked (from a simulation); else null. */
+  tiebreak: number | null;
+  /** Chance the whole way happens: `chance`, times `tiebreak` when there is one. */
+  overall: number;
+  /** "Likeliest way in (4% chance): Virginia beats Duke; and Miami beats Pitt." The chance is `overall`. */
   line: string;
   /** The same, in parts for a card. "4% chance". */
   heading: string;
@@ -126,7 +130,7 @@ export type Likeliest = {
   needs: string[];
   /** "Favorites win the other 11 games it needs", or null. */
   favorites: string | null;
-  /** "Virginia also has to win the ranking tiebreak.", or null. */
+  /** "With these results Virginia gets in about 40% of the time, depending on the ranking tiebreak.", or null. */
   note: string | null;
   /** The team's part: "Win all 4 left", "Win 3 of 4 left". */
   ownJob: string;
@@ -144,11 +148,14 @@ export type Rival = {
   /** Losses the picks give it, out of `left` games still to play (not counting the team's own game with it). */
   needs: number;
   left: number;
-  /** "2 of 4" */
+  /** The exact results the picks need: "Loses to Virginia Tech and Stanford", "Loses to Duke, beats Wake Forest". */
   line: string;
-  /** Its games left: the opponent and the chance of that upset (the rival losing). */
-  games: { opponent: string; chance: number }[];
-  /** Chance it loses at least `needs` of them. */
+  /**
+   * Its games left: the opponent, the chance of that upset (the rival losing), and the result the picks
+   * need from it: "lose", "win" (another rival has to lose it), or null when either result will do.
+   */
+  games: { opponent: string; chance: number; result: "lose" | "win" | null }[];
+  /** Chance it gets every result the picks need from it. */
   chance: number;
 };
 
@@ -242,6 +249,10 @@ const MAX_DEPTH = 12;
 // Odds for the other side of a locked game: a small simulation each, for at most this many games per call.
 const SWAP_ITERATIONS = 2_000;
 const MAX_SWAP_SIMS = 12;
+// Seasons simulated to put a chance on the ranking tiebreak a likeliest way in needs.
+const TIEBREAK_ITERATIONS = 2_000;
+// How much likelier a way through the ranking tiebreak has to be than a sure way to be shown instead.
+const TIEBREAK_EDGE = 1.5;
 // Search nodes for a swapped pick's first, quick proof.
 const QUICK_BUDGET = 3_000;
 const DATE_FORMAT = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
@@ -448,6 +459,16 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     h.ifAwayWins = proveIf(h.oddsIfAwayWins, h.awayId);
   }
 
+  /** The team's title-game odds with these locks, from a fresh simulation of `n` seasons. */
+  const simulatedOdds = (locks: Record<number, number>, n: number): number => {
+    let hit = 0;
+    simulateSeason(season, { iterations: n, seed, locks }).forEachIteration((it, winnerAt, teams) => {
+      const [x, y] = championshipFromData(data, conference, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: mulberry32(mix(seed, it, 1)), rank: teams.rank });
+      if (x === teamId || y === teamId) hit++;
+    });
+    return hit / n;
+  };
+
   // Likeliest way in: the most probable combination of remaining results that gets the team in,
   // found exactly, trimmed to the results its spot depends on. Own games first, then the rest by importance.
   let likeliest: Likeliest | null = null;
@@ -457,8 +478,27 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
       ...ownConf.filter(({ g }) => unlocked(g)).map(({ g }) => g),
       ...help.map((h) => others.find(({ g }) => g.id === h.gameId)!.g),
     ].map((g) => ({ g, pHome: gameWinProbability(season, g) }));
-    const way = likeliestWayIn(data, conference, teamId, opts.locks ?? {}, choices);
+    // Two candidates: a way in however the tiebreaks go, and one that leans on the ranking tiebreak. That one
+    // is worth its results' chance times how often the team gets in with them locked, from a small simulation.
+    // It's shown only when clearly likelier: the simulation also counts seasons the sure way covers.
+    const locks = opts.locks ?? {};
+    const starts = likelyStarts(sim, reachedAt, choices, gameIndex);
+    const sure = likeliestWayIn(data, conference, teamId, locks, choices, false, starts);
+    const lucky = likeliestWayIn(data, conference, teamId, locks, choices, true, starts);
+    const tiebreakOdds = (w: WayIn) =>
+      simulatedOdds({ ...locks, ...Object.fromEntries(w.picks.map((p) => [p.gameId, p.winner])) }, Math.min(TIEBREAK_ITERATIONS, iterations));
+    // Compare on a quick trim of each, then trim only the one shown in full.
+    const sureQuick = sure && trimWay(data, conference, teamId, locks, choices, sure, true);
+    const luckyQuick = lucky && trimWay(data, conference, teamId, locks, choices, lucky, true);
+    // A way that's no likelier even before its tiebreak can't beat the sure way.
+    const q = luckyQuick && (!sureQuick || luckyQuick.chance > sureQuick.chance) ? tiebreakOdds(luckyQuick) : 0;
+    const luckyWins = luckyQuick !== null && (!sureQuick || luckyQuick.chance * q > TIEBREAK_EDGE * sureQuick.chance);
+    const found = luckyWins ? lucky : sure;
+    const way = found && trimWay(data, conference, teamId, locks, choices, found);
+    const tiebreak = way && luckyWins ? tiebreakOdds(way) : null;
     if (way) {
+      const overall = way.chance * (tiebreak ?? 1);
+      const often = tiebreak === 0 ? "rarely" : `${tiebreak! < 0.01 ? "under 1%" : `about ${formatOdds(tiebreak!)}`} of the time`;
       // Name the team's own results and the upsets elsewhere; favorites winning elsewhere are counted.
       const own: string[] = [];
       const elsewhere: string[] = [];
@@ -481,21 +521,21 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
       if (favorites > 0) elsewhere.push(elsewhere.length ? `the favorites win ${favorites} other game${favorites === 1 ? "" : "s"}` : `the favorites win ${favorites} game${favorites === 1 ? "" : "s"} elsewhere`);
       const parts = [own.length ? `${team} ${list(own)}` : "", elsewhere.length ? list(elsewhere) : ""].filter(Boolean);
       const what = parts.length ? parts.join("; and ") : `${team} needs nothing more`;
-      const extra = [
-        way.needsTiebreak ? ` ${team} also has to win the ranking tiebreak.` : "",
-      ].join("");
+      const note = tiebreak === null ? null : `With these results ${team} gets in ${often}, depending on the ranking tiebreak.`;
       likeliest = {
         picks: way.picks,
         named,
         chance: way.chance,
         upsets: way.upsets,
-        needsTiebreak: way.needsTiebreak,
-        line: `Likeliest way in (${formatOdds(way.chance)} chance): ${what}.${extra}`,
-        heading: `${formatOdds(way.chance)} chance`,
+        needsTiebreak: tiebreak !== null,
+        tiebreak,
+        overall,
+        line: `Likeliest way in (${formatOdds(overall)} chance): ${what}.${note ? ` ${note}` : ""}`,
+        heading: `${formatOdds(overall)} chance`,
         own: ownItems,
         needs,
         favorites: favorites > 0 ? `Favorites win the other ${favorites} game${favorites === 1 ? "" : "s"} it needs` : null,
-        note: way.needsTiebreak ? `${team} also has to win the ranking tiebreak.` : null,
+        note,
         ...wayParts(way, choices, teamId, name, sim, reachedAt, minSample, gameIndex),
       };
     }
@@ -511,14 +551,9 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     const quick = settled(provenStatus(season, conference, teamId, swap, QUICK_BUDGET));
     if (quick) return quick;
     if (swapSims++ >= MAX_SWAP_SIMS) return settled(proven(swap)) ?? "—";
-    const n = Math.min(SWAP_ITERATIONS, iterations);
-    let hit = 0;
-    simulateSeason(season, { iterations: n, seed, locks: swap }).forEachIteration((it, winnerAt, teams) => {
-      const [x, y] = championshipFromData(data, conference, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: mulberry32(mix(seed, it, 1)), rank: teams.rank });
-      if (x === teamId || y === teamId) hit++;
-    });
-    if (hit > 0 && hit < n) return formatFine(hit / n);
-    return settled(proven(swap)) ?? (hit === 0 ? "<0.1%" : ">99%");
+    const p = simulatedOdds(swap, Math.min(SWAP_ITERATIONS, iterations));
+    if (p > 0 && p < 1) return formatFine(p);
+    return settled(proven(swap)) ?? (p === 0 ? "<0.1%" : ">99%");
   };
   const proofOf = (gameId: number, winner: number) => proven({ ...opts.locks, [gameId]: winner });
   const verdict = (odds: number | null, gameId: number, winner: number): string => {
@@ -658,6 +693,26 @@ function helpGames(
   return help.sort((x, y) => tier(x) - tier(y) || weight(y) - weight(x) || order.get(x.gameId)! - order.get(y.gameId)!);
 }
 
+// Simulated seasons the likeliest-way search starts from.
+const STARTS = 40;
+
+/** The likeliest simulated seasons in which the team got in, as winners of `choices`: a good start for the exact search. */
+function likelyStarts(sim: SimResult, reachedAt: Uint8Array, choices: { g: Game; pHome: number }[], gameIndex: Map<number, number>): number[][] {
+  const at = choices.map(({ g }) => gameIndex.get(g.id)!);
+  const logP = choices.map(({ pHome }) => [Math.log(Math.max(pHome, 1e-12)), Math.log(Math.max(1 - pHome, 1e-12))]);
+  const top: { score: number; winners: number[] }[] = [];
+  sim.forEachIteration((it, winnerAt) => {
+    if (!reachedAt[it]) return;
+    let score = 0;
+    choices.forEach(({ g }, k) => { score += logP[k][winnerAt(at[k]) === g.homeId ? 0 : 1]; });
+    if (top.length === STARTS && score <= top[STARTS - 1].score) return;
+    top.push({ score, winners: at.map((i) => winnerAt(i)) });
+    top.sort((a, b) => b.score - a.score);
+    if (top.length > STARTS) top.pop();
+  });
+  return top.map((t) => t.winners);
+}
+
 /** The card's breakdown of a way in: the team's own job, rival loss counts, and a week-by-week script. */
 function wayParts(
   way: WayIn,
@@ -694,19 +749,23 @@ function wayParts(
     losses.set(loserOf(x), (losses.get(loserOf(x)) ?? 0) + 1);
     if (x.p < 0.5 + 1e-9) upset.add(loserOf(x));
   }
+  // Each game says exactly what the picks need: picking "any 2 of 3" would be wrong whenever the way
+  // needs a particular loss, or needs the rival to win a game another rival has to lose.
+  const pickedWinner = new Map(picks.map((x) => [x.gameId, x.winner]));
   const rivals: Rival[] = [...losses].filter(([id]) => upset.has(id)).map(([id, needs]) => {
     const games = choices
       .filter(({ g }) => !isOwn(g) && (g.homeId === id || g.awayId === id))
-      .map(({ g }) => ({ opponent: name(g.homeId === id ? g.awayId : g.homeId), chance: chanceOf(g.id, g.homeId === id ? g.awayId : g.homeId) }));
-    // Chance of at least `needs` losses: dist[k] = chance of exactly k so far.
-    let dist = [1];
-    for (const { chance } of games) {
-      const next = new Array<number>(dist.length + 1).fill(0);
-      dist.forEach((q, k) => { next[k] += q * (1 - chance); next[k + 1] += q * chance; });
-      dist = next;
-    }
-    const chance = dist.slice(needs).reduce((a, q) => a + q, 0);
-    return { teamId: id, team: name(id), needs, left: games.length, line: `${needs} of ${games.length}`, games, chance };
+      .sort((a, b) => (Date.parse(a.g.start) || 0) - (Date.parse(b.g.start) || 0) || a.g.week - b.g.week || a.g.id - b.g.id)
+      .map(({ g }) => {
+        const opp = g.homeId === id ? g.awayId : g.homeId;
+        const w = pickedWinner.get(g.id);
+        return { opponent: name(opp), chance: chanceOf(g.id, opp), result: w === undefined ? null : w === id ? ("win" as const) : ("lose" as const) };
+      });
+    const chance = games.reduce((a, g) => a * (g.result === "lose" ? g.chance : g.result === "win" ? 1 - g.chance : 1), 1);
+    const lost = games.filter((g) => g.result === "lose").map((g) => g.opponent);
+    const won = games.filter((g) => g.result === "win").map((g) => g.opponent);
+    const line = [`Loses to ${list(lost)}`, won.length ? `beats ${list(won)}` : ""].filter(Boolean).join(", ");
+    return { teamId: id, team: name(id), needs, left: games.length, line, games, chance };
   }).sort((a, b) => b.needs - a.needs || a.chance - b.chance || a.team.localeCompare(b.team));
 
   // Weeks in kickoff order; each holds the picks played that week.

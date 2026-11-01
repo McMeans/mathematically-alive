@@ -20,7 +20,7 @@ export type WayIn = {
   chance: number;
   /** Picked results that go against the likelier side. */
   upsets: number;
-  /** True when every way in found needs the team to win a ranking or draw tiebreak step. */
+  /** True when the picks get the team in only if it also wins its ranking and draw tiebreak steps. */
   needsTiebreak: boolean;
 };
 
@@ -28,8 +28,11 @@ export type Choice = { g: Game; pHome: number };
 
 /**
  * `games`: the unplayed, unlocked conference games to pick results for, in search order (the most
- * important first), each with its home win probability. Null when no way in exists. When the search
- * runs out of budget it returns the likeliest way found so far.
+ * important first), each with its home win probability. `starts`: candidate ways in to begin from
+ * (winners in `games` order), such as simulated seasons the team got in; the better the start, the
+ * more of the search the bound cuts off. `luck`: the team wins every ranking and draw step; otherwise
+ * the picks must get it in however those go. Null when no way in exists. When the search runs out of
+ * budget it returns the likeliest way found so far. The way picks every game; `trimWay` cuts it down.
  */
 export function likeliestWayIn(
   data: ConferenceData,
@@ -37,18 +40,41 @@ export function likeliestWayIn(
   teamId: number,
   locks: Record<number, number>,
   games: Choice[],
+  luck: boolean,
+  starts: number[][] = [],
 ): WayIn | null {
-  for (const luck of [false, true]) {
-    const best = search(data, conference, teamId, locks, games, luck);
-    if (best) return trim(data, conference, teamId, locks, games, best, luck);
-  }
-  return null;
+  const best = search(data, conference, teamId, locks, games, luck, starts);
+  return best && summary(games, best, () => true, luck);
+}
+
+/**
+ * The way cut down to the results the team's spot depends on (each one left is needed). `quick`: a
+ * tenth of the budget, for comparing ways; it may keep results that aren't needed.
+ */
+export function trimWay(data: ConferenceData, conference: string, teamId: number, locks: Record<number, number>, games: Choice[], way: WayIn, quick = false): WayIn {
+  const winner = new Map(way.picks.map((p) => [p.gameId, p.winner]));
+  return trim(data, conference, teamId, locks, games, games.map(({ g }) => winner.get(g.id)!), way.needsTiebreak, quick ? TRIM_BUDGET / 10 : TRIM_BUDGET);
+}
+
+/** The picks in `games` that `keep` keeps, with the chance they all happen. */
+function summary(games: Choice[], winners: number[], keep: (gameId: number) => boolean, luck: boolean): WayIn {
+  let chance = 1;
+  let upsets = 0;
+  const picks: WayIn["picks"] = [];
+  games.forEach(({ g, pHome }, k) => {
+    if (!keep(g.id)) return;
+    const p = winners[k] === g.homeId ? pHome : 1 - pHome;
+    picks.push({ gameId: g.id, winner: winners[k] });
+    chance *= p;
+    if (p < 0.5 - 1e-9) upsets++;
+  });
+  return { picks, chance, upsets, needsTiebreak: luck };
 }
 
 /** Cost of a result: how much less likely it is than the likelier side (0 for the likelier side). */
 const cost = (p: number, other: number): number => Math.log(Math.max(p, other)) - Math.log(Math.max(p, 1e-12));
 
-function search(data: ConferenceData, conference: string, teamId: number, locks: Record<number, number>, games: Choice[], luck: boolean): number[] | null {
+function search(data: ConferenceData, conference: string, teamId: number, locks: Record<number, number>, games: Choice[], luck: boolean, starts: number[][]): number[] | null {
   const ids = [...data.ids];
   const wins = new Map<number, number>(ids.map((id) => [id, 0]));
   const scheduled = new Map<number, number>(ids.map((id) => [id, 0]));
@@ -74,22 +100,34 @@ function search(data: ConferenceData, conference: string, teamId: number, locks:
     games.forEach(({ g }, k) => all.set(g.id, ws[k]));
     return inEveryDraw(data, conference, teamId, (g) => all.get(g.id)!, luck);
   };
-  // The proof's way in holds for some draw; the search wants one that holds for every draw. Start there if it
-  // does, then flip results to the likelier side, costliest first, as long as the team stays in.
-  const start = games.map(({ g }) => witness.get(g.id)!);
-  let best: number[] | null = isIn(start) ? start : null;
-  for (let improved = best !== null; improved; ) {
-    improved = false;
-    const cur: number[] = best!;
-    const order = games.map((_, k) => k).sort((x, y) => costs[y](cur[y]) - costs[x](cur[x]));
-    for (const k of order) {
-      if (best![k] === likely[k]) continue;
-      const next = best!.slice();
-      next[k] = likely[k];
-      if (isIn(next)) { best = next; improved = true; }
+  // Flip results to the likelier side, costliest first, as long as the team stays in.
+  const climb = (start: number[]): number[] => {
+    let cur = start;
+    for (let improved = true; improved; ) {
+      improved = false;
+      const order = games.map((_, k) => k).sort((x, y) => costs[y](cur[y]) - costs[x](cur[x]));
+      for (const k of order) {
+        if (cur[k] === likely[k]) continue;
+        const next = cur.slice();
+        next[k] = likely[k];
+        if (isIn(next)) { cur = next; improved = true; }
+      }
     }
+    return cur;
+  };
+  // The proof's way in holds for some draw; the search wants one that holds for every draw. Climb from
+  // it and from each start that holds, and keep the likeliest: the bound for the search below.
+  let best: number[] | null = null;
+  let bestCost = Infinity;
+  const seen = new Set<string>();
+  for (const start of [games.map(({ g }) => witness.get(g.id)!), ...starts]) {
+    const key = start.join();
+    if (seen.has(key) || !isIn(start)) continue;
+    seen.add(key);
+    const way = climb(start);
+    const c = total(way);
+    if (c < bestCost) { best = way; bestCost = c; }
   }
-  let bestCost = best ? total(best) : Infinity;
   let budget = BUDGET;
 
   const dfs = (k: number, spent: number): void => {
@@ -142,11 +180,12 @@ function trim(
   games: Choice[],
   winners: number[],
   luck: boolean,
+  budget: number,
 ): WayIn {
   const prob = games.map(({ g, pHome }, k) => (winners[k] === g.homeId ? pHome : 1 - pHome));
   const kept = new Map<number, number>(games.map(({ g }, k) => [g.id, winners[k]]));
   const order = games.map((_, k) => k).sort((x, y) => prob[x] - prob[y] || x - y);
-  const pool = { left: TRIM_BUDGET };
+  const pool = { left: budget };
   for (const k of order) {
     if (pool.left === 0) break;
     const id = games[k].g.id;
@@ -161,14 +200,5 @@ function trim(
     pool.left += check.left;
     if (!ok) kept.set(id, w);
   }
-  let chance = 1;
-  let upsets = 0;
-  const picks: WayIn["picks"] = [];
-  games.forEach(({ g }, k) => {
-    if (!kept.has(g.id)) return;
-    picks.push({ gameId: g.id, winner: winners[k] });
-    chance *= prob[k];
-    if (prob[k] < 0.5 - 1e-9) upsets++;
-  });
-  return { picks, chance, upsets, needsTiebreak: luck };
+  return summary(games, winners, (id) => kept.has(id), luck);
 }

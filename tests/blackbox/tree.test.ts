@@ -414,7 +414,7 @@ describe("help from elsewhere", () => {
     expect(t.likeliest!.ownJob).toBe("Win its last game");
     expect(t.likeliest!.ownChance).toBeCloseTo(winProbability(14), 10);
     expect(t.likeliest!.rivals).toEqual([
-      { teamId: 4, team: "Team4", needs: 1, left: 1, line: "1 of 1", games: [{ opponent: "Team3", chance: winProbability(0) }], chance: winProbability(0) },
+      { teamId: 4, team: "Team4", needs: 1, left: 1, line: "Loses to Team3", games: [{ opponent: "Team3", chance: winProbability(0), result: "lose" }], chance: winProbability(0) },
     ]);
     expect(t.likeliest!.weeks.map((w) => [w.label, w.own, w.root.map((r) => r.what), w.favorites, w.afterLabel])).toEqual([
       ["Nov 7", "Beat Team2", [], null, t.likeliest!.weeks[0].afterLabel],
@@ -468,12 +468,16 @@ describe("help from elsewhere", () => {
     const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
-    const cut: Season = {
-      ...full,
-      games: full.games.map((g) => (g.week > last - 3 ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
-    };
     let checked = 0;
-    for (const t of cut.teams.filter((x) => x.conference === "ACC")) {
+    // Most contenders' likeliest way leans on a tiebreak; three cut-off points give enough sure ones.
+    for (const t of [3, 4, 5].flatMap((weeks) => {
+      const cut: Season = {
+        ...full,
+        games: full.games.map((g) => (g.week > last - weeks ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
+      };
+      return full.teams.filter((x) => x.conference === "ACC").map((x) => ({ ...x, cut }));
+    })) {
+      const cut = t.cut;
       const opts = { conference: "ACC", teamId: t.id, iterations: 1000, seed: 1 };
       const tree = pathTree(cut, opts);
       if (!tree.likeliest || tree.likeliest.needsTiebreak) continue;
@@ -494,7 +498,87 @@ describe("help from elsewhere", () => {
       checked++;
     }
     expect(checked).toBeGreaterThan(3);
-  });
+  }, 60_000);
+
+  it("the likeliest way, tiebreak included, is never likelier than the team's title odds, nor far below them for a contender", () => {
+    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const full = seasonFromCfbd(snap);
+    const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
+    let viaTiebreak = 0;
+    for (const weeks of [3, 4]) {
+      const cut: Season = {
+        ...full,
+        games: full.games.map((g) => (g.week > last - weeks ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
+      };
+      for (const t of cut.teams.filter((x) => x.conference === "ACC")) {
+        const tree = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 2000, seed: 1 });
+        const way = tree.likeliest;
+        if (!way) continue;
+        // One combination of results can't be likelier than every way in together (allowing for sampling noise).
+        expect(way.overall).toBeLessThanOrEqual(tree.titleGame + 0.03);
+        expect(way.heading).toBe(`${formatOdds(way.overall)} chance`);
+        if (way.needsTiebreak) {
+          // A way through the ranking tiebreak counts the chance of winning it, and says so.
+          expect(way.overall).toBeCloseTo(way.chance * way.tiebreak!, 12);
+          expect(way.note).toMatch(new RegExp(`^With these results ${t.name} gets in (about \\d+% of the time|under 1% of the time|rarely), depending on the ranking tiebreak\\.$`));
+          viaTiebreak++;
+        } else {
+          expect(way.tiebreak).toBeNull();
+          expect(way.overall).toBe(way.chance);
+        }
+        // A real contender whose route runs through a tiebreak isn't shown only a long shot that avoids it.
+        if (tree.titleGame >= 0.05) expect(way.overall).toBeGreaterThan(tree.titleGame / 10);
+      }
+    }
+    expect(viaTiebreak).toBeGreaterThan(3);
+  }, 60_000);
+
+  it("the card's rivals and the week by week agree with the picks, for every team", () => {
+    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const full = seasonFromCfbd(snap);
+    const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
+    let rivals = 0;
+    for (const weeks of [3, 4]) {
+      const cut: Season = {
+        ...full,
+        games: full.games.map((g) => (g.week > last - weeks ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
+      };
+      const nameOf = (id: number) => cut.teams.find((x) => x.id === id)!.name;
+      for (const t of cut.teams.filter((x) => x.conference === "ACC")) {
+        const tree = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 1000, seed: 1 });
+        const way = tree.likeliest;
+        if (!way) continue;
+        const picked = new Map(way.picks.map((p) => [p.gameId, p.winner]));
+        for (const r of way.rivals) {
+          // Each of the rival's games says exactly what the picks need from it: a loss, a win, or nothing.
+          // In kickoff order.
+          const mine = cut.games
+            .filter((g) => !g.completed && g.conferenceGame && (g.homeId === r.teamId || g.awayId === r.teamId) && g.homeId !== t.id && g.awayId !== t.id)
+            .sort((a, b) => Date.parse(a.start) - Date.parse(b.start) || a.week - b.week || a.id - b.id);
+          expect(r.games.map((g) => g.opponent)).toEqual(mine.map((g) => nameOf(g.homeId === r.teamId ? g.awayId : g.homeId)));
+          let chance = 1;
+          mine.forEach((g, k) => {
+            const w = picked.get(g.id);
+            expect(r.games[k].result).toBe(w === undefined ? null : w === r.teamId ? "win" : "lose");
+            if (w !== undefined) chance *= w === r.teamId ? 1 - r.games[k].chance : r.games[k].chance;
+          });
+          expect(r.needs).toBe(r.games.filter((g) => g.result === "lose").length);
+          expect(r.chance).toBeCloseTo(chance, 12);
+          rivals++;
+        }
+        // No pick is a result the week by week shows knocks the team out.
+        for (const g of tree.weeks.flatMap((w) => w.games)) {
+          const w = picked.get(g.gameId);
+          if (w !== undefined) expect(w === g.homeId ? g.ifHome : g.ifAway).not.toBe("Out");
+        }
+        for (const w of tree.weeks) {
+          const own = w.own && picked.get(w.own.gameId);
+          if (w.own && own !== undefined) expect(own === t.id ? w.own.ifWin : w.own.ifLose).not.toBe("Out");
+        }
+      }
+    }
+    expect(rivals).toBeGreaterThan(10);
+  }, 60_000);
 
   it("the season by week gives the team's game with its odds either way, and the games elsewhere that matter", () => {
     const { s, upset, other } = needsHelp();

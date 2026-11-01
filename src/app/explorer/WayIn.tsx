@@ -4,6 +4,8 @@ import { formatOdds, type Likeliest } from "@/core";
 
 const label = "text-[11px] font-semibold uppercase tracking-wide text-ink-muted";
 const RIVALS_SHOWN = 4;
+// A rival's game: a loss the way needs, a win it needs (another rival losing), or either result.
+const RESULT_LOOK = { lose: "bg-marker font-semibold text-white", win: "bg-white font-semibold text-navy ring-1 ring-inset ring-navy/30", either: "bg-mist text-ink-muted" };
 
 /** The likeliest way in, as counts: the team's own job, then how many games each rival has to lose. */
 export function WayCard({ way, teamName }: { way: Likeliest; teamName: string }) {
@@ -44,17 +46,20 @@ export function WayCard({ way, teamName }: { way: Likeliest; teamName: string })
                   <span className="font-bold text-navy">{r.team}</span>{" "}
                   <span className="font-semibold text-marker-text">{r.line}</span>
                 </span>
-                <span className="flex shrink-0 items-center gap-2" title="Chance it loses that many">
+                <span className="flex shrink-0 items-center gap-2" title="Chance it gets all of those results">
                   <span className="h-1.5 w-12 rounded-full bg-navy/10">
                     <span className="block h-1.5 rounded-full bg-marker" style={{ width: `${Math.max(8, Math.round(r.chance * 100))}%` }} />
                   </span>
                   <span className="w-9 text-right text-sm font-bold text-navy">{formatOdds(r.chance)}</span>
                 </span>
               </div>
-              <ul aria-label={`${r.team}'s games left, with the chance of an upset`} className="mt-1 flex flex-wrap gap-1">
+              <ul aria-label={`${r.team}'s games left: what this way needs from each, and the chance of an upset`} className="mt-1 flex flex-wrap gap-1">
                 {r.games.map((g) => (
-                  <li key={g.opponent} className="rounded-md bg-mist px-1.5 py-0.5 text-[11px] text-navy">
-                    vs {g.opponent} <span className="text-ink-muted">{formatOdds(g.chance)}</span>
+                  <li key={g.opponent} className={`rounded-md px-1.5 py-0.5 text-[11px] ${RESULT_LOOK[g.result ?? "either"]}`}>
+                    {g.result === "lose" ? "loses to" : g.result === "win" ? "beats" : "vs"} {g.opponent}{" "}
+                    <span className={g.result === "lose" ? "text-white/80" : "text-ink-muted"}>
+                      {g.result === null ? "either way" : formatOdds(g.result === "win" ? 1 - g.chance : g.chance)}
+                    </span>
                   </li>
                 ))}
               </ul>
