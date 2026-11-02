@@ -103,7 +103,19 @@ function Tile({ label, value, tone, badge }: { label: string; value: string; ton
   );
 }
 
-export function StatTiles({ outlook, ifWinOut, compact }: { outlook: TeamOutlook; ifWinOut: number | null; compact?: boolean }) {
+export function StatTiles({ outlook, ifWinOut, compact, condensed }: { outlook: TeamOutlook; ifWinOut: number | null; compact?: boolean; condensed?: boolean }) {
+  // One slim row, for the pinned phone bar once the page has scrolled.
+  if (condensed)
+    return (
+      <dl className="flex animate-rise items-baseline justify-between gap-3 text-xs text-ink-muted">
+        {([["Title game", formatChance(outlook.titleGame, outlook.status), "text-turf"], ["Win ACC", pct(outlook.champion), "text-navy"], ["Playoff", pct(outlook.playoff), "text-navy"]] as const).map(([label, value, tone]) => (
+          <div key={label} className="flex items-baseline gap-1.5">
+            <dt>{label}</dt>
+            <dd className={`font-display text-base font-bold ${tone}`}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    );
   return (
     <dl className={`grid gap-2 ${compact ? "grid-cols-3" : "grid-cols-2"}`}>
       <Tile label="Title game" value={formatChance(outlook.titleGame, outlook.status)} tone="text-turf" />

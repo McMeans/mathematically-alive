@@ -31,6 +31,14 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
   const [failed, setFailed] = useState(false);
   const [sheet, setSheet] = useState(false);
   const pickerRef = useRef<HTMLButtonElement>(null);
+  // Phones: fold the odds tiles into one row once scrolled. The gap between the two thresholds stops
+  // the bar flickering as its own height change nudges the scroll position.
+  const [condensed, setCondensed] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setCondensed((c) => (c ? window.scrollY > 40 : window.scrollY > 160));
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
   useEffect(() => {
     if (!sheet) return;
     const close = (e: KeyboardEvent) => {
@@ -189,8 +197,8 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
               </>
             )}
           </div>
-          <div className="border-b border-ink-muted/25 px-4 py-3 md:hidden">
-            <StatTiles outlook={me} ifWinOut={path.ifWinOut} compact />
+          <div className={`border-b border-ink-muted/25 px-4 transition-[padding] duration-200 md:hidden ${condensed ? "py-2" : "py-3"}`}>
+            <StatTiles outlook={me} ifWinOut={path.ifWinOut} compact condensed={condensed} />
           </div>
         </div>
 
