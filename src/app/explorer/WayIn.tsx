@@ -13,7 +13,7 @@ export function WayCard({ way, teamName }: { way: Likeliest; teamName: string })
   const rivals = all ? way.rivals : way.rivals.slice(0, RIVALS_SHOWN);
   const footer = [way.favorites && `${way.favorites}.`, way.note].filter(Boolean).join(" ");
   return (
-    <section aria-label="Likeliest way in" className="mt-2 flex max-w-3xl flex-col gap-3 rounded-xl bg-mist p-3">
+    <section aria-label="Likeliest way in" className="mt-2 flex max-w-3xl animate-rise flex-col gap-3 rounded-xl bg-mist p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
         <h3 className="font-display text-base text-navy">What {teamName} needs</h3>
         <p className="text-xs text-ink-muted">

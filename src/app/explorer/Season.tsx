@@ -35,9 +35,9 @@ export function SeasonWeeks({ weeks, base, teamId, locks, likely, onPick }: {
             {k === "big" ? "a lot" : k === "some" ? "some" : "a little"}
           </span>
         ))}
-        <span className="flex items-center gap-1"><span className="h-3 w-5 rounded-sm ring-2 ring-inset ring-navy" />likeliest way</span>
+        <span className="flex items-center gap-1"><span className="h-3 w-5 rounded-sm outline-dashed outline-1 -outline-offset-1 outline-navy/50" />likeliest way</span>
       </div>
-      <ol className="scroll-thin mt-2 flex gap-2 overflow-x-auto pb-2 md:grid md:grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] md:overflow-visible">
+      <ol className="scroll-thin mt-2 flex gap-2 overflow-x-auto pb-2 md:grid md:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] md:overflow-visible">
         {weeks.map((w) => (
           <Week key={w.week} w={w} base={base.find((b) => b.week === w.week) ?? w} teamId={teamId} locks={locks} likely={likely} onPick={onPick} />
         ))}
@@ -80,7 +80,7 @@ function Week({ w, base, teamId, locks, likely, onPick }: { w: SeasonWeek; base:
       <div className="flex grow flex-col gap-1 rounded-lg bg-mist p-1.5">
         <span className="px-0.5 text-[11px] font-semibold text-ink-muted">Elsewhere</span>
         {games.map((g) => (
-          <div key={g.gameId} role="group" aria-label={`${g.home} vs ${g.away}`} className="grid grid-cols-2 gap-0.5 rounded-md bg-white p-0.5">
+          <div key={g.gameId} role="group" aria-label={`${g.home} vs ${g.away}`} className="grid animate-rise grid-cols-2 gap-0.5 rounded-md bg-white p-0.5">
             <SideButton team={g.home} odds={g.ifHome} effect={effectOf(g, g.homeId)} state={side(g.gameId, g.homeId, g.likely)} onClick={() => onPick(g.gameId, g.homeId)} />
             <SideButton team={g.away} odds={g.ifAway} effect={effectOf(g, g.awayId)} state={side(g.gameId, g.awayId, g.likely)} onClick={() => onPick(g.gameId, g.awayId)} />
           </div>
@@ -141,17 +141,16 @@ export function byOdds(names: Record<number, string>) {
 const sideOdds = (p: number, o: TeamOutlook) => formatSideOdds(p, o.status);
 const titleOdds = (o: TeamOutlook) => formatTitleOdds(o.titleGame, o.status);
 
-const tone = (odds: string) => (odds === "In" ? "text-turf" : odds === "Out" ? "text-marker-text" : "");
-// The same on the navy own-game card, light enough to read there.
+// In / Out on the navy own-game card, light enough to read there.
 const darkTone = (odds: string) => (odds === "In" ? "font-bold text-[#8FE3B4]" : odds === "Out" ? "font-bold text-[#F6B08C]" : "");
 
 function OwnButton({ text, odds, state, onClick }: { text: string; odds: string; state: "picked" | "likely" | "open"; onClick: () => void }) {
   const look =
-    state === "picked" ? "bg-turf text-white" : state === "likely" ? "bg-white text-navy ring-2 ring-inset ring-turf" : "bg-white/10 text-white hover:bg-white/20";
+    state === "picked" ? "bg-turf text-white" : state === "likely" ? "bg-white/10 text-white outline-dashed outline-1 -outline-offset-2 outline-white/60 hover:bg-white/20" : "bg-white/10 text-white hover:bg-white/20";
   return (
-    <button type="button" aria-label={`${text}: ${odds}`} aria-pressed={state === "picked"} onClick={onClick} className={`flex min-h-8 items-center justify-between rounded-md px-2 text-xs font-bold ${look}`}>
+    <button type="button" aria-label={`${text}: ${odds}`} aria-pressed={state === "picked"} onClick={onClick} className={`press flex min-h-8 items-center justify-between rounded-md px-2 text-xs font-bold ${look}`}>
       {text}
-      <span className={`font-normal ${state === "picked" ? "" : state === "open" ? darkTone(odds) : tone(odds)}`}>{odds}</span>
+      <span className={`font-normal ${state === "picked" ? "" : darkTone(odds)}`}>{odds}</span>
     </button>
   );
 }
@@ -179,14 +178,14 @@ function SideButton({ team, odds, effect, state, onClick }: {
   onClick: () => void;
 }) {
   const tint = effect ? `${TINT[effect.kind][effect.impact]} text-navy` : "text-ink-soft hover:bg-mist";
-  const look = state === "picked" ? "bg-navy text-white" : `${tint} ${state === "likely" ? "ring-2 ring-inset ring-navy" : ""}`;
+  const look = state === "picked" ? "bg-navy text-white" : `${tint} ${state === "likely" ? "outline-dashed outline-1 -outline-offset-1 outline-navy/50" : ""}`;
   const oddsLook =
     state === "picked" ? "font-bold text-white"
     : effect && effect.impact !== "small" ? `font-bold ${ODDS_TEXT[effect.kind]}`
-    : state === "likely" ? "font-bold text-turf" : "text-ink-muted";
+    : "text-ink-muted";
   return (
-    <button type="button" aria-label={`${team} wins: ${odds}${effect ? `, ${effect.kind} (${effect.impact})` : ""}`} aria-pressed={state === "picked"} onClick={onClick} className={`flex min-h-9 min-w-0 flex-col items-start rounded px-1.5 py-0.5 text-left text-[11px] font-semibold ${look}`}>
-      <span className="w-full truncate">{team}</span>
+    <button type="button" aria-label={`${team} wins: ${odds}${effect ? `, ${effect.kind} (${effect.impact})` : ""}`} aria-pressed={state === "picked"} onClick={onClick} className={`press flex min-h-9 min-w-0 flex-col items-start rounded px-1.5 py-0.5 text-left text-[11px] font-semibold ${look}`}>
+      <span className="line-clamp-2 w-full break-words leading-tight">{team}</span>
       <span className={oddsLook}>{odds}</span>
     </button>
   );
@@ -224,65 +223,72 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
   const place = race.findIndex((o) => o.teamId === teamId);
   const verdict = titleOdds(me);
   return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <h2 className="font-display text-2xl font-bold">{team.name}</h2>
-        <p className="text-sm text-ink-soft">
-          {me.record.wins}-{me.record.losses} ({me.record.conferenceWins}-{me.record.conferenceLosses} ACC){has && " with your picks"}
-        </p>
-      </div>
-
-      <section className="flex flex-col gap-3 rounded-xl bg-mist p-4">
-        <div className="flex items-end justify-between">
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Name, record, Reset and the odds stay fixed above a divider; only the race and picks below it scroll. */}
+      <div className="flex flex-col gap-5 border-b border-ink-muted/25 p-5 xl:p-6">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs text-ink-muted">{has ? "Title game, with your picks" : "Title game"}</p>
-            <p className={`font-display text-5xl font-bold leading-none ${me.titleGame >= 0.5 || me.status === "clinched" ? "text-turf" : "text-marker-text"}`}>{verdict}</p>
+            <h2 className="font-display text-2xl font-bold">{team.name}</h2>
+            <p className="text-sm text-ink-soft">
+              {me.record.wins}-{me.record.losses} ({me.record.conferenceWins}-{me.record.conferenceLosses} ACC){has && " with your picks"}
+            </p>
           </div>
-          {has && <p className="text-xs text-ink-muted">Today {titleOdds(today)}</p>}
-        </div>
-        <div className="flex flex-col gap-1 border-t border-navy/10 pt-2 text-sm text-ink-soft">
-          <p className="flex justify-between">Win the ACC<span className="font-bold text-navy">{sideOdds(me.champion, me)}</span></p>
-          <p className="flex justify-between">Playoff (beta)<span className="font-bold text-navy">{sideOdds(me.playoff, me)}</span></p>
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-1.5">
-        <div className="flex items-baseline justify-between">
-          <p className={label}>The race</p>
-          <p className="text-[11px] text-ink-muted">{has ? "Projected with your picks" : "Projected"}</p>
-        </div>
-        {top.map((o) => <RaceRow key={o.teamId} o={o} name={names[o.teamId]} me={o.teamId === teamId} />)}
-        {place >= top.length && (
-          <div className="mt-1 flex items-center gap-2">
-            <span className="w-5 text-xs text-ink-muted">{place + 1}</span>
-            <div className="min-w-0 flex-1"><RaceRow o={me} name={names[teamId]} me /></div>
-          </div>
-        )}
-      </section>
-      <section className="flex flex-col gap-1.5">
-        <div className="flex items-baseline justify-between">
-          <p className={label}>Your picks</p>
           {has && (
-            <button type="button" onClick={onReset} className="text-xs font-bold text-navy underline">Reset</button>
+            <button type="button" onClick={onReset} className="press flex h-8 shrink-0 animate-rise items-center gap-1.5 rounded-full border border-navy/20 px-3 text-xs font-bold text-navy hover:bg-mist">
+              <span aria-hidden>↺</span> Reset
+            </button>
           )}
         </div>
-        {has ? (
-          picks.map((p) => (
-            <div key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-navy/10 px-2.5 py-1.5">
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate text-sm font-semibold">{p.what}</span>
-                <span className="text-[11px] text-ink-muted">{p.when}</span>
-              </span>
-              <button type="button" aria-label={`Remove ${p.what}`} onClick={() => onPick(p.id, undefined)} className="h-8 w-8 shrink-0 rounded text-ink-muted hover:bg-mist">
-                ×
-              </button>
-            </div>
-          ))
-        ) : (
-          <p className="text-xs text-ink-muted">Pick results in the weeks to see what they do.</p>
-        )}
-      </section>
 
+        <section className="flex flex-col gap-3 rounded-xl bg-mist p-4">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-xs text-ink-muted">{has ? "Title game, with your picks" : "Title game"}</p>
+              <p key={verdict} className={`animate-rise font-display text-5xl font-bold leading-none ${me.titleGame >= 0.5 || me.status === "clinched" ? "text-turf" : "text-marker-text"}`}>{verdict}</p>
+            </div>
+            {has && <p className="text-xs text-ink-muted">Today {titleOdds(today)}</p>}
+          </div>
+          <div className="flex flex-col gap-1 border-t border-navy/10 pt-2 text-sm text-ink-soft">
+            <p className="flex justify-between">Win the ACC<span className="font-bold text-navy">{sideOdds(me.champion, me)}</span></p>
+            <p className="flex justify-between">Playoff (beta)<span className="font-bold text-navy">{sideOdds(me.playoff, me)}</span></p>
+          </div>
+        </section>
+      </div>
+      <div className="scroll-thin flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-5 xl:p-6">
+        <section className="flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between">
+            <p className={label}>The race</p>
+            <p className="text-[11px] text-ink-muted">{has ? "Projected with your picks" : "Projected"}</p>
+          </div>
+          {top.map((o) => <RaceRow key={o.teamId} o={o} name={names[o.teamId]} me={o.teamId === teamId} />)}
+          {place >= top.length && (
+            <div className="mt-1 flex items-center gap-2">
+              <span className="w-5 text-xs text-ink-muted">{place + 1}</span>
+              <div className="min-w-0 flex-1"><RaceRow o={me} name={names[teamId]} me /></div>
+            </div>
+          )}
+        </section>
+        <section className="flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between">
+            <p className={label}>Your picks</p>
+          </div>
+          {has ? (
+            picks.map((p) => (
+              <div key={p.id} className="flex animate-rise items-center justify-between gap-2 rounded-lg border border-navy/10 px-2.5 py-1.5">
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm font-semibold">{p.what}</span>
+                  <span className="text-[11px] text-ink-muted">{p.when}</span>
+                </span>
+                <button type="button" aria-label={`Remove ${p.what}`} onClick={() => onPick(p.id, undefined)} className="h-8 w-8 shrink-0 rounded text-ink-muted hover:bg-mist">
+                  ×
+                </button>
+              </div>
+            ))
+          ) : (
+            <p className="text-xs text-ink-muted">Pick results in the weeks to see what they do.</p>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
@@ -293,7 +299,7 @@ function RaceRow({ o, name, me }: { o: TeamOutlook; name: string; me: boolean })
       <span className="w-28 truncate text-sm font-semibold">{name}</span>
       <span className="w-8 text-xs text-ink-muted" title="ACC record, counting your picks">{o.record.conferenceWins}-{o.record.conferenceLosses}</span>
       <span className="h-1.5 flex-1 rounded-full bg-navy/10">
-        <span className={`block h-1.5 rounded-full ${me ? "bg-marker" : "bg-navy"}`} style={{ width: `${Math.max(3, Math.round(o.titleGame * 100))}%` }} />
+        <span className={`block h-1.5 rounded-full transition-[width] duration-500 ease-out ${me ? "bg-marker" : "bg-navy"}`} style={{ width: `${Math.max(3, Math.round(o.titleGame * 100))}%` }} />
       </span>
       <span className="w-10 text-right text-xs font-bold">{titleOdds(o)}</span>
     </div>

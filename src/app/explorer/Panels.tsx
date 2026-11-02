@@ -30,24 +30,27 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
   const ids = order.filter((id) => byId.get(id)!.name.toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <div>
-      <div className="p-3">
-        <label htmlFor={searchId} className="mb-1 block text-xs font-bold text-ink-muted">
-          Team
-        </label>
-        <input
-          id={searchId}
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search"
-          autoComplete="off"
-          className="min-h-11 w-full rounded-lg border border-ink-muted/40 bg-white px-3 text-sm placeholder:text-ink-muted md:min-h-9"
-        />
-      </div>
-      <div aria-hidden className="flex items-center gap-2 px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-ink-muted">
-        <span className="w-2.5" />
-        <span className="flex-1">Team</span>
-        <span className="text-right">Odds</span>
+      {/* Search and column labels stay put while the list scrolls under them. */}
+      <div className="sticky top-0 z-10 bg-white">
+        <div className="p-3">
+          <label htmlFor={searchId} className="mb-1 block text-xs font-bold text-ink-muted">
+            Team
+          </label>
+          <input
+            id={searchId}
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search"
+            autoComplete="off"
+            className="min-h-11 w-full rounded-lg border border-ink-muted/40 bg-white px-3 text-sm placeholder:text-ink-muted md:min-h-9"
+          />
+        </div>
+        <div aria-hidden className="flex items-center gap-2 px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-ink-muted">
+          <span className="w-2.5" />
+          <span className="flex-1">Team</span>
+          <span className="text-right">Odds</span>
+        </div>
       </div>
       <ul>
         {ids.map((id) => {
