@@ -241,7 +241,10 @@ export type PathTree = {
   help: HelpGame[];
   /** One line about the help list, covering the games that don't matter. */
   helpNote: string;
-  /** Null when the team is proven in or out, or no combination of results gets it in. */
+  /**
+   * Null when the team is proven in or out, when no combination of results gets it in, or (rarely) when the
+   * search runs out of budget before it finds any way in.
+   */
   likeliest: Likeliest | null;
 };
 
