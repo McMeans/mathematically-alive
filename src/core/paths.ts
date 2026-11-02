@@ -4,7 +4,7 @@
 // odds of exactly 1 or 0 without a proof stay "open".
 import { mix, mulberry32, simulateSeason, type SimResult } from "./sim";
 import { provenStatus } from "./proof";
-import type { Game, Season } from "./season";
+import type { Game, Season, TeamRecord } from "./season";
 import { OVERALL, isClear } from "./signal";
 import { championshipFromData, conferenceData } from "./tiebreak";
 
@@ -80,6 +80,20 @@ export function formatFine(p: number): string {
   if (p >= 0.001 && p < 0.0095) return `${(Math.round(p * 1000) / 10).toFixed(1)}%`;
   return formatOdds(p);
 }
+
+/** A team's record for display: "4-5 (2-4 ACC)", or just "4-5" without a conference. */
+export function formatRecord(record: TeamRecord, conference: string | null): string {
+  const overall = `${record.wins}-${record.losses}`;
+  return conference ? `${overall} (${record.conferenceWins}-${record.conferenceLosses} ${conference})` : overall;
+}
+
+/** Labels for the odds tiles, so every view names each number the same way. */
+export const ODDS_LABELS = {
+  titleGame: "Title game",
+  champion: "Win ACC",
+  playoff: "Playoff",
+  winOut: "Win out",
+} as const;
 
 /** Whole-percent odds. "<1%" and ">99%" stand in for 0 or 100 when the true value isn't exact. */
 export function formatOdds(p: number): string {
