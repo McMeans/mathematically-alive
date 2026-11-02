@@ -200,7 +200,7 @@ export function twoAhead(
 // The early stops below assume conference schedules differ by at most one game (the ACC: 8 or 9).
 // With a wider spread, a lower-ranked team could be placed through another team's "Tied Teams" group,
 // so the stop that proves a team in is switched off.
-const MAX_SPREAD = 1;
+export const MAX_SPREAD = 1;
 
 /**
  * True when the team can't make the top two whatever happens in `open` (its own games there are

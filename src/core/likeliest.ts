@@ -5,7 +5,7 @@
 //
 // The way is then trimmed to the results the team's spot depends on. Each result left is needed:
 // drop it and some combination of the rest keeps the team out.
-import { couldTieByCount, guaranteed, inEveryDraw, twoAhead, wayIn } from "./proof";
+import { MAX_SPREAD, couldTieByCount, guaranteed, inEveryDraw, twoAhead, wayIn } from "./proof";
 import type { Game } from "./season";
 import type { ConferenceData } from "./tiebreak";
 
@@ -95,6 +95,9 @@ function search(data: ConferenceData, conference: string, teamId: number, locks:
   for (const { g } of games) { left.set(g.homeId, left.get(g.homeId)! + 1); left.set(g.awayId, left.get(g.awayId)! + 1); }
   const pct = (id: number, w: number) => (scheduled.get(id)! === 0 ? 0 : w / scheduled.get(id)!);
   const myGames = scheduled.get(teamId)!;
+  // The early stop below assumes schedules differ by at most MAX_SPREAD games, as the proof's does.
+  const counts = [...scheduled.values()];
+  const spreadOk = Math.max(...counts) - Math.min(...counts) <= MAX_SPREAD;
   const likely = games.map(({ g, pHome }) => (pHome >= 0.5 ? g.homeId : g.awayId));
   const choice = new Array<number>(games.length);
   const witness = wayIn(data, conference, teamId, locks, luck, WITNESS_BUDGET);
@@ -149,7 +152,7 @@ function search(data: ConferenceData, conference: string, teamId: number, locks:
     }
     if (twoAhead(ids, teamId, myGames, myMin, myMax, scheduled, wins, left)) return;
     // In whatever happens from here: the rest go the likelier way, at no extra cost.
-    if (maybeAhead < 2 || k === games.length) {
+    if ((spreadOk && maybeAhead < 2) || k === games.length) {
       if (k === games.length) {
         if (!inEveryDraw(data, conference, teamId, (g) => fixed.get(g.id)!, luck)) return;
       }

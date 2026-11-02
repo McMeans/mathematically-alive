@@ -464,6 +464,27 @@ describe("help from elsewhere", () => {
     }
   });
 
+  it("the likeliest way in still holds once locked when schedules differ by several games", () => {
+    // Team 1 plays five conference games, team 6 one: past the spread the proof's early stops assume.
+    nextId = 500;
+    const games = [
+      game(1, 2, 1), game(1, 3), game(1, 4), game(1, 5), game(1, 6),
+      game(2, 3, 3), game(2, 4), game(3, 5), game(4, 5, 4), game(2, 5),
+    ];
+    const s6 = season(games, 6);
+    let checked = 0;
+    for (let id = 1; id <= 6; id++) {
+      const way = pathTree(s6, { ...base, teamId: id }).likeliest;
+      if (!way) continue;
+      const locks = Object.fromEntries(way.picks.map((p) => [p.gameId, p.winner]));
+      const v = pathTree(s6, { ...base, teamId: id, locks }).root.verdict;
+      if (way.needsTiebreak) expect(v, `team ${id}`).not.toBe("Out");
+      else expect(v, `team ${id}`).toBe("In");
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(2);
+  });
+
   it("the likeliest way in proves the spot once locked, for every team in a real season", () => {
     const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
     const full = seasonFromCfbd(snap);
