@@ -533,6 +533,56 @@ describe("help from elsewhere", () => {
     expect(viaTiebreak).toBeGreaterThan(3);
   }, 60_000);
 
+  it("no result shows a flat 100% or 0% unless it's proven", () => {
+    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const full = seasonFromCfbd(snap);
+    const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
+    const cut: Season = {
+      ...full,
+      games: full.games.map((g) => (g.week > last - 4 ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
+    };
+    const open = cut.games.filter((g) => !g.completed && g.conferenceGame);
+    let checked = 0;
+    for (const t of cut.teams.filter((x) => x.conference === "ACC")) {
+      // Win out, plus a few home wins elsewhere: some teams end up nearly in, and a small sample says
+      // 100% where the proof doesn't.
+      const own = open.filter((g) => g.homeId === t.id || g.awayId === t.id);
+      const locks: Record<number, number> = Object.fromEntries(own.map((g) => [g.id, t.id]));
+      for (const g of open.filter((x) => !own.includes(x)).slice(0, 4)) locks[g.id] = g.homeId;
+      const tree = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 500, seed: 1, locks });
+      for (const w of tree.weeks) {
+        const shown = [...w.games.flatMap((g) => [g.ifHome, g.ifAway]), ...(w.own ? [w.own.ifWin, w.own.ifLose] : [])];
+        for (const s of shown) expect(s, `${t.name} week ${w.week}`).not.toMatch(/^(100|0)%$/);
+        checked += shown.length;
+      }
+    }
+    expect(checked).toBeGreaterThan(20);
+  }, 60_000);
+
+  it("a week marks the same side as helping that the team is told to root for", () => {
+    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const full = seasonFromCfbd(snap);
+    const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
+    let checked = 0;
+    for (const weeks of [2, 3, 4]) {
+      const cut: Season = {
+        ...full,
+        games: full.games.map((g) => (g.week > last - weeks ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
+      };
+      for (const t of cut.teams.filter((x) => x.conference === "ACC")) {
+        const tree = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 2000, seed: 2 });
+        const help = new Map(tree.help.map((h) => [h.gameId, h]));
+        for (const g of tree.weeks.flatMap((w) => w.games)) {
+          const h = help.get(g.gameId);
+          if (!h || g.helps === null || h.rooting === null || h.ifHomeWins || h.ifAwayWins) continue;
+          expect(g.helps, `${t.name}: ${h.label}`).toBe(h.rooting);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(20);
+  }, 60_000);
+
   it("the card's rivals and the week by week agree with the picks, for every team", () => {
     const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
     const full = seasonFromCfbd(snap);

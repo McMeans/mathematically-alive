@@ -27,10 +27,14 @@ export function SeasonWeeks({ weeks, base, teamId, locks, likely, onPick }: {
         <p className="text-xs text-ink-muted">Each button shows the odds if it happens.</p>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-soft" aria-label="How much a result helps">
-        <span>Helps:</span>
-        <span className="flex items-center gap-1"><span className="h-3 w-5 rounded-sm bg-turf" />a lot</span>
-        <span className="flex items-center gap-1"><span className="h-3 w-5 rounded-sm bg-turf/30" />some</span>
-        <span className="flex items-center gap-1"><span className="h-3 w-5 rounded-sm bg-turf/10" />a little</span>
+        <span>Helps / hurts:</span>
+        {(["big", "some", "small"] as const).map((k) => (
+          <span key={k} className="flex items-center gap-1">
+            <span className={`h-3 w-2.5 rounded-l-sm ${TINT.helps[k]}`} />
+            <span className={`-ml-1 h-3 w-2.5 rounded-r-sm ${TINT.hurts[k]}`} />
+            {k === "big" ? "a lot" : k === "some" ? "some" : "a little"}
+          </span>
+        ))}
         <span className="flex items-center gap-1"><span className="h-3 w-5 rounded-sm ring-2 ring-inset ring-navy" />likeliest way</span>
       </div>
       <ol className="scroll-thin mt-2 flex gap-2 overflow-x-auto pb-2 md:grid md:grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] md:overflow-visible">
@@ -77,8 +81,8 @@ function Week({ w, base, teamId, locks, likely, onPick }: { w: SeasonWeek; base:
         <span className="px-0.5 text-[11px] font-semibold text-ink-muted">Elsewhere</span>
         {games.map((g) => (
           <div key={g.gameId} role="group" aria-label={`${g.home} vs ${g.away}`} className="grid grid-cols-2 gap-0.5 rounded-md bg-white p-0.5">
-            <SideButton team={g.home} odds={g.ifHome} impact={g.helps === g.homeId ? g.impact : null} state={side(g.gameId, g.homeId, g.likely)} onClick={() => onPick(g.gameId, g.homeId)} />
-            <SideButton team={g.away} odds={g.ifAway} impact={g.helps === g.awayId ? g.impact : null} state={side(g.gameId, g.awayId, g.likely)} onClick={() => onPick(g.gameId, g.awayId)} />
+            <SideButton team={g.home} odds={g.ifHome} effect={effectOf(g, g.homeId)} state={side(g.gameId, g.homeId, g.likely)} onClick={() => onPick(g.gameId, g.homeId)} />
+            <SideButton team={g.away} odds={g.ifAway} effect={effectOf(g, g.awayId)} state={side(g.gameId, g.awayId, g.likely)} onClick={() => onPick(g.gameId, g.awayId)} />
           </div>
         ))}
         {listed.length === 0 && !all && <span className="px-0.5 text-[11px] text-ink-muted">Nothing elsewhere changes the odds</span>}
@@ -134,14 +138,17 @@ export function byOdds(names: Record<number, string>) {
   return (a: TeamOutlook, b: TeamOutlook) => key(b) - key(a) || names[a.teamId].localeCompare(names[b.teamId]);
 }
 
-/** Any other odds of a team: a team still alive at 0% in the sample shows as under 0.1%, one that's out as 0%. */
-const sideOdds = (p: number, o: TeamOutlook) => (p === 0 && o.status !== "eliminated" ? "<0.1%" : formatFine(p));
+/** Any other odds of a team: a team still alive at 0% in the sample shows as under 0.1%, one that's out as 0%; 100% only once it's in. */
+const sideOdds = (p: number, o: TeamOutlook) =>
+  p === 0 && o.status !== "eliminated" ? "<0.1%" : p === 1 && o.status !== "clinched" ? ">99%" : formatFine(p);
 
-/** Title-game odds for display: In or Out when proven; a team still alive at 0% in the sample shows as under 0.1%. */
+/** Title-game odds for display: In or Out when proven; otherwise never a flat 0% or 100% (under 0.1%, over 99%). */
 const titleOdds = (o: TeamOutlook) =>
-  o.status === "clinched" ? "In" : o.status === "eliminated" ? "Out" : o.titleGame === 0 ? "<0.1%" : formatFine(o.titleGame);
+  o.status === "clinched" ? "In" : o.status === "eliminated" ? "Out" : o.titleGame === 0 ? "<0.1%" : o.titleGame === 1 ? ">99%" : formatFine(o.titleGame);
 
 const tone = (odds: string) => (odds === "In" ? "text-turf" : odds === "Out" ? "text-marker-text" : "");
+// The same on the navy own-game card, light enough to read there.
+const darkTone = (odds: string) => (odds === "In" ? "font-bold text-[#8FE3B4]" : odds === "Out" ? "font-bold text-[#F6B08C]" : "");
 
 function OwnButton({ text, odds, state, onClick }: { text: string; odds: string; state: "picked" | "likely" | "open"; onClick: () => void }) {
   const look =
@@ -149,28 +156,41 @@ function OwnButton({ text, odds, state, onClick }: { text: string; odds: string;
   return (
     <button type="button" aria-label={`${text}: ${odds}`} aria-pressed={state === "picked"} onClick={onClick} className={`flex min-h-8 items-center justify-between rounded-md px-2 text-xs font-bold ${look}`}>
       {text}
-      <span className={`font-normal ${state === "picked" ? "" : tone(odds)}`}>{odds}</span>
+      <span className={`font-normal ${state === "picked" ? "" : state === "open" ? darkTone(odds) : tone(odds)}`}>{odds}</span>
     </button>
   );
 }
 
-// The side that helps the team is tinted green, deeper the more it moves the odds.
-const TINT: Record<Impact, string> = { big: "bg-turf text-white", some: "bg-turf/30 text-navy", small: "bg-turf/10 text-navy" };
+// The side that helps the team is tinted green and the side that hurts it red, deeper the more it moves
+// the odds. Light tints with navy text, so only a picked result (solid navy) reads as selected.
+type Effect = { kind: "helps" | "hurts"; impact: Impact };
+const TINT: Record<Effect["kind"], Record<Impact, string>> = {
+  helps: { big: "bg-turf/40", some: "bg-turf/20", small: "bg-turf/10" },
+  hurts: { big: "bg-red-600/30", some: "bg-red-600/15", small: "bg-red-600/[0.07]" },
+};
+const ODDS_TEXT: Record<Effect["kind"], string> = { helps: "text-turf", hurts: "text-red-700" };
 
-function SideButton({ team, odds, impact, state, onClick }: {
+/** Whether this winner helps or hurts the team, and how much; null when the game doesn't move its odds. */
+function effectOf(g: SeasonWeek["games"][number], winner: number): Effect | null {
+  if (g.helps === null || g.impact === null) return null;
+  return { kind: g.helps === winner ? "helps" : "hurts", impact: g.impact };
+}
+
+function SideButton({ team, odds, effect, state, onClick }: {
   team: string;
   odds: string;
-  impact: Impact | null;
+  effect: Effect | null;
   state: "picked" | "likely" | "open";
   onClick: () => void;
 }) {
-  const tint = impact ? TINT[impact] : "hover:bg-mist";
-  const look =
-    state === "picked" ? "bg-navy text-white" : `${tint} ${impact ? "" : "text-ink-soft"} ${state === "likely" ? "ring-2 ring-inset ring-navy" : ""}`;
+  const tint = effect ? `${TINT[effect.kind][effect.impact]} text-navy` : "text-ink-soft hover:bg-mist";
+  const look = state === "picked" ? "bg-navy text-white" : `${tint} ${state === "likely" ? "ring-2 ring-inset ring-navy" : ""}`;
   const oddsLook =
-    state === "picked" || impact === "big" ? "font-bold text-white" : impact === "some" || state === "likely" ? "font-bold text-turf" : "text-ink-muted";
+    state === "picked" ? "font-bold text-white"
+    : effect && effect.impact !== "small" ? `font-bold ${ODDS_TEXT[effect.kind]}`
+    : state === "likely" ? "font-bold text-turf" : "text-ink-muted";
   return (
-    <button type="button" aria-label={`${team} wins: ${odds}${impact ? `, helps (${impact})` : ""}`} aria-pressed={state === "picked"} onClick={onClick} className={`flex min-h-9 min-w-0 flex-col items-start rounded px-1.5 py-0.5 text-left text-[11px] font-semibold ${look}`}>
+    <button type="button" aria-label={`${team} wins: ${odds}${effect ? `, ${effect.kind} (${effect.impact})` : ""}`} aria-pressed={state === "picked"} onClick={onClick} className={`flex min-h-9 min-w-0 flex-col items-start rounded px-1.5 py-0.5 text-left text-[11px] font-semibold ${look}`}>
       <span className="w-full truncate">{team}</span>
       <span className={oddsLook}>{odds}</span>
     </button>

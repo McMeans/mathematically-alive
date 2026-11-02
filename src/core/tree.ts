@@ -602,7 +602,8 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     const locked = opts.locks?.[g.id];
     const h = helpById.get(g.id);
     if (locked !== undefined) {
-      const mine = root.outcome === "in" ? "In" : root.outcome === "out" ? "Out" : formatFine(titleGame);
+      // Not proven: never a flat 0% or 100%.
+      const mine = root.outcome === "in" ? "In" : root.outcome === "out" ? "Out" : titleGame === 0 ? "<0.1%" : titleGame === 1 ? ">99%" : formatFine(titleGame);
       w.games.push({ gameId: g.id, homeId: g.homeId, awayId: g.awayId, home: name(g.homeId), away: name(g.awayId),
         ifHome: locked === g.homeId ? mine : swapped(g.id, g.homeId), ifAway: locked === g.awayId ? mine : swapped(g.id, g.awayId), swing: Infinity, likely: null, matters: true, helps: null, impact: null });
     } else if (h) {
@@ -813,7 +814,9 @@ function helpsSide(g: Game, h: HelpGame, now: number): { helps: number | null; i
   // A proof settles it even when the sample can't tell the sides apart: "In" beats ">99%", "<0.1%" beats "Out".
   const sure = (p: "in" | "out" | null) => (p === "in" ? 1 : p === "out" ? -1 : 0);
   const proven = sure(h.ifHomeWins) - sure(h.ifAwayWins);
-  const edge = proven !== 0 ? Math.sign(proven) : h.leans || h.scenario ? Math.sign(a - b) : 0;
+  // The same side as `rooting`: today's odds when they clearly differ, else the scenario's, else today's faint lean.
+  const fromScenario = h.scenario ? Math.sign(h.scenario.oddsIfHomeWins - h.scenario.oddsIfAwayWins) : 0;
+  const edge = proven !== 0 ? Math.sign(proven) : h.now ? Math.sign(a - b) : h.scenario ? fromScenario : h.leans ? Math.sign(a - b) : 0;
   if (edge === 0) return { helps: null, impact: null };
   const rel = Math.abs(a - b) / Math.max(now, IMPACT_FLOOR);
   return { helps: edge > 0 ? g.homeId : g.awayId, impact: rel >= BIG ? "big" : rel >= SOME ? "some" : "small" };

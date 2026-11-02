@@ -15,8 +15,23 @@ const BUDGET = 30_000;
 /** `budget`: search nodes per check; a smaller one answers faster but says "open" more often. */
 export function provenStatus(season: Season, conference: string, teamId: number, locks: Record<number, number> = {}, budget = BUDGET): ProvenStatus {
   const data = conferenceData(season, conference);
-  if (canGetIn(data, conference, teamId, locks, true, budget)) return canFinish(data, conference, teamId, locks, true, false, { left: budget }) ? "open" : "clinched";
-  return "eliminated";
+  if (!canGetIn(data, conference, teamId, locks, true, budget)) return "eliminated";
+  if (!canFinish(data, conference, teamId, locks, true, false, { left: budget })) return "clinched";
+  return oneRivalLeft(data, conference, teamId, locks, budget) ? "clinched" : "open";
+}
+
+/**
+ * Two teams play for the title, so when at most one other team can still get in, the team is in. Catches
+ * clinches the search above runs out of budget on: each other team's elimination is a smaller search.
+ */
+function oneRivalLeft(data: ConferenceData, conference: string, teamId: number, locks: Record<number, number>, budget: number): boolean {
+  let rivals = 0;
+  for (const id of data.ids) {
+    if (id === teamId) continue;
+    // Out of budget counts as "can get in", so the answer stays a proof.
+    if (canGetIn(data, conference, id, locks, true, budget) && ++rivals > 1) return false;
+  }
+  return true;
 }
 
 /**

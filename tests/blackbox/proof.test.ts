@@ -1,6 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { championshipParticipants, explore, formatChance, pathTree, seasonOutlook, teamPath } from "@/core";
-import type { Game, Season } from "@/core";
+import { championshipParticipants, explore, formatChance, pathTree, seasonFromCfbd, seasonOutlook, teamPath } from "@/core";
+import type { CfbdSnapshot, Game, Season } from "@/core";
 
 let nextId = 0;
 function game(home: number, away: number, winner?: number, spread: number | null = null): Game {
@@ -164,4 +165,25 @@ describe("proofs agree with checking every combination", () => {
     }
     expect(settled).toBeGreaterThan(150);
   });
+});
+
+describe("a team with one rival left", () => {
+  it("is in once every other team but one is out, however deep the proof would have to go", () => {
+    const snap = JSON.parse(readFileSync("fixtures/acc-2026.json", "utf8")) as CfbdSnapshot;
+    const season = seasonFromCfbd(snap);
+    const id = (name: string) => season.teams.find((t) => t.name === name)!.id;
+    const between = (a: string, b: string) =>
+      season.games.find((g) => !g.completed && g.conferenceGame && [g.homeId, g.awayId].includes(id(a)) && [g.homeId, g.awayId].includes(id(b)))!.id;
+    // Wake Forest 7-2 with these results; everyone but Miami is out, so Wake Forest takes the other spot.
+    const results: [string, string][] = [
+      ["Georgia Tech", "Louisville"], ["SMU", "Virginia Tech"], ["Wake Forest", "SMU"],
+      ["Miami", "Duke"], ["Wake Forest", "Georgia Tech"], ["Duke", "Wake Forest"],
+    ];
+    const locks = Object.fromEntries(results.map(([w, l]) => [between(w, l), id(w)]));
+    const r = explore(season, { conference: "ACC", teamId: id("Wake Forest"), iterations: 2000, seed: 1, locks });
+    const alive = r.outlook.filter((o) => o.status !== "eliminated").map((o) => o.teamId);
+    expect(alive.sort()).toEqual([id("Miami"), id("Wake Forest")].sort());
+    expect(r.outlook.find((o) => o.teamId === id("Wake Forest"))!.status).toBe("clinched");
+    expect(r.tree.root.outcome).toBe("in");
+  }, 60_000);
 });
