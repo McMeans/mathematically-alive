@@ -110,7 +110,7 @@ export type Likeliest = {
   picks: { gameId: number; winner: number }[];
   /** The picks the card names: the team's own results and the non-favorites elsewhere (not favorites winning). */
   named: { gameId: number; winner: number }[];
-  /** Chance every picked result happens: their game odds multiplied. */
+  /** Chance every picked result happens: their game odds multiplied, as if independent (see `WayIn.chance`). */
   chance: number;
   /** Picked results that go against the likelier side. */
   upsets: number;

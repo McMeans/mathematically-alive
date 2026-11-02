@@ -16,7 +16,11 @@ const TRIM_BUDGET = 150_000;
 
 export type WayIn = {
   picks: { gameId: number; winner: number }[];
-  /** Chance that every picked result happens: their game odds multiplied. */
+  /**
+   * Chance that every picked result happens: their game odds multiplied, as if independent. The simulation
+   * links one team's games through its season rating shift, so a way that needs several results from the
+   * same team can be a little likelier (all its wins, say) or less likely than this says.
+   */
   chance: number;
   /** Picked results that go against the likelier side. */
   upsets: number;

@@ -182,7 +182,9 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
   const cwins = new Int32Array(T);
   const rand = mulberry32(seed);
   const shift = new Float64Array(T);
-  // Only teams with a game left to simulate need a shift while simulating.
+  // A team's shift is one hashed draw per (seed, iteration, team): the same value `IterationTeams.shift`
+  // and `rank` return later. Teams with no game left to simulate have nothing to use it for here, so their
+  // slots aren't filled; they still get that same shift for ranking and the title game.
   const active = Int32Array.from(new Set(Array.from({ length: G }, (_, i) => i).filter((i) => fixed[i] < 0).flatMap((i) => [homeIdx[i], awayIdx[i]])));
 
   for (let it = 0; it < iterations; it++) {
