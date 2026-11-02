@@ -13,7 +13,7 @@
 //
 // Uses the same simulated seasons and title-game draw as teamPath, so the root
 // odds equal teamPath's titleGame for the same seed and locks.
-import { formatFine, formatOdds, type PathOptions } from "./paths";
+import { formatFine, formatOdds, formatTitleOdds, type PathOptions, type PathStatus } from "./paths";
 import { teamRecord } from "./season";
 import type { Game, Season } from "./season";
 import { FAINT, OVERALL, SCENARIO, isClear } from "./signal";
@@ -605,13 +605,12 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     const locked = opts.locks?.[g.id];
     const h = helpById.get(g.id);
     if (locked !== undefined) {
-      // Not proven: never a flat 0% or 100%.
-      const mine = root.outcome === "in" ? "In" : root.outcome === "out" ? "Out" : titleGame === 0 ? "<0.1%" : titleGame === 1 ? ">99%" : formatFine(titleGame);
+      const mine = formatTitleOdds(titleGame, statusOf(root.outcome));
       w.games.push({ gameId: g.id, homeId: g.homeId, awayId: g.awayId, home: name(g.homeId), away: name(g.awayId),
         ifHome: locked === g.homeId ? mine : swapped(g.id, g.homeId), ifAway: locked === g.awayId ? mine : swapped(g.id, g.awayId), swing: Infinity, likely: null, matters: true, helps: null, impact: null });
     } else if (h) {
       const side = (odds: number | null, proof: "in" | "out" | null) =>
-        proof === "in" ? "In" : proof === "out" ? "Out" : odds === null ? "—" : odds === 0 ? "<0.1%" : odds === 1 ? ">99%" : formatFine(odds);
+        odds === null && proof === null ? "—" : formatTitleOdds(odds ?? 0, statusOf(proof));
       const matters = h.now || h.scenario !== null || likelyIds.has(g.id);
       if (!matters) w.quiet++;
       w.games.push({ gameId: g.id, homeId: g.homeId, awayId: g.awayId, home: name(g.homeId), away: name(g.awayId),
@@ -860,4 +859,9 @@ function footnote(
     notes.push(`The tree stops after ${plural(depth, "game", "games")}; ${plural(cut, `later ${conference} game isn't`, `later ${conference} games aren't`)} shown.`);
   }
   return notes.length ? notes.join(" ") : null;
+}
+
+/** A proven outcome as a title-game status for the odds wording: only "in" and "out" are proven. */
+function statusOf(outcome: TreeOutcome | "in" | "out" | null): PathStatus {
+  return outcome === "in" ? "clinched" : outcome === "out" ? "eliminated" : "alive";
 }
