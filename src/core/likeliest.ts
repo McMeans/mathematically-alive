@@ -37,8 +37,9 @@ export type Choice = { g: Game; pHome: number };
  * important first), each with its home win probability. `starts`: candidate ways in to begin from
  * (winners in `games` order), such as simulated seasons the team got in; the better the start, the
  * more of the search the bound cuts off. `luck`: the team wins every ranking and draw step; otherwise
- * the picks must get it in however those go. Null when no way in exists, or when the search for a first way in runs out of budget before finding one. When the search runs out of
- * budget it returns the likeliest way found so far. The way picks every game; `trimWay` cuts it down.
+ * the picks must get it in however those go. Null when no way in exists, or when the search for a first
+ * way in runs out of budget before finding one. When the later search runs out of budget it returns the
+ * likeliest way found so far. The way picks every game; `trimWay` cuts it down.
  */
 export function likeliestWayIn(
   data: ConferenceData,
