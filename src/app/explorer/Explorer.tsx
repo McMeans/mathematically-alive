@@ -36,18 +36,26 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
   const [condensed, setCondensed] = useState(false);
   useEffect(() => {
     const onScroll = () => setCondensed((c) => (c ? window.scrollY > 40 : window.scrollY > 160));
+    onScroll(); // the browser may restore a scrolled position on reload
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
   useEffect(() => {
     if (!sheet) return;
+    // The picker is hidden from xl up; close the popup if the window widens past it.
+    const wide = window.matchMedia("(min-width: 80rem)");
+    const onWide = () => wide.matches && setSheet(false);
+    wide.addEventListener("change", onWide);
     const close = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       setSheet(false);
       pickerRef.current?.focus();
     };
     window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("keydown", close);
+      wide.removeEventListener("change", onWide);
+    };
   }, [sheet]);
   // The team just clicked in the list, while its page loads (this component remounts per team).
   const [going, setGoing] = useState<number | null>(null);

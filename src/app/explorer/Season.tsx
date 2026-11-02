@@ -35,7 +35,7 @@ export function SeasonWeeks({ weeks, base, teamId, locks, likely, onPick }: {
             {k === "big" ? "a lot" : k === "some" ? "some" : "a little"}
           </span>
         ))}
-        <span className="flex items-center gap-1"><span className="h-3 w-5 rounded-sm outline-dashed outline-1 -outline-offset-1 outline-navy/50" />likeliest way</span>
+        <span className="flex items-center gap-1"><span className="h-3 w-5 rounded-sm outline-dashed outline-[1.5px] -outline-offset-[1.5px] outline-navy/80" />likeliest way</span>
       </div>
       <ol className="scroll-thin mt-2 flex gap-2 overflow-x-auto pb-2 md:grid md:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] md:overflow-visible">
         {weeks.map((w) => (
@@ -178,7 +178,7 @@ function SideButton({ team, odds, effect, state, onClick }: {
   onClick: () => void;
 }) {
   const tint = effect ? `${TINT[effect.kind][effect.impact]} text-navy` : "text-ink-soft hover:bg-mist";
-  const look = state === "picked" ? "bg-navy text-white" : `${tint} ${state === "likely" ? "outline-dashed outline-1 -outline-offset-1 outline-navy/50" : ""}`;
+  const look = state === "picked" ? "bg-navy text-white" : `${tint} ${state === "likely" ? "outline-dashed outline-[1.5px] -outline-offset-[1.5px] outline-navy/80" : ""}`;
   const oddsLook =
     state === "picked" ? "font-bold text-white"
     : effect && effect.impact !== "small" ? `font-bold ${ODDS_TEXT[effect.kind]}`
