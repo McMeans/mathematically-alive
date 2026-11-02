@@ -91,6 +91,18 @@ describe("championship participants", () => {
     expect(run(l)).toEqual([4, 1]);
   });
 
+  it("a round-robin tie cut down by head-to-head starts over among the teams left, ahead of rank", () => {
+    // 1-4 are each 4-2. Among themselves 1 and 2 are 2-1, 3 and 4 are 1-2; 1 beat 2, and 2 beat 3 and 4.
+    // Rank favors 2, then 3 and 4, then 1, but 1 and 2 go: 1 on head-to-head with 2, then 2 at 2-0 over 3 and 4.
+    const results: [number, number][] = [
+      [1, 2], [1, 3], [4, 1], [2, 3], [2, 4], [3, 4],
+      [1, 5], [1, 6], [7, 1], [2, 5], [2, 6], [7, 2],
+      [3, 5], [3, 6], [3, 7], [4, 5], [4, 6], [4, 7],
+    ];
+    const l = league(7, results, { 1: 1, 2: 90, 3: 50, 4: 40 });
+    expect(run(l)).toEqual([1, 2]);
+  });
+
   it("with no round robin, a team that beat every other tied team is placed first", () => {
     // 1, 2, 3 are each 2-1. 1 beat 2 and 3, who never met. Rank then orders 2 over 3.
     const l = league(5, [[1, 2], [1, 3], [4, 1], [2, 4], [2, 5], [3, 4], [3, 5]], { 2: 10, 3: 5 });

@@ -9,9 +9,9 @@ export type Exploration = { outlook: TeamOutlook[]; path: TeamPath; tree: PathTr
 
 export function explore(season: Season, opts: PathOptions): Exploration {
   const sim = simulateSeason(season, { iterations: opts.iterations, seed: opts.seed, locks: opts.locks });
-  return {
-    outlook: seasonOutlook(season, opts, sim).teams,
-    path: teamPath(season, opts, sim),
-    tree: pathTree(season, opts, sim),
-  };
+  const tree = pathTree(season, opts, sim);
+  // The tree proves the team's own spot with a bigger budget than the outlook gives each team; use what it found.
+  const status: TeamOutlook["status"] | null = tree.root.outcome === "in" ? "clinched" : tree.root.outcome === "out" ? "eliminated" : null;
+  const outlook = seasonOutlook(season, opts, sim).teams.map((o) => (o.teamId === opts.teamId && status ? { ...o, status } : o));
+  return { outlook, path: teamPath(season, opts, sim), tree };
 }

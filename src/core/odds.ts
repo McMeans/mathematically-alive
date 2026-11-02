@@ -1,6 +1,6 @@
 // Standard deviation of college football final margins around the spread,
 // in points. Roughly 15-16 historically.
-const MARGIN_SD = 15.5;
+export const MARGIN_SD = 15.5;
 
 /**
  * Chance the home side wins given a point spread from the home side's view
@@ -14,7 +14,7 @@ export function winProbability(homeSpread: number, sd: number = MARGIN_SD): numb
 }
 
 // Abramowitz-Stegun 26.2.17, error < 7.5e-8.
-function normalCdf(z: number): number {
+export function normalCdf(z: number): number {
   const t = 1 / (1 + 0.2316419 * Math.abs(z));
   const d = 0.3989422804014327 * Math.exp((-z * z) / 2);
   const p =

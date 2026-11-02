@@ -1,10 +1,20 @@
 // Monte Carlo season simulator. Plays out every unplayed game many times and
 // records the outcomes compactly so standings/tiebreaker code can replay them.
-import { winProbability } from "./odds";
+import { MARGIN_SD, normalCdf, winProbability } from "./odds";
 import type { Game, Season, Team } from "./season";
 
 const HOME_FIELD = 2.5;
 const MISSING_RATING_OTHER = -10;
+// Ratings are estimates. Each simulated season shifts every team's rating by a
+// normal draw with this SD (points), shared by all its games, so a team that is
+// better than its rating tends to win more of them. The per-game SD shrinks to
+// match, so a single game's odds stay what the spread or ratings say.
+const SHOCK_SD = 4;
+const GAME_SD = Math.sqrt(MARGIN_SD * MARGIN_SD - 2 * SHOCK_SD * SHOCK_SD);
+// Stand-in for the SportSource Team Success Ranking at season's end: a body-of-work
+// measure, so it rises with the simulated record, plus noise for how it's computed.
+const RANK_PER_NET_WIN = 2;
+const RANK_SD = 3;
 
 export type OddsOptions = { sd?: number };
 
@@ -19,15 +29,63 @@ export function gameWinProbability(season: Season, game: Game, opts: OddsOptions
 }
 
 function probability(byId: Map<number, Team>, game: Game, sd?: number): number {
-  if (game.spread !== null) return winProbability(game.spread, sd);
-  const rating = (id: number): number => {
-    const t = byId.get(id);
-    if (t?.rating != null) return t.rating;
-    return t?.classification === "fbs" ? 0 : MISSING_RATING_OTHER;
-  };
-  const home = game.neutralSite ? 0 : HOME_FIELD;
-  return winProbability(-(rating(game.homeId) - rating(game.awayId)) - home, sd);
+  return winProbability(homeSpread(byId, game), sd);
 }
+
+function ratingOf(byId: Map<number, Team>, id: number): number {
+  const t = byId.get(id);
+  if (t?.rating != null) return t.rating;
+  return t?.classification === "fbs" ? 0 : MISSING_RATING_OTHER;
+}
+
+/** The game's spread when it has one, else one derived from ratings and home field. */
+function homeSpread(byId: Map<number, Team>, game: Game): number {
+  if (game.spread !== null) return game.spread;
+  const home = game.neutralSite ? 0 : HOME_FIELD;
+  return -(ratingOf(byId, game.homeId) - ratingOf(byId, game.awayId)) - home;
+}
+
+/** Chance team a beats team b on a neutral field in one simulated season, given each team's rating shift. */
+export function neutralOdds(season: Season): (a: number, b: number, shiftA: number, shiftB: number) => number {
+  const byId = new Map<number, Team>(season.teams.map((t) => [t.id, t]));
+  return (a, b, shiftA, shiftB) => normalCdf((ratingOf(byId, a) + shiftA - ratingOf(byId, b) - shiftB) / GAME_SD);
+}
+
+// Lookup tables, since the inner loop needs millions of normal draws and CDF values.
+// CDF: x from -CDF_SPAN to CDF_SPAN in CDF_STEPS steps. Quantile: p from 0 to 1 in Q_STEPS steps.
+const CDF_SPAN = 8;
+const CDF_STEPS = 4096;
+const CDF_TABLE = Float64Array.from({ length: CDF_STEPS + 1 }, (_, k) => normalCdf(-CDF_SPAN + (2 * CDF_SPAN * k) / CDF_STEPS));
+const Q_STEPS = 4096;
+const Q_TABLE = Float64Array.from({ length: Q_STEPS + 1 }, (_, k) => {
+  const p = Math.min(Math.max(k / Q_STEPS, 1e-6), 1 - 1e-6);
+  let lo = -CDF_SPAN;
+  let hi = CDF_SPAN;
+  for (let n = 0; n < 60; n++) {
+    const mid = (lo + hi) / 2;
+    if (normalCdf(mid) < p) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+});
+
+function fastCdf(x: number): number {
+  const f = ((x + CDF_SPAN) * CDF_STEPS) / (2 * CDF_SPAN);
+  if (f <= 0) return 0;
+  if (f >= CDF_STEPS) return 1;
+  const k = f | 0;
+  return CDF_TABLE[k] + (CDF_TABLE[k + 1] - CDF_TABLE[k]) * (f - k);
+}
+
+/** A standard normal draw for (seed, iteration, salt), by table lookup of a hashed uniform. */
+function normalAt(seed: number, iteration: number, salt: number): number {
+  const f = (mix(seed, iteration, salt) / 4294967296) * Q_STEPS;
+  const k = f | 0;
+  return Q_TABLE[k] + (Q_TABLE[k + 1] - Q_TABLE[k]) * (f - k);
+}
+// Salts for each team's rating shift and ranking noise: SHIFT_SALT + team index, RANK_SALT + team index.
+const SHIFT_SALT = 1 << 20;
+const RANK_SALT = 1 << 21;
 
 export type SimOptions = {
   iterations: number;
@@ -52,7 +110,15 @@ export type SimResult = {
    * a function mapping an index into `season.games` to the winning team id.
    * The function is only valid during the callback.
    */
-  forEachIteration(cb: (iteration: number, winnerOf: (gameIndex: number) => number) => void): void;
+  forEachIteration(cb: (iteration: number, winnerOf: (gameIndex: number) => number, season: IterationTeams) => void): void;
+};
+
+/** Per-team values of one simulated season. Valid only during the forEachIteration callback. */
+export type IterationTeams = {
+  /** Points added to the team's rating in this season. */
+  shift(teamId: number): number;
+  /** Season-end ranking stand-in for the tiebreaker's ranking step; higher is better. */
+  rank(teamId: number): number;
 };
 
 /** Simulate the season `iterations` times. Deterministic for a given seed. */
@@ -80,7 +146,7 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
 
   // Fixed outcome (or -1) and home win probability per game.
   const fixed = new Int8Array(G);
-  const prob = new Float64Array(G);
+  const spread = new Float64Array(G);
   const homeIdx = new Int32Array(G);
   const awayIdx = new Int32Array(G);
   const conf = new Uint8Array(G);
@@ -102,7 +168,7 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
     else if (locked[i] >= 0) fixed[i] = locked[i];
     else {
       fixed[i] = -1;
-      prob[i] = probability(byId, g);
+      spread[i] = homeSpread(byId, g);
     }
   }
   for (let t = 0; t < T; t++) maxGames = Math.max(maxGames, gamesPer[t]);
@@ -115,17 +181,24 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
   const wins = new Int32Array(T);
   const cwins = new Int32Array(T);
   const rand = mulberry32(seed);
+  const shift = new Float64Array(T);
+  // A team's shift is one hashed draw per (seed, iteration, team): the same value `IterationTeams.shift`
+  // and `rank` return later. Teams with no game left to simulate have nothing to use it for here, so their
+  // slots aren't filled; they still get that same shift for ranking and the title game.
+  const active = Int32Array.from(new Set(Array.from({ length: G }, (_, i) => i).filter((i) => fixed[i] < 0).flatMap((i) => [homeIdx[i], awayIdx[i]])));
 
   for (let it = 0; it < iterations; it++) {
     wins.fill(0);
     cwins.fill(0);
     const base = it * stride;
+    // Rating shifts are hashed from (seed, iteration, team), so locks never change them.
+    for (let j = 0; j < active.length; j++) shift[active[j]] = SHOCK_SD * normalAt(seed, it, SHIFT_SALT + active[j]);
     for (let i = 0; i < G; i++) {
       const f = fixed[i];
       // Draw for every game, fixed or not, so a lock changes only its own game
       // and what-if runs at the same seed stay paired.
       const r = rand();
-      const homeWon = f >= 0 ? f === 1 : r < prob[i];
+      const homeWon = f >= 0 ? f === 1 : r < fastCdf((shift[homeIdx[i]] - shift[awayIdx[i]] - spread[i]) / GAME_SD);
       const w = homeWon ? homeIdx[i] : awayIdx[i];
       if (homeWon) bits[base + (i >> 3)] |= 1 << (i & 7);
       wins[w]++;
@@ -148,15 +221,32 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
   }
 
   let current = 0;
-  const winnerOf = (i: number): number => {
-    const homeWon = (bits[current * stride + (i >> 3)] >> (i & 7)) & 1;
-    return homeWon ? games[i].homeId : games[i].awayId;
+  const homeWonAt = (i: number): boolean => ((bits[current * stride + (i >> 3)] >> (i & 7)) & 1) === 1;
+  const winnerOf = (i: number): number => (homeWonAt(i) ? games[i].homeId : games[i].awayId);
+  // Shifts and ranks are worked out per team, only when asked for.
+  const rating = Float64Array.from(teamIds, (id) => ratingOf(byId, id));
+  const gamesOf: number[][] = teamIds.map(() => []);
+  for (let i = 0; i < G; i++) { gamesOf[homeIdx[i]].push(i); gamesOf[awayIdx[i]].push(i); }
+  const indexOf = (id: number): number => {
+    const t = teamIndex.get(id);
+    if (t === undefined) throw new Error(`unknown team ${id}`);
+    return t;
+  };
+  const shiftAt = (t: number): number => SHOCK_SD * normalAt(seed, current, SHIFT_SALT + t);
+  const teamsNow: IterationTeams = {
+    shift: (id) => shiftAt(indexOf(id)),
+    rank(id) {
+      const t = indexOf(id);
+      let net = 0;
+      for (const i of gamesOf[t]) net += (homeWonAt(i) === (homeIdx[i] === t)) ? 1 : -1;
+      return rating[t] + shiftAt(t) + RANK_PER_NET_WIN * net + RANK_SD * normalAt(seed, current, RANK_SALT + t);
+    },
   };
   return {
     iterations,
     teams,
     forEachIteration(cb) {
-      for (current = 0; current < iterations; current++) cb(current, winnerOf);
+      for (current = 0; current < iterations; current++) cb(current, winnerOf, teamsNow);
     },
   };
 }

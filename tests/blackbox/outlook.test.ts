@@ -57,6 +57,33 @@ describe("season outlook", () => {
     expect(byTeam(o, 1).expectedConferenceWins).toBe(4);
   });
 
+  it("counts locked results in a team's record", () => {
+    const { season, upset } = build();
+    const o = run(season, { locks: { [upset.id]: 3 } });
+    expect(byTeam(o, 3).record).toEqual({ wins: 2, losses: 1, conferenceWins: 2, conferenceLosses: 1 });
+    expect(byTeam(o, 2).record).toEqual({ wins: 1, losses: 2, conferenceWins: 1, conferenceLosses: 2 });
+  });
+
+  it("breaks a tie on ranking toward the team with the better simulated record", () => {
+    // Conference "R": 20 beat everyone; 21 and 22 are 1-1, never met, and have equal ratings. Only the
+    // ranking step separates them, and 21 wins its game outside the conference while 22 loses its.
+    nextId = 100;
+    const out = game(21, 24, false);
+    const other = game(22, 25, false);
+    const games = [
+      game(20, 21, true, 20), game(20, 22, true, 20), game(20, 23, true, 20),
+      game(21, 23, true, 21), game(22, 23, true, 22), out, other,
+    ];
+    const teams = [20, 21, 22, 23].map((id) => team(id, "R")).concat([team(24, "Other"), team(25, "Other")]);
+    const o = seasonOutlook({ year: 2026, fetchedAt: "", teams, games }, {
+      conference: "R", iterations: 4000, seed: 7, locks: { [out.id]: 21, [other.id]: 25 },
+    });
+    const a = o.teams.find((t) => t.teamId === 21)!.titleGame;
+    const b = o.teams.find((t) => t.teamId === 22)!.titleGame;
+    expect(a + b).toBeCloseTo(1, 10);
+    expect(a).toBeGreaterThan(0.6);
+  });
+
   it("puts two teams in the title game every iteration", () => {
     const { season } = build();
     expect(sum(run(season).teams.map((t) => t.titleGame))).toBeCloseTo(2, 10);
