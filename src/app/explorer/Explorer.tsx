@@ -30,9 +30,14 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const pickerRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!sheet) return;
-    const close = (e: KeyboardEvent) => e.key === "Escape" && setSheet(false);
+    const close = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setSheet(false);
+      pickerRef.current?.focus();
+    };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [sheet]);
@@ -151,6 +156,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                ref={pickerRef}
                 aria-expanded={sheet}
                 aria-controls="team-sheet"
                 onClick={() => setSheet(!sheet)}
@@ -173,7 +179,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
             {sheet && (
               <>
                 {/* Clicking anywhere outside the popup closes it. */}
-                <button type="button" aria-label="Close team list" tabIndex={-1} onClick={() => setSheet(false)} className="fixed inset-0 z-20 cursor-default" />
+                <button type="button" aria-label="Close team list" tabIndex={-1} onClick={() => { setSheet(false); pickerRef.current?.focus(); }} className="fixed inset-0 z-20 cursor-default" />
                 <div
                   id="team-sheet"
                   className="scroll-thin absolute inset-x-4 top-full z-30 mt-1 max-h-[60dvh] origin-top animate-pop overflow-y-auto rounded-lg border border-ink-muted/25 bg-white shadow-lg md:inset-x-6 md:max-w-sm"
@@ -226,7 +232,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
           </div>
         </main>
 
-        <aside aria-label="Summary" aria-busy={going !== null} className={`relative hidden min-h-0 border-l border-ink-muted/25 md:flex md:flex-col md:overflow-hidden transition-opacity duration-200 ${busy ? "opacity-70" : ""}`}>
+        <aside aria-label="Summary" aria-busy={going !== null} className={`scroll-thin relative hidden min-h-0 border-l border-ink-muted/25 md:flex md:flex-col md:overflow-y-auto tall:md:overflow-hidden transition-opacity duration-200 ${busy ? "opacity-70" : ""}`}>
           {going !== null && <Loading />}
           <WhatIf
             team={team}

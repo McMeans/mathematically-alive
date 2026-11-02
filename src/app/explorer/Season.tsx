@@ -223,8 +223,9 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
   const place = race.findIndex((o) => o.teamId === teamId);
   const verdict = titleOdds(me);
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* Name, record, Reset and the odds stay fixed above a divider; only the race and picks below it scroll. */}
+    <div className="flex flex-col tall:min-h-0 tall:flex-1">
+      {/* On tall screens name, record, Reset and the odds stay fixed above a divider and only the race and picks scroll;
+          on short ones the whole column scrolls so the list isn't squeezed. */}
       <div className="flex flex-col gap-5 border-b border-ink-muted/25 p-5 xl:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -254,7 +255,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
           </div>
         </section>
       </div>
-      <div className="scroll-thin flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-5 xl:p-6">
+      <div className="scroll-thin flex flex-col gap-5 p-5 xl:p-6 tall:min-h-0 tall:flex-1 tall:overflow-y-auto">
         <section className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between">
             <p className={label}>The race</p>
