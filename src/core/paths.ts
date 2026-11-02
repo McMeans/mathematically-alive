@@ -57,6 +57,23 @@ export function formatChance(p: number, status: PathStatus): string {
   return formatOdds(p);
 }
 
+/** Title-game odds for display: In or Out when proven; otherwise never a flat 0% or 100% (under 0.1%, over 99%). */
+export function formatTitleOdds(p: number, status: PathStatus): string {
+  if (status === "clinched") return "In";
+  if (status === "eliminated") return "Out";
+  return formatSideOdds(p, status);
+}
+
+/**
+ * Any other odds of a team (winning the conference, the playoff), given its title-game status: a live team's
+ * 0% in the sample shows as under 0.1%, and 100% only once it's in. A team that's out can show 0%.
+ */
+export function formatSideOdds(p: number, status: PathStatus): string {
+  if (p === 0 && status !== "eliminated") return "<0.1%";
+  if (p === 1 && status !== "clinched") return ">99%";
+  return formatFine(p);
+}
+
 /** Odds with one decimal under 1%, so long shots can be told apart: "0.4%", "<0.1%"; whole percents otherwise. */
 export function formatFine(p: number): string {
   if (p > 0 && p < 0.001) return "<0.1%";

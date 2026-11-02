@@ -1,8 +1,10 @@
 // Likeliest way in, found by search rather than sampled: the most probable combination of
 // remaining conference results that puts the team in the title game (game odds multiplied).
 // Starts from any way in the proof finds, flips results toward the likelier side while the team
-// stays in, then improves it by branch and bound within a node budget. Then it's trimmed to the results its spot depends on. Each result left is
-// needed: drop it and some combination of the rest keeps the team out.
+// stays in, then improves it by branch and bound within a node budget.
+//
+// The way is then trimmed to the results the team's spot depends on. Each result left is needed:
+// drop it and some combination of the rest keeps the team out.
 import { couldTieByCount, guaranteed, inEveryDraw, twoAhead, wayIn } from "./proof";
 import type { Game } from "./season";
 import type { ConferenceData } from "./tiebreak";

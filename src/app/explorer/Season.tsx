@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { formatFine, type Impact, type SeasonWeek, type TeamOutlook } from "@/core";
+import { formatSideOdds, formatTitleOdds, type Impact, type SeasonWeek, type TeamOutlook } from "@/core";
 import type { Locks, TeamInfo } from "./Explorer";
 
 const label = "text-[11px] font-semibold uppercase tracking-wide text-ink-muted";
@@ -138,13 +138,8 @@ export function byOdds(names: Record<number, string>) {
   return (a: TeamOutlook, b: TeamOutlook) => key(b) - key(a) || names[a.teamId].localeCompare(names[b.teamId]);
 }
 
-/** Any other odds of a team: a team still alive at 0% in the sample shows as under 0.1%, one that's out as 0%; 100% only once it's in. */
-const sideOdds = (p: number, o: TeamOutlook) =>
-  p === 0 && o.status !== "eliminated" ? "<0.1%" : p === 1 && o.status !== "clinched" ? ">99%" : formatFine(p);
-
-/** Title-game odds for display: In or Out when proven; otherwise never a flat 0% or 100% (under 0.1%, over 99%). */
-const titleOdds = (o: TeamOutlook) =>
-  o.status === "clinched" ? "In" : o.status === "eliminated" ? "Out" : o.titleGame === 0 ? "<0.1%" : o.titleGame === 1 ? ">99%" : formatFine(o.titleGame);
+const sideOdds = (p: number, o: TeamOutlook) => formatSideOdds(p, o.status);
+const titleOdds = (o: TeamOutlook) => formatTitleOdds(o.titleGame, o.status);
 
 const tone = (odds: string) => (odds === "In" ? "text-turf" : odds === "Out" ? "text-marker-text" : "");
 // The same on the navy own-game card, light enough to read there.
