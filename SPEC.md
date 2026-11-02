@@ -32,7 +32,7 @@ All logic lives in `src/core` (framework-free, public API in `src/core/index.ts`
 
 ### Season simulation (`sim.ts`)
 
-- Monte Carlo: every unplayed game is played out over `ITERATIONS` = 20,000 seasons (`SEED` = 2026). Completed games are never changed. Locked games always go to the locked winner.
+- Monte Carlo: every unplayed game is played out over many seasons. The core takes the count and seed as options; the app sets them in `src/app/config.ts` (`ITERATIONS` = 20,000, `SEED` = 2026). Completed games are never changed. Locked games always go to the locked winner.
 - **Rating shift:** in each simulated season, each team's rating moves by one normal draw (`SHOCK_SD` = 4) that is shared by all its games. A team that is better than its rating tends to win more of them. The per-game SD shrinks to match, so a single game's odds still equal what the spread says.
 - **Ranking stand-in:** the SportSource Team Success Ranking (a tiebreak step) is modelled as the rating plus `RANK_PER_NET_WIN` = 2 per net simulated win, plus noise (`RANK_SD` = 3). It comes from one hashed draw per team and season, which the title game reuses.
 - Tiebreak draws and title-game rolls come from streams seeded per iteration, so what-if runs stay paired with the base run. That means differences come from the lock, not from noise.
@@ -71,8 +71,10 @@ Exact checks, not Monte Carlo. Can the team still miss, or still make, the title
 
 All wording users see is made in the core so tests can check it. `formatTitleOdds(p, status)` and `formatSideOdds(p, status)` follow these rules:
 
-- Proven clinched → "In". Proven eliminated → "Out".
-- An unproven 1.0 → ">99%". An unproven, still-alive 0 → "<0.1%". The app never shows a flat 100% or 0% unless it is proven.
+- `formatTitleOdds` (title-game odds): proven clinched → "In", proven eliminated → "Out", else as side odds.
+- `formatSideOdds` (title and playoff odds): 1.0 shows ">99%" unless the team has clinched the title game. 0 shows "<0.1%" unless it is eliminated, in which case it may show "0%".
+- Under 1%, odds keep one decimal (`formatFine`), and anything above 0 but under 0.1% shows "<0.1%".
+- So a flat 100% or 0% only appears once a proof backs it.
 
 ### Telling a real swing from noise (`signal.ts`)
 
