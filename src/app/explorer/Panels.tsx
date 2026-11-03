@@ -5,7 +5,6 @@ import { formatChance, formatRecord, mustWinConference, type OddsLabels, type Te
 import { NAVY, pct, type GameInfo, type TeamInfo } from "./Explorer";
 import { useConference } from "./conference";
 
-
 /** White or navy text, whichever reads better on the team color (WCAG relative luminance). */
 function inkOn(hex: string): string {
   const [r, g, b] = [1, 3, 5].map((i) => {
@@ -95,12 +94,12 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
 }
 
 export function Beta() {
-  const { labels: LABELS } = useConference();
-  return <span className="rounded border border-marker-text px-1 text-[10px] font-bold leading-4 text-marker-text">{LABELS.beta}</span>;
+  const { labels } = useConference();
+  return <span className="rounded border border-marker-text px-1 text-[10px] font-bold leading-4 text-marker-text">{labels.beta}</span>;
 }
 
 /** The playoff odds, or "Must win <conference>" when the team only gets in as champion (then they'd just repeat the Win <conference> odds). */
-export const playoffText = (o: TeamOutlook, odds: string, LABELS: OddsLabels) => (mustWinConference(o) ? LABELS.mustWin : odds);
+export const playoffText = (o: TeamOutlook, odds: string, labels: OddsLabels) => (mustWinConference(o) ? labels.mustWin : odds);
 
 function Tile({ label, value, tone, badge, small }: { label: string; value: string; tone: string; badge?: boolean; small?: boolean }) {
   return (
@@ -115,12 +114,12 @@ function Tile({ label, value, tone, badge, small }: { label: string; value: stri
 }
 
 export function StatTiles({ outlook, ifWinOut, compact, condensed }: { outlook: TeamOutlook; ifWinOut: number | null; compact?: boolean; condensed?: boolean }) {
-  const { labels: LABELS } = useConference();
+  const { labels } = useConference();
   // One slim row, for the pinned phone bar once the page has scrolled.
   if (condensed)
     return (
       <dl className="flex animate-rise items-baseline justify-between gap-3 text-xs text-ink-muted">
-        {([[LABELS.titleGame, formatChance(outlook.titleGame, outlook.status), "text-turf", false], [LABELS.champion, pct(outlook.champion), "text-navy", false], [LABELS.playoff, playoffText(outlook, pct(outlook.playoff), LABELS), "text-navy", true]] as const).map(([label, value, tone, badge]) => (
+        {([[labels.titleGame, formatChance(outlook.titleGame, outlook.status), "text-turf", false], [labels.champion, pct(outlook.champion), "text-navy", false], [labels.playoff, playoffText(outlook, pct(outlook.playoff), labels), "text-navy", true]] as const).map(([label, value, tone, badge]) => (
           <div key={label} className="flex items-baseline gap-1.5">
             <dt className="flex items-center gap-1">{label}{badge && <Beta />}</dt>
             <dd className={`font-display text-base font-bold ${tone}`}>{value}</dd>
@@ -130,10 +129,10 @@ export function StatTiles({ outlook, ifWinOut, compact, condensed }: { outlook: 
     );
   return (
     <dl className={`grid gap-2 ${compact ? "grid-cols-3" : "grid-cols-2"}`}>
-      <Tile label={LABELS.titleGame} value={formatChance(outlook.titleGame, outlook.status)} tone="text-turf" />
-      <Tile label={LABELS.champion} value={pct(outlook.champion)} tone="text-navy" />
-      <Tile label={LABELS.playoff} value={playoffText(outlook, pct(outlook.playoff), LABELS)} tone="text-navy" badge small={mustWinConference(outlook)} />
-      {!compact && <Tile label={LABELS.winOut} value={pct(ifWinOut)} tone="text-navy" />}
+      <Tile label={labels.titleGame} value={formatChance(outlook.titleGame, outlook.status)} tone="text-turf" />
+      <Tile label={labels.champion} value={pct(outlook.champion)} tone="text-navy" />
+      <Tile label={labels.playoff} value={playoffText(outlook, pct(outlook.playoff), labels)} tone="text-navy" badge small={mustWinConference(outlook)} />
+      {!compact && <Tile label={labels.winOut} value={pct(ifWinOut)} tone="text-navy" />}
     </dl>
   );
 }
