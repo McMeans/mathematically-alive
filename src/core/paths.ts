@@ -87,8 +87,11 @@ export function formatRecord(record: TeamRecord, conference: string | null): str
   return conference ? `${overall} (${record.conferenceWins}-${record.conferenceLosses} ${conference})` : overall;
 }
 
+/** What each odds tile is called. */
+export type OddsLabels = { titleGame: string; champion: string; playoff: string; winOut: string };
+
 /** Labels for the odds tiles, so every view names each number the same way. */
-export function oddsLabels(conference: string) {
+export function oddsLabels(conference: string): OddsLabels {
   return { titleGame: "Title game", champion: `Win ${conference}`, playoff: "Playoff", winOut: "Win out" };
 }
 

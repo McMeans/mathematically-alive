@@ -23,6 +23,6 @@ export type { OutlookOptions, SeasonOutlook, TeamOutlook } from "./outlook";
 export { formatChance, formatFine, formatOdds, formatRecord, formatSideOdds, formatTitleOdds, oddsLabels, teamPath } from "./paths";
 export { explore } from "./explore";
 export type { Exploration } from "./explore";
-export type { KeyGame, PathOptions, PathStatus, TeamPath } from "./paths";
+export type { KeyGame, OddsLabels, PathOptions, PathStatus, TeamPath } from "./paths";
 export { pathTree } from "./tree";
 export type { HelpGame, Impact, Likeliest, PathTree, Rival, SeasonWeek, TreeNode, TreeOptions, TreeOutcome, WayWeek } from "./tree";
