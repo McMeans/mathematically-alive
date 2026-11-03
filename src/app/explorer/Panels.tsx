@@ -91,12 +91,16 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
   );
 }
 
+function Beta() {
+  return <span className="rounded border border-marker-text px-1 text-[10px] font-bold leading-4 text-marker-text">BETA</span>;
+}
+
 function Tile({ label, value, tone, badge }: { label: string; value: string; tone: string; badge?: boolean }) {
   return (
     <div className="rounded-lg bg-mist p-3">
       <dt className="flex items-center gap-1 text-xs text-ink-muted">
         {label}
-        {badge && <span className="rounded border border-marker-text px-1 text-[10px] font-bold leading-4 text-marker-text">BETA</span>}
+        {badge && <Beta />}
       </dt>
       <dd className={`font-display text-2xl font-bold ${tone}`}>{value}</dd>
     </div>
@@ -108,9 +112,9 @@ export function StatTiles({ outlook, ifWinOut, compact, condensed }: { outlook: 
   if (condensed)
     return (
       <dl className="flex animate-rise items-baseline justify-between gap-3 text-xs text-ink-muted">
-        {([["Title game", formatChance(outlook.titleGame, outlook.status), "text-turf"], ["Win ACC", pct(outlook.champion), "text-navy"], ["Playoff", pct(outlook.playoff), "text-navy"]] as const).map(([label, value, tone]) => (
+        {([["Title game", formatChance(outlook.titleGame, outlook.status), "text-turf", false], ["Win ACC", pct(outlook.champion), "text-navy", false], ["Playoff", pct(outlook.playoff), "text-navy", true]] as const).map(([label, value, tone, badge]) => (
           <div key={label} className="flex items-baseline gap-1.5">
-            <dt>{label}</dt>
+            <dt className="flex items-center gap-1">{label}{badge && <Beta />}</dt>
             <dd className={`font-display text-base font-bold ${tone}`}>{value}</dd>
           </div>
         ))}
