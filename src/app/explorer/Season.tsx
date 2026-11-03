@@ -126,7 +126,7 @@ function NonConference({ game }: { game: NonNullable<SeasonWeek["nonConference"]
       {game.score ? (
         <span className={`text-sm font-bold ${game.won ? "text-turf" : "text-marker-text"}`}>{game.won ? "Won" : "Lost"} {game.score}</span>
       ) : (
-        <span className="text-xs text-ink-soft">Non-conference: not in the ACC standings</span>
+        <span className="text-xs text-ink-soft">Non-conference: not in the {CONFERENCE} standings</span>
       )}
     </div>
   );
@@ -253,7 +253,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
             {has && <p className="text-xs text-ink-muted">Today {titleOdds(today)}</p>}
           </div>
           <div className="flex flex-col gap-1 border-t border-navy/10 pt-2 text-sm text-ink-soft">
-            <p className="flex justify-between">Win the ACC<span className="font-bold text-navy">{sideOdds(me.champion, me)}</span></p>
+            <p className="flex justify-between">{LABELS.champion}<span className="font-bold text-navy">{sideOdds(me.champion, me)}</span></p>
             <p className="flex justify-between">{LABELS.playoff} (beta)<span className="font-bold text-navy">{sideOdds(me.playoff, me)}</span></p>
           </div>
         </section>

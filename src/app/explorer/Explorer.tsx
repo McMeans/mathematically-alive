@@ -160,7 +160,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
             <h1 className="font-display text-lg font-bold tracking-tight sm:text-xl">Mathematically Alive</h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">ACC</span>
+            <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">{CONFERENCE}</span>
             <span className="hidden text-sm text-ink-muted sm:inline">
               {asOf}
             </span>
@@ -215,7 +215,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
 
       {/* On desktop the page is one screen tall and each column scrolls on its own. */}
       <div className="grid flex-1 md:min-h-0 md:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[260px_minmax(0,1fr)_340px]">
-        <nav aria-label="ACC teams" className="scroll-thin hidden border-r border-ink-muted/25 xl:block xl:overflow-y-auto">
+        <nav aria-label={`${CONFERENCE} teams`} className="scroll-thin hidden border-r border-ink-muted/25 xl:block xl:overflow-y-auto">
           {list}
         </nav>
 
