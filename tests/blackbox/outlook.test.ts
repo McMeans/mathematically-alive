@@ -143,13 +143,13 @@ describe("season outlook", () => {
     expect(t.playoff).toBeLessThan(1);
   });
 
-  it("a non-conference win raises a contender's playoff odds but not its title odds", () => {
+  it("a non-conference win raises a contender's playoff odds", () => {
     const { season } = build();
     const idle = Array.from({ length: 12 }, (_, i) => team(100 + i, "Idle"));
     const t = byTeam(run({ ...season, teams: [...season.teams, ...idle] }), 2);
     expect(t.atLarge).toBeGreaterThan(0);
-    const only = t.games.find((x) => x.gameId === season.games[10].id)!; // 10 vs 2
-    expect(only.ifWin!).toBeGreaterThan(only.ifLose!);
+    const nc = t.games.find((x) => x.gameId === season.games[10].id)!; // 10 vs 2
+    expect(nc.ifWin!).toBeGreaterThan(nc.ifLose!);
   });
 
   it("a team whose only way into the playoff is the title has no at-large odds", () => {

@@ -14,7 +14,7 @@
 // Uses the same simulated seasons and title-game draw as teamPath, so the root
 // odds equal teamPath's titleGame for the same seed and locks.
 import { seasonOutlook, type TeamOutlook } from "./outlook";
-import { formatFine, formatOdds, formatSideOdds, formatTitleOdds, type PathOptions, type PathStatus } from "./paths";
+import { formatFine, formatOdds, formatSideOdds, formatTitleOdds, mustWinConference, type PathOptions, type PathStatus } from "./paths";
 import { teamRecord } from "./season";
 import type { Game, Season } from "./season";
 import { FAINT, OVERALL, SCENARIO, isClear } from "./signal";
@@ -200,7 +200,7 @@ export type SeasonWeek = {
     /** For display: "In", "Out", "12%", "0.4%", or "—" when too few simulated seasons go that way. A locked game's other side is worked out by itself. */
     ifWin: string;
     ifLose: string;
-    /** The team's playoff odds (EXPERIMENTAL) either way ("41%"); null when it never gets in at large, so only the title matters. */
+    /** The team's playoff odds (EXPERIMENTAL) either way ("41%"); null when it must win the conference (`mustWinConference`), so only the title matters. */
     cfpIfWin: string | null;
     cfpIfLose: string | null;
     /** "58% to win"; null once the game is locked. */
@@ -635,8 +635,8 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
       oddsIfWin, oddsIfLose,
       ifWin: lockedTo === opp ? swapped(g.id, teamId) : verdict(oddsIfWin, g.id, teamId),
       ifLose: lockedTo === teamId ? swapped(g.id, opp) : verdict(oddsIfLose, g.id, opp),
-      cfpIfWin: me.atLarge === 0 ? null : playoffIf(g.id, teamId, playoffById.get(g.id)?.ifWin ?? null),
-      cfpIfLose: me.atLarge === 0 ? null : playoffIf(g.id, opp, playoffById.get(g.id)?.ifLose ?? null),
+      cfpIfWin: mustWinConference(me) ? null : playoffIf(g.id, teamId, playoffById.get(g.id)?.ifWin ?? null),
+      cfpIfLose: mustWinConference(me) ? null : playoffIf(g.id, opp, playoffById.get(g.id)?.ifLose ?? null),
       winChance: winChance(g),
     };
   });
