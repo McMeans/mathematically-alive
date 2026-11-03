@@ -1,7 +1,10 @@
 "use client";
 import { useState } from "react";
-import { formatSideOdds, formatTitleOdds, type Impact, type SeasonWeek, type TeamOutlook } from "@/core";
+import { formatRecord, formatSideOdds, formatTitleOdds, oddsLabels, type Impact, type SeasonWeek, type TeamOutlook } from "@/core";
+import { CONFERENCE } from "@/app/config";
 import type { Locks, TeamInfo } from "./Explorer";
+
+const LABELS = oddsLabels(CONFERENCE);
 
 const label = "text-[11px] font-semibold uppercase tracking-wide text-ink-muted";
 
@@ -123,7 +126,7 @@ function NonConference({ game }: { game: NonNullable<SeasonWeek["nonConference"]
       {game.score ? (
         <span className={`text-sm font-bold ${game.won ? "text-turf" : "text-marker-text"}`}>{game.won ? "Won" : "Lost"} {game.score}</span>
       ) : (
-        <span className="text-xs text-ink-soft">Non-conference: not in the ACC standings</span>
+        <span className="text-xs text-ink-soft">Non-conference: not in the {CONFERENCE} standings</span>
       )}
     </div>
   );
@@ -231,7 +234,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
           <div>
             <h2 className="font-display text-2xl font-bold">{team.name}</h2>
             <p className="text-sm text-ink-soft">
-              {me.record.wins}-{me.record.losses} ({me.record.conferenceWins}-{me.record.conferenceLosses} ACC){has && " with your picks"}
+              {formatRecord(me.record, CONFERENCE)}{has && " with your picks"}
             </p>
           </div>
           {has && (
@@ -244,14 +247,14 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
         <section className="flex flex-col gap-3 rounded-xl bg-mist p-4">
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-xs text-ink-muted">{has ? "Title game, with your picks" : "Title game"}</p>
+              <p className="text-xs text-ink-muted">{has ? `${LABELS.titleGame}, with your picks` : LABELS.titleGame}</p>
               <p key={verdict} className={`animate-rise font-display text-5xl font-bold leading-none ${me.titleGame >= 0.5 || me.status === "clinched" ? "text-turf" : "text-marker-text"}`}>{verdict}</p>
             </div>
             {has && <p className="text-xs text-ink-muted">Today {titleOdds(today)}</p>}
           </div>
           <div className="flex flex-col gap-1 border-t border-navy/10 pt-2 text-sm text-ink-soft">
-            <p className="flex justify-between">Win the ACC<span className="font-bold text-navy">{sideOdds(me.champion, me)}</span></p>
-            <p className="flex justify-between">Playoff (beta)<span className="font-bold text-navy">{sideOdds(me.playoff, me)}</span></p>
+            <p className="flex justify-between">{LABELS.champion}<span className="font-bold text-navy">{sideOdds(me.champion, me)}</span></p>
+            <p className="flex justify-between">{LABELS.playoff} (beta)<span className="font-bold text-navy">{sideOdds(me.playoff, me)}</span></p>
           </div>
         </section>
       </div>
@@ -298,7 +301,7 @@ function RaceRow({ o, name, me }: { o: TeamOutlook; name: string; me: boolean })
   return (
     <div className={`flex items-center gap-2 rounded-md px-1.5 py-1 ${me ? "bg-mist" : ""}`}>
       <span className="w-28 truncate text-sm font-semibold">{name}</span>
-      <span className="w-8 text-xs text-ink-muted" title="ACC record, counting your picks">{o.record.conferenceWins}-{o.record.conferenceLosses}</span>
+      <span className="w-8 text-xs text-ink-muted" title={`${CONFERENCE} record, counting your picks`}>{o.record.conferenceWins}-{o.record.conferenceLosses}</span>
       <span className="h-1.5 flex-1 rounded-full bg-navy/10">
         <span className={`block h-1.5 rounded-full transition-[width] duration-500 ease-out ${me ? "bg-marker" : "bg-navy"}`} style={{ width: `${Math.max(3, Math.round(o.titleGame * 100))}%` }} />
       </span>

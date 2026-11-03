@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatOdds, type PathTree, type TeamOutlook, type TeamPath } from "@/core";
+import { formatOdds, formatRecord, type PathTree, type TeamOutlook, type TeamPath } from "@/core";
+import { CONFERENCE } from "@/app/config";
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
 import { Logo } from "@/app/Logo";
 import { WayCard } from "./WayIn";
@@ -159,7 +160,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
             <h1 className="font-display text-lg font-bold tracking-tight sm:text-xl">Mathematically Alive</h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">ACC</span>
+            <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">{CONFERENCE}</span>
             <span className="hidden text-sm text-ink-muted sm:inline">
               {asOf}
             </span>
@@ -180,7 +181,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
               >
                 <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: team.color ?? NAVY }} />
                 <span className="min-w-0 flex-1 truncate">
-                  {team.name} <span className="font-normal text-ink-soft">· {me.record.wins}-{me.record.losses} ({me.record.conferenceWins}-{me.record.conferenceLosses} ACC)</span>
+                  {team.name} <span className="font-normal text-ink-soft">· {formatRecord(me.record, CONFERENCE)}</span>
                 </span>
                 <span className="hidden text-xs font-normal text-ink-muted sm:inline">Change team</span>
                 <span aria-hidden className={`text-ink-muted transition-transform duration-200 ${sheet ? "rotate-180" : ""}`}>▾</span>
@@ -213,7 +214,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
 
       {/* On desktop the page is one screen tall and each column scrolls on its own. */}
       <div className="grid flex-1 md:min-h-0 md:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[260px_minmax(0,1fr)_340px]">
-        <nav aria-label="ACC teams" className="scroll-thin hidden border-r border-ink-muted/25 xl:block xl:overflow-y-auto">
+        <nav aria-label={`${CONFERENCE} teams`} className="scroll-thin hidden border-r border-ink-muted/25 xl:block xl:overflow-y-auto">
           {list}
         </nav>
 

@@ -1,8 +1,11 @@
 "use client";
 import Link from "next/link";
 import { useId, useState } from "react";
-import { formatChance, type TeamOutlook, type TeamPath } from "@/core";
+import { formatChance, formatRecord, oddsLabels, type TeamOutlook, type TeamPath } from "@/core";
+import { CONFERENCE } from "@/app/config";
 import { NAVY, pct, type GameInfo, type TeamInfo } from "./Explorer";
+
+const LABELS = oddsLabels(CONFERENCE);
 
 /** White or navy text, whichever reads better on the team color (WCAG relative luminance). */
 function inkOn(hex: string): string {
@@ -75,7 +78,7 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate leading-5">{t.name}</span>
                   <span className={`block text-[11px] leading-4 tabular-nums ${selected ? "font-normal" : "text-ink-muted"}`}>
-                    {o.record.wins}-{o.record.losses} ({o.record.conferenceWins}-{o.record.conferenceLosses} ACC)
+                    {formatRecord(o.record, CONFERENCE)}
                   </span>
                 </span>
                 <span className={`w-10 text-right tabular-nums ${o.status === "eliminated" && !selected ? "font-normal text-ink-muted" : ""}`}>
@@ -112,7 +115,7 @@ export function StatTiles({ outlook, ifWinOut, compact, condensed }: { outlook: 
   if (condensed)
     return (
       <dl className="flex animate-rise items-baseline justify-between gap-3 text-xs text-ink-muted">
-        {([["Title game", formatChance(outlook.titleGame, outlook.status), "text-turf", false], ["Win ACC", pct(outlook.champion), "text-navy", false], ["Playoff", pct(outlook.playoff), "text-navy", true]] as const).map(([label, value, tone, badge]) => (
+        {([[LABELS.titleGame, formatChance(outlook.titleGame, outlook.status), "text-turf", false], [LABELS.champion, pct(outlook.champion), "text-navy", false], [LABELS.playoff, pct(outlook.playoff), "text-navy", true]] as const).map(([label, value, tone, badge]) => (
           <div key={label} className="flex items-baseline gap-1.5">
             <dt className="flex items-center gap-1">{label}{badge && <Beta />}</dt>
             <dd className={`font-display text-base font-bold ${tone}`}>{value}</dd>
@@ -122,10 +125,10 @@ export function StatTiles({ outlook, ifWinOut, compact, condensed }: { outlook: 
     );
   return (
     <dl className={`grid gap-2 ${compact ? "grid-cols-3" : "grid-cols-2"}`}>
-      <Tile label="Title game" value={formatChance(outlook.titleGame, outlook.status)} tone="text-turf" />
-      <Tile label="Win ACC" value={pct(outlook.champion)} tone="text-navy" />
-      <Tile label="Playoff" value={pct(outlook.playoff)} tone="text-navy" badge />
-      {!compact && <Tile label="Win out" value={pct(ifWinOut)} tone="text-navy" />}
+      <Tile label={LABELS.titleGame} value={formatChance(outlook.titleGame, outlook.status)} tone="text-turf" />
+      <Tile label={LABELS.champion} value={pct(outlook.champion)} tone="text-navy" />
+      <Tile label={LABELS.playoff} value={pct(outlook.playoff)} tone="text-navy" badge />
+      {!compact && <Tile label={LABELS.winOut} value={pct(ifWinOut)} tone="text-navy" />}
     </dl>
   );
 }
@@ -153,7 +156,7 @@ export function Stats({ team, outlook, me, path, teamId, own, names }: {
           <h2 className="font-display text-2xl font-bold">{team.name}</h2>
         </div>
         <p className="mt-1 text-sm text-ink-soft">
-          {me.record.wins}-{me.record.losses} ({me.record.conferenceWins}-{me.record.conferenceLosses} ACC)
+          {formatRecord(me.record, CONFERENCE)}
         </p>
       </div>
       <StatTiles outlook={me} ifWinOut={path.ifWinOut} />
