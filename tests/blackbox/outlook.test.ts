@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { championshipParticipants, seasonOutlook } from "@/core";
+import { championshipParticipants, mustWinConference, seasonOutlook } from "@/core";
 import type { Game, Season } from "@/core";
 
 const ratings: Record<number, number> = { 1: 5, 2: 10, 3: -5, 4: 0, 5: -20, 10: 8, 11: -2 };
@@ -37,8 +37,8 @@ function build(): { season: Season; upset: Game } {
   return { season: { year: 2026, fetchedAt: "", teams, games }, upset };
 }
 
-const run = (season: Season, extra: { locks?: Record<number, number>; seed?: number } = {}) =>
-  seasonOutlook(season, { conference: "C", iterations: 4000, seed: extra.seed ?? 7, locks: extra.locks });
+const run = (season: Season, extra: { locks?: Record<number, number>; seed?: number; teamId?: number } = {}) =>
+  seasonOutlook(season, { conference: "C", iterations: 4000, seed: extra.seed ?? 7, locks: extra.locks, teamId: extra.teamId });
 const byTeam = (o: ReturnType<typeof run>, id: number) => o.teams.find((t) => t.teamId === id)!;
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
@@ -141,6 +141,58 @@ describe("season outlook", () => {
     const t = byTeam(run(crowded), 2);
     expect(t.playoff).toBeGreaterThan(t.champion);
     expect(t.playoff).toBeLessThan(1);
+  });
+
+  it("a non-conference win raises a contender's playoff odds", () => {
+    const { season } = build();
+    const idle = Array.from({ length: 12 }, (_, i) => team(100 + i, "Idle"));
+    const t = byTeam(run({ ...season, teams: [...season.teams, ...idle] }, { teamId: 2 }), 2);
+    expect(t.atLarge).toBeGreaterThan(0);
+    const nc = t.games.find((x) => x.gameId === season.games[10].id)!; // 10 vs 2
+    expect(nc.playoffIfWin).toBeGreaterThan(nc.playoffIfLose);
+  });
+
+  it("a team whose only way into the playoff is the title has no at-large odds", () => {
+    const { season } = build();
+    // Eleven idle teams rated far above anyone fill every at-large spot.
+    const strong = Array.from({ length: 11 }, (_, i) => ({ ...team(100 + i, "Idle"), rating: 200 }));
+    const o = run({ ...season, teams: [...season.teams, ...strong] });
+    const t = byTeam(o, 2);
+    expect(t.playoff).toBeGreaterThan(0);
+    expect(t.atLarge).toBe(0);
+    expect(mustWinConference(t)).toBe(true);
+    const contender = byTeam(run({ ...season, teams: [...season.teams, ...Array.from({ length: 12 }, (_, i) => team(100 + i, "Idle"))] }), 2);
+    expect(mustWinConference(contender)).toBe(false);
+    expect(t.playoff).toBeCloseTo(t.champion, 10);
+  });
+
+  it("a conference win raises a contender's playoff odds", () => {
+    const { season, upset } = build();
+    const idle = Array.from({ length: 12 }, (_, i) => team(100 + i, "Idle"));
+    const x = byTeam(run({ ...season, teams: [...season.teams, ...idle] }, { teamId: 2 }), 2).games.find((y) => y.gameId === upset.id)!;
+    expect(x.playoffIfWin).toBeGreaterThan(x.playoffIfLose);
+    expect(x.titleIfWin).toBeGreaterThan(x.titleIfLose);
+  });
+
+  it("a game's odds either way are exactly what picking that result shows", () => {
+    const { season } = build();
+    const idle = Array.from({ length: 12 }, (_, i) => team(100 + i, "Idle"));
+    const s: Season = { ...season, teams: [...season.teams, ...idle] };
+    const pick = (gameId: number, winner: number, locks: Record<number, number> = {}) =>
+      byTeam(run(s, { locks: { ...locks, [gameId]: winner } }), 2);
+    // Every one of team 2's games, conference or not, with and without a pick already on one of them.
+    for (const locks of [{}, { [season.games[10].id]: 10 }]) {
+      const t = byTeam(run(s, { teamId: 2, locks }), 2);
+      expect(t.games.map((x) => x.gameId)).toEqual(s.games.filter((g) => !g.completed && (g.homeId === 2 || g.awayId === 2)).map((g) => g.id));
+      for (const x of t.games) {
+        const g = s.games.find((y) => y.id === x.gameId)!;
+        const opp = g.homeId === 2 ? g.awayId : g.homeId;
+        const [win, lose] = [pick(g.id, 2, locks), pick(g.id, opp, locks)];
+        expect([x.titleIfWin, x.titleIfLose, x.playoffIfWin, x.playoffIfLose]).toEqual([win.titleGame, lose.titleGame, win.playoff, lose.playoff]);
+      }
+    }
+    // Only the team asked about gets them.
+    expect(byTeam(run(s, { teamId: 2 }), 3).games).toEqual([]);
   });
 
   it("keeps what-if runs paired: locking a game outside the conference leaves its odds identical", () => {

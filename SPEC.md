@@ -58,6 +58,8 @@ For each conference team, `seasonOutlook` gives:
 - `title`: the share of seasons it wins the title game. That game is a neutral-site game using the simulated ratings;
 - `status`: clinched, eliminated or alive, from the proof;
 - `playoff`: **experimental**, not the committee. The conference champion always gets in. Any other FBS team gets in when it ranks in the top 11 by `wins − 1.5·losses + rating/10`.
+- `atLarge`: the share of seasons it gets in without winning the conference. 0 means it must win the conference (`mustWinConference`), and the app shows "Must win ACC" instead of a playoff percentage.
+- `games` (only for `OutlookOptions.teamId`): its title-game and playoff odds if it wins or loses each unplayed game. Each simulated season is replayed with only that game flipped (the title race rerun, ranking included), so the numbers equal what picking that result shows. A lock changes only its own game's draw, which is what makes this exact. Splitting the seasons by how the game went instead would be biased: seasons where a team loses lean toward seasons it drew a weak rating, so it also loses more of its other games.
 
 ### Proofs (`proof.ts`)
 
@@ -111,7 +113,7 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - Panels:
   - Team list with odds.
   - Stat tiles: title game, title, playoff and if-win-out.
-  - The season by week. Own-game buttons and elsewhere chips can be clicked to lock a result.
+  - The season by week. Own-game buttons and elsewhere chips can be clicked to lock a result. Each own game (conference or not) is a small table: Win and Lose rows under ACC and CFP columns, the chance to win, and a "Non-con" tag on non-conference games. Each number is what picking that result would show (see `games` above). Non-conference games show "—" for ACC; they move the title race only slightly, through the ranking tiebreak. For a team that must win the conference, conference cards drop the CFP column. Its non-conference cards keep it so they stay pickable and a pick on them stays visible. Final results, byes and the tables are all the same height, so the weeks line up.
   - The race table.
   - The likeliest way in card.
 - **Brand:** see `CLAUDE.md`. Space Grotesk and Inter; navy, turf, marker and mist colors; light-only.
@@ -129,4 +131,6 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - Ranking is a stand-in for SportSource.
 - Proofs and the likeliest search have budgets. Near the edge they say "open" or return null rather than guess.
 - Only the ACC for now. The core takes a conference name, so adding more is mostly a data and UI task.
+- **Expanding conferences.** Next: SEC, Big Ten and Big 12. Like the ACC, each champion gets an automatic playoff bid, and as power-four teams they have the best at-large odds, so today's model and UI carry over.
+- **Group of Six, later.** The 2026 format guarantees a spot only to the highest-ranked Group of Six conference champion, not to every champion. Winning the conference isn't enough on its own, and at-large bids are rare but have happened. Before adding a G6 conference, the playoff model needs that rule (champion and ranked above every other G6 champion), and the UI needs wording for it ("Must win the conference and be the top G6 champion", or similar, rather than "Must win ACC").
 - A future MCP server is planned on top of `src/core`.

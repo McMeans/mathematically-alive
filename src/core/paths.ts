@@ -2,6 +2,7 @@
 // Odds are Monte Carlo counts over simulated seasons. "clinched" and "eliminated"
 // are mathematically proven (provenStatus checks every remaining combination);
 // odds of exactly 1 or 0 without a proof stay "open".
+import type { TeamOutlook } from "./outlook";
 import { mix, mulberry32, simulateSeason, type SimResult } from "./sim";
 import { provenStatus } from "./proof";
 import type { Game, Season, TeamRecord } from "./season";
@@ -88,7 +89,7 @@ export function formatRecord(record: TeamRecord, conference: string | null): str
 }
 
 /** What each odds tile is called. */
-export type OddsLabels = { titleGame: string; champion: string; playoff: string; winOut: string; beta: string; conferenceRecord: string };
+export type OddsLabels = { titleGame: string; champion: string; playoff: string; winOut: string; beta: string; conferenceRecord: string; mustWin: string; nonConference: string; conference: string; cfp: string };
 
 /** Labels for the odds tiles, so every view names each number the same way. */
 export function oddsLabels(conference: string): OddsLabels {
@@ -99,7 +100,16 @@ export function oddsLabels(conference: string): OddsLabels {
     winOut: "Win out",
     beta: "BETA",
     conferenceRecord: `${conference} record, counting your picks`,
+    mustWin: `Must win ${conference}`,
+    nonConference: "Non-con",
+    conference,
+    cfp: "CFP",
   };
+}
+
+/** The team makes the playoff only as conference champion (never at large), so its playoff odds are its title odds. */
+export function mustWinConference(o: TeamOutlook): boolean {
+  return o.playoff > 0 && o.atLarge === 0;
 }
 
 /** Whole-percent odds. "<1%" and ">99%" stand in for 0 or 100 when the true value isn't exact. */
