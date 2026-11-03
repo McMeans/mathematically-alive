@@ -49,6 +49,19 @@ The ACC tiebreaker policy (July 2026), no divisions, top two play for the title:
 
 Steps based on record come before ranking and the draw. Proofs treat ranking and the draw as "could go either way".
 
+The rules depend on the conference name. Any conference other than the Big 12 uses the ACC policy above.
+
+**Big 12** (Big 12 Football Tiebreaking Procedures, 2024 season document, the latest published). Every team plays nine conference games, so there's no game-count rule. Order teams by conference win pct. A tie is broken by the first of these steps that tells the teams apart. If that step leaves one team best, that team is placed. If several share the best mark, the tie starts over among them, so two left go back to the two-team steps. After a team is placed, the rest start over.
+
+a. Head-to-head. For two teams, their game. For three or more who all played each other, the record among them. For three or more who didn't, a team that beat every other tied team is placed; otherwise go to the next step.
+b. Win pct against common conference opponents (those every tied team played).
+c. Win pct against the next highest placed common opponent, down the standings. Common opponents tied in the standings count as one group.
+d. Strength of conference schedule: the combined conference win pct of the team's conference opponents, counted per game.
+e. Total wins in the regular season, with at most one win over a team below FBS. Games exempt from the NCAA 12-game limit can't be told apart in the data, so they count too.
+f. Ranking (SP+ standing in for the SportSource Analytics rating), then g. a seeded draw (the coin toss).
+
+Proofs search conference games only, so they skip total wins and treat it like ranking: "could go either way". The likeliest-way note for a Big 12 team says "depending on total wins and the ranking tiebreak".
+
 ### Outlook (`outlook.ts`)
 
 For each conference team, `seasonOutlook` gives:
@@ -130,7 +143,7 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - The playoff model is a rough placeholder, not the committee.
 - Ranking is a stand-in for SportSource.
 - Proofs and the likeliest search have budgets. Near the edge they say "open" or return null rather than guess.
-- Only the ACC for now. The core takes a conference name, so adding more is mostly a data and UI task.
-- **Expanding conferences.** Next: SEC, Big Ten and Big 12. Like the ACC, each champion gets an automatic playoff bid, and as power-four teams they have the best at-large odds, so today's model and UI carry over.
+- The core has ACC and Big 12 tiebreak rules. The app shows only the ACC until the Big 12 is switched on there. SEC and Big Ten still need their own rules.
+- **Expanding conferences.** Next: SEC and Big Ten. Like the ACC and Big 12, each champion gets an automatic playoff bid, and as power-four teams they have the best at-large odds, so today's model and UI carry over.
 - **Group of Six, later.** The 2026 format guarantees a spot only to the highest-ranked Group of Six conference champion, not to every champion. Winning the conference isn't enough on its own, and at-large bids are rare but have happened. Before adding a G6 conference, the playoff model needs that rule (champion and ranked above every other G6 champion), and the UI needs wording for it ("Must win the conference and be the top G6 champion", or similar, rather than "Must win ACC").
 - A future MCP server is planned on top of `src/core`.

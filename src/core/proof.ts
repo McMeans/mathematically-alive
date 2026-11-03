@@ -1,6 +1,7 @@
 // Exact checks, not Monte Carlo: can a team still miss (or still make) the
 // conference title game under some combination of remaining results, its own
-// included? Rating and coin-flip tiebreak steps count as "could go either way".
+// included? Rating and coin-flip tiebreak steps count as "could go either way", and so
+// does the Big 12's total-wins step, since the search covers conference games only.
 // Searches remaining conference games depth-first, cutting a branch early once a
 // matching argument shows its answer; gives up after a node budget and then
 // reports "open" (never a false clinch or elimination).
@@ -97,7 +98,7 @@ function someDraw(data: ConferenceData, conference: string, teamId: number, winn
       choice[j] ??= 0;
       return (choice[j] + 0.5) / count;
     };
-    const [a, b] = championshipFromData(data, conference, winnerOf, { draw, rank });
+    const [a, b] = championshipFromData(data, conference, winnerOf, { draw, rank, allGames: false });
     if ((a === teamId || b === teamId) !== out) return true;
     // Next draw outcome: like an odometer over this run's draws, later ones starting over.
     choice.length = counts.length;
@@ -146,7 +147,7 @@ function surelyOut(data: ConferenceData, teamId: number, winnerOf: (g: Game) => 
 
 /** Is the team in under the first draw order (each pick among tied teams goes to the first of them)? */
 function firstDraw(data: ConferenceData, conference: string, teamId: number, winnerOf: (g: Game) => number, luck: boolean): boolean {
-  const [a, b] = championshipFromData(data, conference, winnerOf, { draw: () => 0, rank: (id) => (id === teamId ? (luck ? Infinity : -Infinity) : 0) });
+  const [a, b] = championshipFromData(data, conference, winnerOf, { draw: () => 0, rank: (id) => (id === teamId ? (luck ? Infinity : -Infinity) : 0), allGames: false });
   return a === teamId || b === teamId;
 }
 
