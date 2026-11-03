@@ -113,7 +113,7 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - Panels:
   - Team list with odds.
   - Stat tiles: title game, title, playoff and if-win-out.
-  - The season by week. Own-game buttons and elsewhere chips can be clicked to lock a result. Each own game (conference or not) is a small table: Win and Lose rows under ACC and CFP columns, the chance to win, and a "Non-con" tag on non-conference games. Non-conference games show "—" for ACC, since they can't move the title race. The CFP column drops for a team that must win the conference.
+  - The season by week. Own-game buttons and elsewhere chips can be clicked to lock a result. Each own game (conference or not) is a small table: Win and Lose rows under ACC and CFP columns, the chance to win, and a "Non-con" tag on non-conference games. Non-conference games show "—" for ACC, since they can't move the title race. For a team that must win the conference, conference cards drop the CFP column. Its non-conference cards keep it (the same odds either way) so they stay pickable and a pick on them stays visible.
   - The race table.
   - The likeliest way in card.
 - **Brand:** see `CLAUDE.md`. Space Grotesk and Inter; navy, turf, marker and mist colors; light-only.
