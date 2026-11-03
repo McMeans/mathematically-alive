@@ -247,11 +247,15 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
   onPick: PickFn;
   onReset: () => void;
 }) {
-  // Every pick is in some week: the team's own game or a locked game elsewhere.
+  // Every pick is in some week: the team's own game (conference or not) or a locked game elsewhere.
   const picks = weeks.flatMap((w) => {
     const out: { id: number; what: string; when: string }[] = [];
     if (w.own && locks[w.own.gameId] !== undefined) {
       out.push({ id: w.own.gameId, what: locks[w.own.gameId] === teamId ? `Beat ${w.own.opponent}` : `Lose to ${w.own.opponent}`, when: w.label });
+    }
+    const nc = w.nonConference;
+    if (nc && locks[nc.gameId] !== undefined) {
+      out.push({ id: nc.gameId, what: locks[nc.gameId] === teamId ? `Beat ${nc.opponent}` : `Lose to ${nc.opponent}`, when: nc.date });
     }
     for (const g of w.games) {
       const winner = locks[g.gameId];
