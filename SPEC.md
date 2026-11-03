@@ -4,7 +4,7 @@ What the app is, how its numbers are made, and the rules the code follows. Read 
 
 ## What it is
 
-A Next.js site. Pick a college football team and see what has to happen for it to reach its conference championship game. The first conference is the ACC (`CONFERENCE` in `src/app/config.ts`). A playoff estimate exists but is experimental.
+A Next.js site. Pick a college football team and see what has to happen for it to reach its conference championship game. A team's page uses its own conference; the supported ones are listed in `SUPPORTED_CONFERENCES` (`src/app/config.ts`), only the ACC for now. A playoff estimate exists but is experimental.
 
 It answers three questions for the picked team:
 
