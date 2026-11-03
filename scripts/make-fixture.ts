@@ -1,6 +1,7 @@
-// Cut the ACC out of a raw season snapshot and write fixtures/acc-<year>.json.
-// Usage: pnpm fixture [year]. Reads data/season-<year>.json, fetching it first
-// (4 API calls, needs CFBD_API_KEY) if it is missing. Default year 2025.
+// Cut one conference out of a raw season snapshot and write fixtures/<conference>-<year>.json
+// (e.g. acc-2025.json, big-12-2025.json).
+// Usage: pnpm fixture [year] [conference]. Reads data/season-<year>.json, fetching it first
+// (4 API calls, needs CFBD_API_KEY) if it is missing. Defaults: 2025, "ACC".
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -8,6 +9,8 @@ import path from "node:path";
 import type { CfbdSnapshot } from "../src/core";
 
 const year = Number(process.argv[2] ?? 2025);
+const conference = process.argv[3] ?? "ACC";
+const slug = conference.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 const raw = path.join("data", `season-${year}.json`);
 
 async function main() {
@@ -18,9 +21,10 @@ async function main() {
   }
   const snap = JSON.parse(await readFile(raw, "utf8")) as CfbdSnapshot;
 
-  const acc = new Set(snap.teams.filter((t) => t.conference === "ACC").map((t) => t.id));
-  const games = snap.games.filter((g) => acc.has(g.homeId) || acc.has(g.awayId));
-  const keep = new Set<number>(acc);
+  const members = new Set(snap.teams.filter((t) => t.conference === conference).map((t) => t.id));
+  if (members.size === 0) throw new Error(`No ${conference} teams in ${raw}.`);
+  const games = snap.games.filter((g) => members.has(g.homeId) || members.has(g.awayId));
+  const keep = new Set<number>(members);
   for (const g of games) {
     keep.add(g.homeId);
     keep.add(g.awayId);
@@ -37,10 +41,10 @@ async function main() {
     ratings: snap.ratings.filter((r) => names.has(r.team)),
   };
 
-  const out = path.join("fixtures", `acc-${year}.json`);
+  const out = path.join("fixtures", `${slug}-${year}.json`);
   await mkdir("fixtures", { recursive: true });
   await writeFile(out, JSON.stringify(subset) + "\n");
-  console.log(`${out}: ${acc.size} ACC teams, ${teams.length} teams, ${games.length} games`);
+  console.log(`${out}: ${members.size} ${conference} teams, ${teams.length} teams, ${games.length} games`);
 }
 
 main().catch((err) => {
