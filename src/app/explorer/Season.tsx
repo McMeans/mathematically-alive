@@ -301,7 +301,7 @@ function RaceRow({ o, name, me }: { o: TeamOutlook; name: string; me: boolean })
   return (
     <div className={`flex items-center gap-2 rounded-md px-1.5 py-1 ${me ? "bg-mist" : ""}`}>
       <span className="w-28 truncate text-sm font-semibold">{name}</span>
-      <span className="w-8 text-xs text-ink-muted" title="ACC record, counting your picks">{o.record.conferenceWins}-{o.record.conferenceLosses}</span>
+      <span className="w-8 text-xs text-ink-muted" title={`${CONFERENCE} record, counting your picks`}>{o.record.conferenceWins}-{o.record.conferenceLosses}</span>
       <span className="h-1.5 flex-1 rounded-full bg-navy/10">
         <span className={`block h-1.5 rounded-full transition-[width] duration-500 ease-out ${me ? "bg-marker" : "bg-navy"}`} style={{ width: `${Math.max(3, Math.round(o.titleGame * 100))}%` }} />
       </span>
