@@ -346,6 +346,7 @@ describe("help from elsewhere", () => {
     expect(locked.help[0].scenario).toBeNull();
   });
 
+  // A full tree (with its playoff outlook) for every ACC team: slow under coverage on CI.
   it("orders help: games that matter now, then games that matter in a scenario, then the rest by kickoff", () => {
     const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
     const full = seasonFromCfbd(snap);
@@ -374,7 +375,7 @@ describe("help from elsewhere", () => {
       }
     }
     expect(scenarioOnly).toBeGreaterThan(0);
-  });
+  }, 30_000);
 
   it("locking the team's win-out makes a game's swing clear when it wasn't before", () => {
     const { s, upset, other } = needsHelp();
