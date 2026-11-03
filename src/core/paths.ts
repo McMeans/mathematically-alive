@@ -88,12 +88,9 @@ export function formatRecord(record: TeamRecord, conference: string | null): str
 }
 
 /** Labels for the odds tiles, so every view names each number the same way. */
-export const ODDS_LABELS = {
-  titleGame: "Title game",
-  champion: "Win ACC",
-  playoff: "Playoff",
-  winOut: "Win out",
-} as const;
+export function oddsLabels(conference: string) {
+  return { titleGame: "Title game", champion: `Win ${conference}`, playoff: "Playoff", winOut: "Win out" };
+}
 
 /** Whole-percent odds. "<1%" and ">99%" stand in for 0 or 100 when the true value isn't exact. */
 export function formatOdds(p: number): string {

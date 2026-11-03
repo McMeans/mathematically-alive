@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatOdds, formatRecord, type PathTree, type TeamOutlook, type TeamPath } from "@/core";
+import { CONFERENCE } from "@/app/config";
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
 import { Logo } from "@/app/Logo";
 import { WayCard } from "./WayIn";
@@ -180,7 +181,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
               >
                 <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: team.color ?? NAVY }} />
                 <span className="flex-1">
-                  {team.name} <span className="font-normal text-ink-soft">· {formatRecord(me.record, "ACC")}</span>
+                  {team.name} <span className="font-normal text-ink-soft">· {formatRecord(me.record, CONFERENCE)}</span>
                 </span>
                 <span className="hidden text-xs font-normal text-ink-muted sm:inline">Change team</span>
                 <span aria-hidden className={`text-ink-muted transition-transform duration-200 ${sheet ? "rotate-180" : ""}`}>▾</span>

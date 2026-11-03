@@ -1,7 +1,10 @@
 "use client";
 import { useState } from "react";
-import { formatRecord, formatSideOdds, formatTitleOdds, ODDS_LABELS, type Impact, type SeasonWeek, type TeamOutlook } from "@/core";
+import { formatRecord, formatSideOdds, formatTitleOdds, oddsLabels, type Impact, type SeasonWeek, type TeamOutlook } from "@/core";
+import { CONFERENCE } from "@/app/config";
 import type { Locks, TeamInfo } from "./Explorer";
+
+const LABELS = oddsLabels(CONFERENCE);
 
 const label = "text-[11px] font-semibold uppercase tracking-wide text-ink-muted";
 
@@ -231,7 +234,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
           <div>
             <h2 className="font-display text-2xl font-bold">{team.name}</h2>
             <p className="text-sm text-ink-soft">
-              {formatRecord(me.record, "ACC")}{has && " with your picks"}
+              {formatRecord(me.record, CONFERENCE)}{has && " with your picks"}
             </p>
           </div>
           {has && (
@@ -244,14 +247,14 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
         <section className="flex flex-col gap-3 rounded-xl bg-mist p-4">
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-xs text-ink-muted">{has ? `${ODDS_LABELS.titleGame}, with your picks` : ODDS_LABELS.titleGame}</p>
+              <p className="text-xs text-ink-muted">{has ? `${LABELS.titleGame}, with your picks` : LABELS.titleGame}</p>
               <p key={verdict} className={`animate-rise font-display text-5xl font-bold leading-none ${me.titleGame >= 0.5 || me.status === "clinched" ? "text-turf" : "text-marker-text"}`}>{verdict}</p>
             </div>
             {has && <p className="text-xs text-ink-muted">Today {titleOdds(today)}</p>}
           </div>
           <div className="flex flex-col gap-1 border-t border-navy/10 pt-2 text-sm text-ink-soft">
             <p className="flex justify-between">Win the ACC<span className="font-bold text-navy">{sideOdds(me.champion, me)}</span></p>
-            <p className="flex justify-between">{ODDS_LABELS.playoff} (beta)<span className="font-bold text-navy">{sideOdds(me.playoff, me)}</span></p>
+            <p className="flex justify-between">{LABELS.playoff} (beta)<span className="font-bold text-navy">{sideOdds(me.playoff, me)}</span></p>
           </div>
         </section>
       </div>

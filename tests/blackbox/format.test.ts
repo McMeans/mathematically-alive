@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRecord, ODDS_LABELS, teamRecord } from "@/core";
+import { formatRecord, oddsLabels, teamRecord } from "@/core";
 import type { Game, Season } from "@/core";
 
 const team = (id: number) => ({
@@ -37,8 +37,9 @@ describe("formatRecord", () => {
   });
 });
 
-describe("ODDS_LABELS", () => {
-  it("names each odds tile", () => {
-    expect(ODDS_LABELS).toEqual({ titleGame: "Title game", champion: "Win ACC", playoff: "Playoff", winOut: "Win out" });
+describe("oddsLabels", () => {
+  it("names each odds tile after the conference", () => {
+    expect(oddsLabels("ACC")).toEqual({ titleGame: "Title game", champion: "Win ACC", playoff: "Playoff", winOut: "Win out" });
+    expect(oddsLabels("Big Ten").champion).toBe("Win Big Ten");
   });
 });
