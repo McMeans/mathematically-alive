@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatOdds, formatRecord, type PathTree, type TeamOutlook, type TeamPath } from "@/core";
-import { CONFERENCE } from "@/app/config";
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
 import { Logo } from "@/app/Logo";
 import { WayCard } from "./WayIn";
 import { byOdds, SeasonWeeks, WhatIf } from "./Season";
 import { StatTiles, TeamList } from "./Panels";
+import { ConferenceProvider } from "./conference";
 
 export type GameInfo = { id: number; homeId: number; awayId: number; week: number; start: string };
 export type TeamInfo = { id: number; name: string; color: string | null; altColor: string | null };
@@ -15,6 +15,7 @@ export type Locks = Record<number, number>;
 
 type Props = {
   teamId: number;
+  conference: string;
   teams: TeamInfo[];
   names: Record<number, string>;
   asOf: string;
@@ -25,7 +26,7 @@ export const NAVY = "#14213D";
 export const pct = (p: number | null) => (p === null ? "—" : formatOdds(p));
 export const oddsTone = (p: number | null) => (p === null ? "text-navy" : p >= 0.5 ? "text-turf" : p < 0.1 ? "text-marker-text" : "text-navy");
 
-export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
+export function Explorer({ teamId, conference, teams, names, asOf, initial }: Props) {
   const [locks, setLocks] = useState<Locks>({});
   const [result, setResult] = useState<Result>(initial);
   const [busy, setBusy] = useState(false);
@@ -103,7 +104,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
     }
     setBusy(true);
     setFailed(false);
-    worker.current?.postMessage({ id: ++latest.current, teamId, locks: next } satisfies SimRequest);
+    worker.current?.postMessage({ id: ++latest.current, conference, teamId, locks: next } satisfies SimRequest);
   }
 
   /** Lock a game to a winner; a missing winner (or the current one, when toggling) clears it. */
@@ -151,6 +152,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
   );
 
   return (
+    <ConferenceProvider value={conference}>
     <div className="flex min-h-dvh flex-col md:h-dvh md:overflow-hidden">
       {/* On phones the page scrolls as one, so the header, team picker and odds stay pinned on top. */}
       <div className="sticky top-0 z-30 bg-white md:static">
@@ -160,7 +162,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
             <h1 className="font-display text-lg font-bold tracking-tight sm:text-xl">Mathematically Alive</h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">{CONFERENCE}</span>
+            <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">{conference}</span>
             <span className="hidden text-sm text-ink-muted sm:inline">
               {asOf}
             </span>
@@ -181,7 +183,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
               >
                 <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: team.color ?? NAVY }} />
                 <span className="min-w-0 flex-1 truncate">
-                  {team.name} <span className="font-normal text-ink-soft">· {formatRecord(me.record, CONFERENCE)}</span>
+                  {team.name} <span className="font-normal text-ink-soft">· {formatRecord(me.record, conference)}</span>
                 </span>
                 <span className="hidden text-xs font-normal text-ink-muted sm:inline">Change team</span>
                 <span aria-hidden className={`text-ink-muted transition-transform duration-200 ${sheet ? "rotate-180" : ""}`}>▾</span>
@@ -214,7 +216,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
 
       {/* On desktop the page is one screen tall and each column scrolls on its own. */}
       <div className="grid flex-1 md:min-h-0 md:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[260px_minmax(0,1fr)_340px]">
-        <nav aria-label={`${CONFERENCE} teams`} className="scroll-thin hidden border-r border-ink-muted/25 xl:block xl:overflow-y-auto">
+        <nav aria-label={`${conference} teams`} className="scroll-thin hidden border-r border-ink-muted/25 xl:block xl:overflow-y-auto">
           {list}
         </nav>
 
@@ -265,6 +267,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
         </aside>
       </div>
     </div>
+    </ConferenceProvider>
   );
 }
 
