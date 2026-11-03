@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { explore, formatFine, formatOdds, pathTree, seasonFromCfbd, seasonOutlook, teamPath, teamRecord, winProbability } from "@/core";
+import { explore, formatFine, formatOdds, gameWinProbability, pathTree, seasonFromCfbd, seasonOutlook, teamPath, teamRecord, winProbability } from "@/core";
 import type { CfbdSnapshot, Game, Season, TreeNode } from "@/core";
 
 function team(id: number, conference: string, rating: number | null = null) {
@@ -145,13 +145,13 @@ describe("path tree", () => {
     expect(t.children.every((c) => c.outcome === "in")).toBe(true);
   });
 
-  it("non-conference games stay out of the tree and the footnote names them", () => {
+  it("non-conference games stay out of the tree and the footnote", () => {
     const { s, early } = scenario();
     s.teams.push(team(9, "Other"));
     s.games.push(game(9, 1, undefined, { conferenceGame: false, start: "2026-11-01T18:00:00Z" }));
     const t = pathTree(s, { ...base, teamId: 1 });
     expect(t.root.children[0].gameId).toBe(early.id);
-    expect(t.footnote).toBe("Not listed: Team9 (Nov 1). Non-conference results don't change the C title-game race.");
+    expect(t.footnote).toBeNull();
     expect(pathTree(scenario().s, { ...base, teamId: 1 }).footnote).toBeNull();
     expect(pathTree(scenario().s, { ...base, teamId: 1, depth: 1 }).footnote).toBe(
       "The tree stops after 1 game; 2 later C games aren't shown.",
@@ -727,11 +727,71 @@ describe("help from elsewhere", () => {
     expect(week.own).toBeNull();
     // With no conference game of its own that week, the week goes by the team's game.
     expect(week.label).toBe("Nov 15");
-    expect(week.nonConference).toEqual({ gameId: next.id, opponent: "Team5", site: "home", date: "Nov 15", won: null, score: null });
+    expect(week.nonConference).toMatchObject({ gameId: next.id, opponent: "Team5", site: "home", date: "Nov 15", won: null, score: null });
     // Already played: the result, next to the conference game still to come that week.
     const first = t.weeks.find((w) => w.week === 1)!;
     expect(first.own).not.toBeNull();
-    expect(first.nonConference).toMatchObject({ opponent: "Team6", site: "away", won: true, score: "21-14" });
+    expect(first.nonConference).toMatchObject({ opponent: "Team6", site: "away", won: true, score: "21-14", ifWin: null, ifLose: null, note: null });
+  });
+
+  it("a non-conference game shows the playoff odds either way when the result can move them", () => {
+    const { s, other } = needsHelp();
+    const next = game(1, 5, undefined, { conferenceGame: false, week: other.week });
+    const idle = Array.from({ length: 12 }, (_, i) => team(100 + i, "Idle"));
+    const s2 = { ...s, teams: [...s.teams, team(5, "X"), ...idle], games: [...s.games, next] };
+    const nc = explore(s2, { ...base, teamId: 1 }).tree.weeks.find((w) => w.week === other.week)!.nonConference!;
+    expect(nc.note).toBeNull();
+    expect(parseFloat(nc.ifWin!)).toBeGreaterThan(parseFloat(nc.ifLose!));
+  });
+
+  it("a non-conference game says it can't move the playoff odds when the title is the only way in", () => {
+    const { s, other } = needsHelp();
+    const next = game(1, 5, undefined, { conferenceGame: false, week: other.week });
+    const strong = Array.from({ length: 11 }, (_, i) => team(100 + i, "Idle", 200));
+    const s2 = { ...s, teams: [...s.teams, team(5, "X"), ...strong], games: [...s.games, next] };
+    const nc = pathTree(s2, { ...base, teamId: 1 }).weeks.find((w) => w.week === other.week)!.nonConference!;
+    expect(nc.ifWin).toBe(nc.ifLose);
+    expect(nc.note).toBe("Doesn't move playoff odds");
+  });
+
+  it("a locked non-conference game shows the playoff odds for both sides", () => {
+    const { s, other } = needsHelp();
+    const next = game(1, 5, undefined, { conferenceGame: false, week: other.week });
+    const idle = Array.from({ length: 12 }, (_, i) => team(100 + i, "Idle"));
+    const s2 = { ...s, teams: [...s.teams, team(5, "X"), ...idle], games: [...s.games, next] };
+    const r = explore(s2, { ...base, teamId: 1, locks: { [next.id]: 5 } });
+    const nc = r.tree.weeks.find((w) => w.week === other.week)!.nonConference!;
+    expect(nc.ifLose).toBe(formatFine(r.outlook.find((o) => o.teamId === 1)!.playoff));
+    // The other side comes from its own simulation.
+    expect(nc.ifWin).toMatch(/%$/);
+  });
+
+  it("each conference game shows the team's chance to win it and its playoff odds either way", () => {
+    const { s } = needsHelp();
+    // Fewer teams than playoff spots: every team gets in at large some of the time.
+    const s2 = s;
+    const own = explore(s2, { ...base, teamId: 1 }).tree.weeks.find((w) => w.own)!.own!;
+    const g = s.games.find((x) => x.id === own.gameId)!;
+    const p = gameWinProbability(s2, g);
+    expect(own.winChance).toBe(`${formatOdds(g.homeId === 1 ? p : 1 - p)} to win`);
+    expect(own.cfpIfWin).toMatch(/%$/);
+    expect(own.cfpIfLose).toMatch(/%$/);
+  });
+
+  it("a team that only gets in as champion shows no playoff odds on its conference games", () => {
+    const { s } = needsHelp();
+    const strong = Array.from({ length: 11 }, (_, i) => team(100 + i, "Idle", 200));
+    const t = pathTree({ ...s, teams: [...s.teams, ...strong] }, { ...base, teamId: 1 });
+    const own = t.weeks.find((w) => w.own)!.own!;
+    expect(own.cfpIfWin).toBeNull();
+    expect(own.cfpIfLose).toBeNull();
+  });
+
+  it("a locked game shows no chance to win", () => {
+    const { s } = needsHelp();
+    const first = pathTree(s, { ...base, teamId: 1 }).weeks.find((w) => w.own)!.own!;
+    const locked = pathTree(s, { ...base, teamId: 1, locks: { [first.gameId]: 1 } }).weeks.find((w) => w.own?.gameId === first.gameId)!.own!;
+    expect(locked.winChance).toBeNull();
   });
 
   it("records count locked results as played", () => {

@@ -26,6 +26,13 @@ export type TeamOutlook = {
   champion: number;
   /** EXPERIMENTAL rough estimate of making the playoff; see PLAYOFF_FIELD. */
   playoff: number;
+  /** Fraction of iterations the team makes the playoff without winning the conference (EXPERIMENTAL, like `playoff`). 0 means its only way in is the title. */
+  atLarge: number;
+  /**
+   * Playoff odds by the result of each of the team's unplayed games (conference or not), in schedule order.
+   * Null when too few simulated seasons go that way (always so for a locked game's other side).
+   */
+  games: { gameId: number; ifWin: number | null; ifLose: number | null }[];
   /** Proven over every combination of remaining results: "clinched" / "eliminated" a title-game spot, else "alive". */
   status: "clinched" | "alive" | "eliminated";
 };
@@ -39,6 +46,8 @@ export type SeasonOutlook = { iterations: number; teams: TeamOutlook[] };
  */
 const PLAYOFF_FIELD = 11;
 const MISSING_RATING = 0;
+// Simulated seasons a non-conference result needs before its playoff odds are shown.
+const MIN_SAMPLE = 30;
 
 /** `shared`: a simulation of the same season, iterations, seed and locks to reuse. */
 export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: SimResult): SeasonOutlook {
@@ -75,6 +84,11 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
   const w = new Int32Array(F);
   const l = new Int32Array(F);
   const playoff = new Float64Array(F);
+  const atLarge = new Float64Array(F);
+  const made = new Uint8Array(F);
+  // Each conference team's unplayed games: [FBS index, game index, team id] and playoff counts by result.
+  const track = inConf.flatMap((id) => season.games.flatMap((g, i) =>
+    !g.completed && (g.homeId === id || g.awayId === id) ? [{ id, k: idx(id), i, winN: 0, winIn: 0, loseN: 0, loseIn: 0 }] : []));
   const top = new Int32Array(PLAYOFF_FIELD);
   const topScore = new Float64Array(PLAYOFF_FIELD);
   /** Credit one game's winner and loser (by FBS index, -1 for non-FBS). */
@@ -125,9 +139,18 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
       topScore[at] = sc;
     }
     let champIn = false;
+    made.fill(0);
     for (let k = 0; k < filled; k++) {
       playoff[top[k]]++;
+      made[top[k]] = 1;
       if (top[k] === champIdx) champIn = true;
+      else atLarge[top[k]]++;
+    }
+    if (champIdx >= 0) made[champIdx] = 1;
+    for (const t of track) {
+      const inIt = t.k >= 0 && made[t.k] === 1 ? 1 : t.id === champ ? 1 : 0;
+      if (winnerAt(t.i) === t.id) { t.winN++; t.winIn += inIt; }
+      else { t.loseN++; t.loseIn += inIt; }
     }
     if (!champIn) {
       if (champIdx >= 0) playoff[champIdx]++;
@@ -151,6 +174,18 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
       titleGame: titleGame.get(id)! / n,
       champion: champion.get(id)! / n,
       playoff: (fbsIndex.has(id) ? playoff[fbsIndex.get(id)!] : (outside.get(id) ?? 0)) / n,
+      atLarge: fbsIndex.has(id) ? atLarge[fbsIndex.get(id)!] / n : 0,
+      games: track.filter((t) => t.id === id).map((t) => {
+        // Never in at large: the title is its only way in, so a non-conference result can't change it.
+        // (Split by result, the odds would still differ: a team rated up that season wins both.)
+        const only = !season.games[t.i].conferenceGame && (!fbsIndex.has(id) || atLarge[fbsIndex.get(id)!] === 0);
+        const all = (fbsIndex.has(id) ? playoff[fbsIndex.get(id)!] : (outside.get(id) ?? 0)) / n;
+        return {
+          gameId: season.games[t.i].id,
+          ifWin: t.winN >= MIN_SAMPLE ? (only ? all : t.winIn / t.winN) : null,
+          ifLose: t.loseN >= MIN_SAMPLE ? (only ? all : t.loseIn / t.loseN) : null,
+        };
+      }),
       status: statusOf(titleGame.get(id)! / n, id),
     })),
   };

@@ -20,7 +20,7 @@ export { gameWinProbability, simulateSeason } from "./sim";
 export type { OddsOptions, SimOptions, SimResult, TeamSimStats } from "./sim";
 export { seasonOutlook } from "./outlook";
 export type { OutlookOptions, SeasonOutlook, TeamOutlook } from "./outlook";
-export { formatChance, formatFine, formatOdds, formatRecord, formatSideOdds, formatTitleOdds, oddsLabels, teamPath } from "./paths";
+export { formatChance, formatFine, formatOdds, formatRecord, formatSideOdds, formatTitleOdds, mustWinConference, oddsLabels, teamPath } from "./paths";
 export { explore } from "./explore";
 export type { Exploration } from "./explore";
 export type { KeyGame, OddsLabels, PathOptions, PathStatus, TeamPath } from "./paths";

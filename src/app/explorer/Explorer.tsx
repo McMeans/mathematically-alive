@@ -188,7 +188,7 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
               </button>
               {hasLocks && (
                 // On phones Reset rides in the pinned bar; wider screens have it in the summary column.
-                <button type="button" onClick={() => update({})} className="press flex min-h-10 shrink-0 animate-rise items-center gap-1.5 rounded-full border border-navy/20 px-3 text-sm font-bold text-navy hover:bg-mist md:hidden">
+                <button type="button" onClick={() => update({})} className="press flex min-h-10 shrink-0 animate-rise items-center gap-1.5 rounded-full bg-marker-text px-3 text-sm font-bold text-white hover:bg-marker md:hidden">
                   <span aria-hidden>↺</span> Reset
                 </button>
               )}

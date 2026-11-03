@@ -5,7 +5,7 @@
 // scenario is covered without drawing branches that can't change anything.
 //
 // Non-conference games aren't branched on: the title game is decided by
-// conference results alone, so they can't move these odds. The footnote names them.
+// conference results alone, so they can't move these odds. The season view lists them.
 //
 // Also lists "help from elsewhere": every other remaining conference game, with
 // the team's odds for each result, and whether it clearly matters now or in one
@@ -13,7 +13,8 @@
 //
 // Uses the same simulated seasons and title-game draw as teamPath, so the root
 // odds equal teamPath's titleGame for the same seed and locks.
-import { formatFine, formatOdds, formatTitleOdds, type PathOptions, type PathStatus } from "./paths";
+import { seasonOutlook, type TeamOutlook } from "./outlook";
+import { formatFine, formatOdds, formatSideOdds, formatTitleOdds, type PathOptions, type PathStatus } from "./paths";
 import { teamRecord } from "./season";
 import type { Game, Season } from "./season";
 import { FAINT, OVERALL, SCENARIO, isClear } from "./signal";
@@ -199,6 +200,11 @@ export type SeasonWeek = {
     /** For display: "In", "Out", "12%", "0.4%", or "—" when too few simulated seasons go that way. A locked game's other side is worked out by itself. */
     ifWin: string;
     ifLose: string;
+    /** The team's playoff odds (EXPERIMENTAL) either way ("41%"); null when it never gets in at large, so only the title matters. */
+    cfpIfWin: string | null;
+    cfpIfLose: string | null;
+    /** "58% to win"; null once the game is locked. */
+    winChance: string | null;
   } | null;
   /** The team's conference game that week when it's already final; null otherwise. */
   played: { gameId: number; opponent: string; site: "home" | "away" | "neutral"; won: boolean; score: string } | null;
@@ -206,8 +212,14 @@ export type SeasonWeek = {
    * The team's non-conference game that week: on the schedule, but not in the conference standings
    * (it only feeds the ranking used to break a tie).
    * `won` and `score` once it's final, else null.
+   * `ifWin`/`ifLose`: the team's playoff odds (EXPERIMENTAL) either way, for display ("36%"); null once it's final.
+   * `note`: shown instead of the odds when the result can't move them, else null.
+   * `winChance`: "97% to win"; null once it's final or locked.
    */
-  nonConference: { gameId: number; opponent: string; site: "home" | "away" | "neutral"; date: string; won: boolean | null; score: string | null } | null;
+  nonConference: {
+    gameId: number; opponentId: number; opponent: string; site: "home" | "away" | "neutral"; date: string; won: boolean | null; score: string | null;
+    ifWin: string | null; ifLose: string | null; note: string | null; winChance: string | null;
+  } | null;
   /**
    * Every game elsewhere that week: locked ones first, then those that matter, then the rest, biggest swing first.
    * `ifHome`/`ifAway`: the team's odds if that side wins, for display.
@@ -272,7 +284,8 @@ type Step = { opp: string; win: boolean };
 type Peak = Omit<NonNullable<HelpGame["scenario"]>, "line">;
 
 /** `shared`: a simulation of the same season, iterations, seed and locks to reuse. */
-export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult): PathTree {
+/** `outlook`: the conference's outlook from the same simulation, to reuse. */
+export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, outlook?: TeamOutlook[]): PathTree {
   const { conference, teamId, iterations, seed } = opts;
   const data = conferenceData(season, conference);
   if (data.ids.size < 2) throw new Error(`${conference} has fewer than two teams`);
@@ -579,6 +592,26 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     if (!w) byWeek.set(g.week, (w = { week: g.week, label: when(g), own: null, played: null, nonConference: null, games: [], quiet: 0 }));
     return w;
   };
+  // Playoff odds by each of the team's own results, and its chance to win each game.
+  const me = (outlook ?? seasonOutlook(season, opts, sim).teams).find((o) => o.teamId === teamId)!;
+  const playoffById = new Map(me.games.map((x) => [x.gameId, x]));
+  const status = statusOf(root.outcome);
+  const winChance = (g: Game): string | null => {
+    if (opts.locks?.[g.id] !== undefined) return null;
+    const pHome = gameWinProbability(season, g);
+    return `${formatOdds(g.homeId === teamId ? pHome : 1 - pHome)} to win`;
+  };
+  const playoffIf = (gameId: number, winner: number, odds: number | null): string => {
+    const locked = opts.locks?.[gameId];
+    // Never in at large: only the title gets it in, which this game can't change.
+    if (locked === winner || (locked !== undefined && me.atLarge === 0)) return formatSideOdds(me.playoff, status);
+    if (locked === undefined) return odds === null ? "—" : formatSideOdds(odds, status);
+    if (swapSims++ >= MAX_SWAP_SIMS) return "—";
+    const swap = { ...opts.locks, [gameId]: winner };
+    const n = Math.min(SWAP_ITERATIONS, iterations);
+    const o = seasonOutlook(season, { conference, iterations: n, seed, locks: swap }).teams.find((t) => t.teamId === teamId)!;
+    return formatSideOdds(o.playoff, status);
+  };
   levels.forEach(({ g }, k) => {
     const w = weekOf(g);
     const opp = g.homeId === teamId ? g.awayId : g.homeId;
@@ -597,6 +630,9 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
       oddsIfWin, oddsIfLose,
       ifWin: lockedTo === opp ? swapped(g.id, teamId) : verdict(oddsIfWin, g.id, teamId),
       ifLose: lockedTo === teamId ? swapped(g.id, opp) : verdict(oddsIfLose, g.id, opp),
+      cfpIfWin: me.atLarge === 0 ? null : playoffIf(g.id, teamId, playoffById.get(g.id)?.ifWin ?? null),
+      cfpIfLose: me.atLarge === 0 ? null : playoffIf(g.id, opp, playoffById.get(g.id)?.ifLose ?? null),
+      winChance: winChance(g),
     };
   });
   for (const g of data.games) {
@@ -639,9 +675,15 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     const theirs = home ? g.awayPoints : g.homePoints;
     const final = g.completed && mine != null && theirs != null;
     if (!w.own && !w.played) w.label = when(g);
+    const opp = home ? g.awayId : g.homeId;
+    const p = playoffById.get(g.id);
+    const ifWin = final ? null : playoffIf(g.id, teamId, p?.ifWin ?? null);
+    const ifLose = final ? null : playoffIf(g.id, opp, p?.ifLose ?? null);
     w.nonConference = {
-      gameId: g.id, opponent: name(home ? g.awayId : g.homeId), site: g.neutralSite ? "neutral" : home ? "home" : "away", date: when(g),
+      gameId: g.id, opponentId: opp, opponent: name(opp), site: g.neutralSite ? "neutral" : home ? "home" : "away", date: when(g),
       won: final ? mine > theirs : null, score: final ? `${mine}-${theirs}` : null,
+      ifWin, ifLose, note: !final && ifWin !== "—" && ifWin === ifLose ? "Doesn't move playoff odds" : null,
+      winChance: final ? null : winChance(g),
     };
   }
   for (const w of byWeek.values()) w.games.sort((a, b) => Number(b.matters) - Number(a.matters) || b.swing - a.swing || a.gameId - b.gameId);
@@ -651,7 +693,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult):
     titleGame,
     root,
     weeks,
-    footnote: footnote(ownAll.filter(({ g }) => !confGames.has(g)).map(({ g }) => g), ownConf.length - depth, depth, teamId, conference, name),
+    footnote: footnote(ownConf.length - depth, depth, conference),
     help,
     likeliest,
     helpNote: helpNote(help, root.outcome === "in" ? "clinched" : root.outcome === "out" ? "eliminated" : "open", team, conference),
@@ -847,18 +889,9 @@ function helpNote(help: HelpGame[], status: string, team: string, conference: st
     : `The other ${quiet} ${conference} games don't clearly change ${team}'s odds.`;
 }
 
-function footnote(
-  nonConf: Game[], cut: number, depth: number, teamId: number, conference: string, name: (id: number) => string,
-): string | null {
-  const notes: string[] = [];
-  if (nonConf.length > 0) {
-    const games = nonConf.map((g) => `${name(g.homeId === teamId ? g.awayId : g.homeId)} (${when(g)})`);
-    notes.push(`Not listed: ${list(games)}. Non-conference results don't change the ${conference} title-game race.`);
-  }
-  if (cut > 0) {
-    notes.push(`The tree stops after ${plural(depth, "game", "games")}; ${plural(cut, `later ${conference} game isn't`, `later ${conference} games aren't`)} shown.`);
-  }
-  return notes.length ? notes.join(" ") : null;
+function footnote(cut: number, depth: number, conference: string): string | null {
+  if (cut <= 0) return null;
+  return `The tree stops after ${plural(depth, "game", "games")}; ${plural(cut, `later ${conference} game isn't`, `later ${conference} games aren't`)} shown.`;
 }
 
 /** A proven outcome as a title-game status for the odds wording: only "in" and "out" are proven. */

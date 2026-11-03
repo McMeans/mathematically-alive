@@ -3,9 +3,10 @@ import { useState } from "react";
 import { formatRecord, formatSideOdds, formatTitleOdds, oddsLabels, type Impact, type SeasonWeek, type TeamOutlook } from "@/core";
 import { CONFERENCE } from "@/app/config";
 import type { Locks, TeamInfo } from "./Explorer";
-import { Beta } from "./Panels";
+import { Beta, playoffText } from "./Panels";
 
 const LABELS = oddsLabels(CONFERENCE);
+type PickState = "picked" | "likely" | "open";
 
 const label = "text-[11px] font-semibold uppercase tracking-wide text-ink-muted";
 
@@ -71,16 +72,19 @@ function Week({ w, base, teamId, locks, likely, onPick }: { w: SeasonWeek; base:
     <li className="flex w-40 shrink-0 flex-col gap-1.5 md:w-auto">
       <span className="text-xs font-semibold text-ink-muted">{w.label}</span>
       {own ? (
-        <div role="group" aria-label={`${own.site === "away" ? "at" : "vs"} ${own.opponent}`} className="flex flex-col gap-1 rounded-lg bg-navy p-1.5">
-          <span className="px-0.5 text-[11px] text-white/75">{own.site === "away" ? "at" : "vs"} {own.opponent}</span>
-          <OwnButton text="Win" odds={own.ifWin} state={state(own.gameId, teamId)} onClick={() => onPick(own.gameId, teamId)} />
-          <OwnButton text="Lose" odds={own.ifLose} state={state(own.gameId, own.opponentId)} onClick={() => onPick(own.gameId, own.opponentId)} />
-        </div>
+        <PickTable
+          vs={`${own.site === "away" ? "at" : "vs"} ${own.opponent}`} winChance={own.winChance} cfp={own.cfpIfWin !== null}
+          win={{ conf: own.ifWin, cfp: own.cfpIfWin, state: state(own.gameId, teamId), onClick: () => onPick(own.gameId, teamId) }}
+          lose={{ conf: own.ifLose, cfp: own.cfpIfLose, state: state(own.gameId, own.opponentId), onClick: () => onPick(own.gameId, own.opponentId) }}
+        />
       ) : w.played || w.nonConference ? null : (
         <span className="rounded-lg border border-dashed border-navy/20 px-2 py-2 text-xs text-ink-muted">No game this week</span>
       )}
       {w.played && <Final played={w.played} />}
-      {w.nonConference && <NonConference game={w.nonConference} />}
+      {w.nonConference && (
+        <NonConference game={w.nonConference} win={state(w.nonConference.gameId, teamId)} lose={state(w.nonConference.gameId, w.nonConference.opponentId)}
+          onWin={() => onPick(w.nonConference!.gameId, teamId)} onLose={() => onPick(w.nonConference!.gameId, w.nonConference!.opponentId)} />
+      )}
       <div className="flex grow flex-col gap-1 rounded-lg bg-mist p-1.5">
         <span className="px-0.5 text-[11px] font-semibold text-ink-muted">Elsewhere</span>
         {games.map((g) => (
@@ -117,17 +121,28 @@ function Final({ played }: { played: NonNullable<SeasonWeek["played"]> }) {
   );
 }
 
-/** The team's non-conference game that week: shown so the week isn't mistaken for a bye. Not in the standings, so not pickable. */
-function NonConference({ game }: { game: NonNullable<SeasonWeek["nonConference"]> }) {
+/**
+ * The team's non-conference game that week. Not in the standings, so it can only move the playoff odds:
+ * pickable with those odds either way, or a quiet card when the result can't move them.
+ */
+function NonConference({ game, win, lose, onWin, onLose }: {
+  game: NonNullable<SeasonWeek["nonConference"]>; win: PickState; lose: PickState; onWin: () => void; onLose: () => void;
+}) {
+  const vs = `${game.site === "away" ? "at" : "vs"} ${game.opponent}`;
+  if (!game.score && !game.note && game.ifWin && game.ifLose)
+    return (
+      <PickTable vs={vs} winChance={game.winChance} cfp nonConference
+        win={{ conf: null, cfp: game.ifWin, state: win, onClick: onWin }} lose={{ conf: null, cfp: game.ifLose, state: lose, onClick: onLose }} />
+    );
   return (
     <div className="flex flex-col gap-0.5 rounded-lg border border-dashed border-navy/20 px-2 py-1.5">
       <span className="text-[11px] text-ink-muted">
-        {game.score ? "Final · " : `${game.date} · `}{game.site === "away" ? "at" : "vs"} {game.opponent}
+        {game.score ? "Final · " : `${game.date} · `}{game.site === "away" ? "at" : "vs"} {game.opponent}{!game.score && game.winChance ? ` · ${game.winChance}` : ""}
       </span>
       {game.score ? (
         <span className={`text-sm font-bold ${game.won ? "text-turf" : "text-marker-text"}`}>{game.won ? "Won" : "Lost"} {game.score}</span>
       ) : (
-        <span className="text-xs text-ink-soft">Non-conference: not in the {CONFERENCE} standings</span>
+        <span className="text-xs text-ink-soft">{game.note ?? `Non-conference: not in the ${CONFERENCE} standings`}</span>
       )}
     </div>
   );
@@ -148,14 +163,39 @@ const titleOdds = (o: TeamOutlook) => formatTitleOdds(o.titleGame, o.status);
 // In / Out on the navy own-game card, light enough to read there.
 const darkTone = (odds: string) => (odds === "In" ? "font-bold text-[#8FE3B4]" : odds === "Out" ? "font-bold text-[#F6B08C]" : "");
 
-function OwnButton({ text, odds, state, onClick }: { text: string; odds: string; state: "picked" | "likely" | "open"; onClick: () => void }) {
-  const look =
-    state === "picked" ? "bg-turf text-white" : state === "likely" ? "bg-white/10 text-white outline-dashed outline-1 -outline-offset-2 outline-white/60 hover:bg-white/20" : "bg-white/10 text-white hover:bg-white/20";
+type PickRow = { conf: string | null; cfp: string | null; state: PickState; onClick: () => void };
+
+// Win and Lose rows under ACC and CFP columns, the same shape for every game so the weeks line up.
+// `conf` null: a non-conference game, which can't move the title odds ("—"). `cfp` false: no CFP column.
+function PickTable({ vs, winChance, cfp, nonConference, win, lose }: {
+  vs: string; winChance: string | null; cfp: boolean; nonConference?: boolean; win: PickRow; lose: PickRow;
+}) {
+  const cols = cfp ? "grid-cols-[1fr_2.75rem_2.75rem]" : "grid-cols-[1fr_2.75rem]";
+  const row = (text: string, r: PickRow) => {
+    const look = r.state === "picked" ? "bg-turf text-white" : r.state === "likely" ? "bg-white/10 text-white outline-dashed outline-1 -outline-offset-2 outline-white/60 hover:bg-white/20" : "bg-white/10 text-white hover:bg-white/20";
+    const label = [r.conf && `${LABELS.conference} ${r.conf}`, r.cfp && `${LABELS.cfp} ${r.cfp}`].filter(Boolean).join(", ");
+    return (
+      <button type="button" aria-label={`${text}: ${label}`} aria-pressed={r.state === "picked"} onClick={r.onClick} className={`press grid h-8 items-center rounded-md px-2 text-xs ${cols} ${look}`}>
+        <span className="text-left font-bold">{text}</span>
+        <span className={`text-right ${r.conf === null ? "text-white/50" : r.state === "picked" ? "" : darkTone(r.conf)}`}>{r.conf ?? "—"}</span>
+        {cfp && <span className={`text-right ${r.conf === null ? "" : "text-white/70"}`}>{r.cfp ?? "—"}</span>}
+      </button>
+    );
+  };
   return (
-    <button type="button" aria-label={`${text}: ${odds}`} aria-pressed={state === "picked"} onClick={onClick} className={`press flex min-h-8 items-center justify-between rounded-md px-2 text-xs font-bold ${look}`}>
-      {text}
-      <span className={`font-normal ${state === "picked" ? "" : darkTone(odds)}`}>{odds}</span>
-    </button>
+    <div role="group" aria-label={nonConference ? `${vs}, non-conference` : vs} className="flex flex-col gap-1 rounded-lg bg-navy p-1.5">
+      <span className={`grid h-4 items-center pl-0.5 pr-2 text-[10px] text-white/60 ${cols}`}>
+        <span className="truncate text-[11px] text-white/75">{vs}</span>
+        <span className="text-right">{LABELS.conference}</span>
+        {cfp && <span className="text-right">{LABELS.cfp}</span>}
+      </span>
+      {row("Win", win)}
+      {row("Lose", lose)}
+      <span className="flex h-4 items-center justify-between gap-1 px-0.5 text-[11px] text-white/75">
+        <span>{nonConference && <span className="whitespace-nowrap rounded border border-white/40 px-1 text-[10px] leading-4">{LABELS.nonConference}</span>}</span>
+        {winChance && <span className="shrink-0">{winChance}</span>}
+      </span>
+    </div>
   );
 }
 
@@ -239,7 +279,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
             </p>
           </div>
           {has && (
-            <button type="button" onClick={onReset} className="press flex h-8 shrink-0 animate-rise items-center gap-1.5 rounded-full border border-navy/20 px-3 text-xs font-bold text-navy hover:bg-mist">
+            <button type="button" onClick={onReset} className="press flex h-8 shrink-0 animate-rise items-center gap-1.5 rounded-full bg-marker-text px-3 text-xs font-bold text-white hover:bg-marker">
               <span aria-hidden>↺</span> Reset
             </button>
           )}
@@ -255,7 +295,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
           </div>
           <div className="flex flex-col gap-1 border-t border-navy/10 pt-2 text-sm text-ink-soft">
             <p className="flex justify-between">{LABELS.champion}<span className="font-bold text-navy">{sideOdds(me.champion, me)}</span></p>
-            <p className="flex justify-between"><span className="flex items-center gap-1">{LABELS.playoff}<Beta /></span><span className="font-bold text-navy">{sideOdds(me.playoff, me)}</span></p>
+            <p className="flex justify-between"><span className="flex items-center gap-1">{LABELS.playoff}<Beta /></span><span className="font-bold text-navy">{playoffText(me, sideOdds(me.playoff, me))}</span></p>
           </div>
         </section>
       </div>
