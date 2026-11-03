@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Screens tall enough to pin a block above a scrolling list without squeezing the list. */
+@custom-variant tall (@media (min-height: 640px));
+
 /* Brand: identity direction D ("Pulse type, Proof colors").
    The site is light-only for now. */
 @theme {
@@ -42,4 +45,40 @@ body {
 }
 .scroll-thin:hover::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--color-navy) 35%, transparent);
+}
+
+/* Motion: short and eased, never bouncy. New content rises in a few pixels as it fades in. */
+@theme {
+  --animate-rise: rise 220ms cubic-bezier(0.2, 0, 0, 1) both;
+  --animate-pop: pop 160ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.press {
+  transition: background-color 180ms ease-out, color 180ms ease-out, box-shadow 180ms ease-out, transform 120ms ease-out;
+}
+.press:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+  .press:active {
+    transform: none;
+  }
 }

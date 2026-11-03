@@ -30,24 +30,27 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
   const ids = order.filter((id) => byId.get(id)!.name.toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <div>
-      <div className="p-3">
-        <label htmlFor={searchId} className="mb-1 block text-xs font-bold text-ink-muted">
-          Team
-        </label>
-        <input
-          id={searchId}
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search"
-          autoComplete="off"
-          className="min-h-11 w-full rounded-lg border border-ink-muted/40 bg-white px-3 text-sm placeholder:text-ink-muted md:min-h-9"
-        />
-      </div>
-      <div aria-hidden className="flex items-center gap-2 px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-ink-muted">
-        <span className="w-2.5" />
-        <span className="flex-1">Team</span>
-        <span className="text-right">Odds</span>
+      {/* Search and column labels stay put while the list scrolls under them. */}
+      <div className="sticky top-0 z-10 bg-white">
+        <div className="p-3">
+          <label htmlFor={searchId} className="mb-1 block text-xs font-bold text-ink-muted">
+            Team
+          </label>
+          <input
+            id={searchId}
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search"
+            autoComplete="off"
+            className="min-h-11 w-full rounded-lg border border-ink-muted/40 bg-white px-3 text-sm placeholder:text-ink-muted md:min-h-9"
+          />
+        </div>
+        <div aria-hidden className="flex items-center gap-2 px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-ink-muted">
+          <span className="w-2.5" />
+          <span className="flex-1">Team</span>
+          <span className="text-right">Odds</span>
+        </div>
       </div>
       <ul>
         {ids.map((id) => {
@@ -88,19 +91,35 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
   );
 }
 
+function Beta() {
+  return <span className="rounded border border-marker-text px-1 text-[10px] font-bold leading-4 text-marker-text">BETA</span>;
+}
+
 function Tile({ label, value, tone, badge }: { label: string; value: string; tone: string; badge?: boolean }) {
   return (
     <div className="rounded-lg bg-mist p-3">
       <dt className="flex items-center gap-1 text-xs text-ink-muted">
         {label}
-        {badge && <span className="rounded border border-marker-text px-1 text-[10px] font-bold leading-4 text-marker-text">BETA</span>}
+        {badge && <Beta />}
       </dt>
       <dd className={`font-display text-2xl font-bold ${tone}`}>{value}</dd>
     </div>
   );
 }
 
-export function StatTiles({ outlook, ifWinOut, compact }: { outlook: TeamOutlook; ifWinOut: number | null; compact?: boolean }) {
+export function StatTiles({ outlook, ifWinOut, compact, condensed }: { outlook: TeamOutlook; ifWinOut: number | null; compact?: boolean; condensed?: boolean }) {
+  // One slim row, for the pinned phone bar once the page has scrolled.
+  if (condensed)
+    return (
+      <dl className="flex animate-rise items-baseline justify-between gap-3 text-xs text-ink-muted">
+        {([["Title game", formatChance(outlook.titleGame, outlook.status), "text-turf", false], ["Win ACC", pct(outlook.champion), "text-navy", false], ["Playoff", pct(outlook.playoff), "text-navy", true]] as const).map(([label, value, tone, badge]) => (
+          <div key={label} className="flex items-baseline gap-1.5">
+            <dt className="flex items-center gap-1">{label}{badge && <Beta />}</dt>
+            <dd className={`font-display text-base font-bold ${tone}`}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    );
   return (
     <dl className={`grid gap-2 ${compact ? "grid-cols-3" : "grid-cols-2"}`}>
       <Tile label="Title game" value={formatChance(outlook.titleGame, outlook.status)} tone="text-turf" />

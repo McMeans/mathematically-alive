@@ -30,6 +30,33 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [sheet, setSheet] = useState(false);
+  const pickerRef = useRef<HTMLButtonElement>(null);
+  // Phones: fold the odds tiles into one row once scrolled. The gap between the two thresholds stops
+  // the bar flickering as its own height change nudges the scroll position.
+  const [condensed, setCondensed] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setCondensed((c) => (c ? window.scrollY > 40 : window.scrollY > 160));
+    onScroll(); // the browser may restore a scrolled position on reload
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  useEffect(() => {
+    if (!sheet) return;
+    // The picker is hidden from xl up; close the popup if the window widens past it.
+    const wide = window.matchMedia("(min-width: 80rem)");
+    const onWide = () => wide.matches && setSheet(false);
+    wide.addEventListener("change", onWide);
+    const close = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setSheet(false);
+      pickerRef.current?.focus();
+    };
+    window.addEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("keydown", close);
+      wide.removeEventListener("change", onWide);
+    };
+  }, [sheet]);
   // The team just clicked in the list, while its page loads (this component remounts per team).
   const [going, setGoing] = useState<number | null>(null);
   // The likeliest-way-in picks currently locked by the button (they stay locked while the live tree changes).
@@ -124,48 +151,69 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
 
   return (
     <div className="flex min-h-dvh flex-col md:h-dvh md:overflow-hidden">
-      <header className="flex items-center justify-between gap-3 border-b border-ink-muted/25 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Logo size={32} decorative />
-          <h1 className="font-display text-lg font-bold tracking-tight sm:text-xl">Mathematically Alive</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">ACC</span>
-          <span className="hidden text-sm text-ink-muted sm:inline">
-            {asOf}
-          </span>
-        </div>
-      </header>
-
-      <div className="md:hidden">
-        <div className="border-b border-ink-muted/25 p-4">
-          <button
-            type="button"
-            aria-expanded={sheet}
-            aria-controls="team-sheet"
-            onClick={() => setSheet(!sheet)}
-            className="flex min-h-11 w-full items-center gap-2 rounded-lg bg-mist px-3 text-left font-bold"
-          >
-            <span aria-hidden className="h-3 w-3 rounded-full" style={{ background: team.color ?? NAVY }} />
-            <span className="flex-1">
-              {team.name} <span className="font-normal text-ink-soft">· {me.record.wins}-{me.record.losses}</span>
+      {/* On phones the page scrolls as one, so the header, team picker and odds stay pinned on top. */}
+      <div className="sticky top-0 z-30 bg-white md:static">
+        <header className="flex items-center justify-between gap-3 border-b border-ink-muted/25 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Logo size={32} decorative />
+            <h1 className="font-display text-lg font-bold tracking-tight sm:text-xl">Mathematically Alive</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">ACC</span>
+            <span className="hidden text-sm text-ink-muted sm:inline">
+              {asOf}
             </span>
-            <span aria-hidden>{sheet ? "▴" : "▾"}</span>
-          </button>
-          {sheet && (
-            <div id="team-sheet" className="mt-2 max-h-[60dvh] overflow-y-auto rounded-lg border border-ink-muted/25">
-              {list}
+          </div>
+        </header>
+
+        {/* Below xl the team list collapses into this picker, leaving the weeks room to breathe. */}
+        <div className="xl:hidden">
+          <div className="relative border-b border-ink-muted/25 px-4 py-2 md:px-6">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                ref={pickerRef}
+                aria-expanded={sheet}
+                aria-controls="team-sheet"
+                onClick={() => setSheet(!sheet)}
+                className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-lg bg-mist px-3 text-left text-sm font-bold transition-colors hover:bg-navy/10"
+              >
+                <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: team.color ?? NAVY }} />
+                <span className="min-w-0 flex-1 truncate">
+                  {team.name} <span className="font-normal text-ink-soft">· {me.record.wins}-{me.record.losses} ({me.record.conferenceWins}-{me.record.conferenceLosses} ACC)</span>
+                </span>
+                <span className="hidden text-xs font-normal text-ink-muted sm:inline">Change team</span>
+                <span aria-hidden className={`text-ink-muted transition-transform duration-200 ${sheet ? "rotate-180" : ""}`}>▾</span>
+              </button>
+              {hasLocks && (
+                // On phones Reset rides in the pinned bar; wider screens have it in the summary column.
+                <button type="button" onClick={() => update({})} className="press flex min-h-10 shrink-0 animate-rise items-center gap-1.5 rounded-full border border-navy/20 px-3 text-sm font-bold text-navy hover:bg-mist md:hidden">
+                  <span aria-hidden>↺</span> Reset
+                </button>
+              )}
             </div>
-          )}
-        </div>
-        <div className="p-4 pb-0">
-          <StatTiles outlook={me} ifWinOut={path.ifWinOut} compact />
+            {sheet && (
+              <>
+                {/* Clicking anywhere outside the popup closes it. */}
+                <button type="button" aria-label="Close team list" tabIndex={-1} onClick={() => { setSheet(false); pickerRef.current?.focus(); }} className="fixed inset-0 z-20 cursor-default" />
+                <div
+                  id="team-sheet"
+                  className="scroll-thin absolute inset-x-4 top-full z-30 mt-1 max-h-[60dvh] origin-top animate-pop overflow-y-auto rounded-lg border border-ink-muted/25 bg-white shadow-lg md:inset-x-6 md:max-w-sm"
+                >
+                  {list}
+                </div>
+              </>
+            )}
+          </div>
+          <div className={`border-b border-ink-muted/25 px-4 transition-[padding] duration-200 md:hidden ${condensed ? "py-2" : "py-3"}`}>
+            <StatTiles outlook={me} ifWinOut={path.ifWinOut} compact condensed={condensed} />
+          </div>
         </div>
       </div>
 
       {/* On desktop the page is one screen tall and each column scrolls on its own. */}
-      <div className="grid flex-1 md:min-h-0 md:grid-cols-[260px_minmax(0,1fr)_340px]">
-        <nav aria-label="ACC teams" className="scroll-thin hidden border-r border-ink-muted/25 md:block md:overflow-y-auto">
+      <div className="grid flex-1 md:min-h-0 md:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[260px_minmax(0,1fr)_340px]">
+        <nav aria-label="ACC teams" className="scroll-thin hidden border-r border-ink-muted/25 xl:block xl:overflow-y-auto">
           {list}
         </nav>
 
@@ -177,11 +225,6 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
             </h2>
             <div className="flex items-center gap-3">
               <span role="status" className={`text-xs ${failed ? "text-marker-text" : "text-ink-muted"}`}>{status}</span>
-              {hasLocks && (
-                <button type="button" onClick={() => update({})} className="min-h-11 text-sm font-bold text-navy underline md:min-h-0">
-                  Reset
-                </button>
-              )}
             </div>
           </div>
 
@@ -198,13 +241,13 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
           </div>
           {!wayOn && likeliest && <WayCard way={likeliest} teamName={team.name} />}
 
-          <div className={`transition-opacity ${busy ? "opacity-70" : ""}`}>
+          <div className={`transition-opacity duration-200 ${busy ? "opacity-70" : ""}`}>
             <SeasonWeeks weeks={tree.weeks} base={initial.tree.weeks} teamId={teamId} locks={locks} likely={likely} onPick={pick} />
             {tree.footnote && <p className="mt-2 text-xs text-ink-muted">{tree.footnote}</p>}
           </div>
         </main>
 
-        <aside aria-label="Summary" aria-busy={going !== null} className={`scroll-thin relative hidden border-l border-ink-muted/25 p-6 md:block md:overflow-y-auto ${busy ? "opacity-70" : ""}`}>
+        <aside aria-label="Summary" aria-busy={going !== null} className={`scroll-thin relative hidden min-h-0 border-l border-ink-muted/25 md:flex md:flex-col md:overflow-y-auto tall:md:overflow-hidden transition-opacity duration-200 ${busy ? "opacity-70" : ""}`}>
           {going !== null && <Loading />}
           <WhatIf
             team={team}
