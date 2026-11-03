@@ -124,7 +124,7 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - `/`: team list. `/team/[id]`: the explorer for that team (`ExplorerPage`, `explorer/*`).
 - The first numbers are computed at build time. What-ifs run in a Web Worker (`sim.worker.ts`) so the main thread never blocks. Explore's worst case is about 2.6 s.
 - Panels:
-  - Team list with odds.
+  - Team list with odds. One tab per supported conference (the team's own selected), and a search that looks through every conference.
   - Stat tiles: title game, title, playoff and if-win-out.
   - The season by week. Own-game buttons and elsewhere chips can be clicked to lock a result. Each own game (conference or not) is a small table: Win and Lose rows under ACC and CFP columns, the chance to win, and a "Non-con" tag on non-conference games. Each number is what picking that result would show (see `games` above). Non-conference games show "—" for ACC; they move the title race only slightly, through the ranking tiebreak. For a team that must win the conference, conference cards drop the CFP column. Its non-conference cards keep it so they stay pickable and a pick on them stays visible. Final results, byes and the tables are all the same height, so the weeks line up.
   - The race table.

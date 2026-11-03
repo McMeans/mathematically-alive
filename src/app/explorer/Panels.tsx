@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { useId, useState } from "react";
 import { formatChance, formatRecord, mustWinConference, type OddsLabels, type TeamOutlook, type TeamPath } from "@/core";
-import { NAVY, pct, type GameInfo, type TeamInfo } from "./Explorer";
+import { NAVY, pct, type ConferenceList, type GameInfo, type TeamInfo } from "./Explorer";
+import { byOdds } from "./Season";
 import { useConference } from "./conference";
 
 /** White or navy text, whichever reads better on the team color (WCAG relative luminance). */
@@ -15,25 +16,48 @@ function inkOn(hex: string): string {
   return (1.05 / (l + 0.05)) >= (l + 0.05) / 0.0652 ? "#FFFFFF" : NAVY;
 }
 
-export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
-  teams: TeamInfo[];
-  order: number[];
-  outlook: TeamOutlook[];
+export function TeamList({ conferences, names, selectedId, onSelect }: {
+  conferences: ConferenceList[];
+  names: Record<number, string>;
   selectedId: number;
   /** Called on a plain click, before navigation, so the row can switch at once. */
   onSelect?: (id: number) => void;
 }) {
   const { conference } = useConference();
   const [q, setQ] = useState("");
+  const [shown, setShown] = useState(conference);
   // Rendered twice (desktop column and phone sheet), so the label needs a per-copy id.
   const searchId = useId();
-  const byId = new Map(teams.map((t) => [t.id, t]));
-  const odds = new Map(outlook.map((o) => [o.teamId, o]));
-  const ids = order.filter((id) => byId.get(id)!.name.toLowerCase().includes(q.trim().toLowerCase()));
+  const query = q.trim().toLowerCase();
+  // A search looks through every conference; otherwise the chosen tab, best odds first.
+  const rows = conferences
+    .filter((c) => query !== "" || c.conference === shown)
+    .flatMap((c) => {
+      const byId = new Map(c.teams.map((t) => [t.id, t]));
+      return [...c.outlook]
+        .sort(byOdds(names))
+        .filter((o) => byId.get(o.teamId)!.name.toLowerCase().includes(query))
+        .map((o) => ({ t: byId.get(o.teamId)!, o, conference: c.conference }));
+    });
   return (
     <div>
       {/* Search and column labels stay put while the list scrolls under them. */}
       <div className="sticky top-0 z-10 bg-white">
+        {conferences.length > 1 && (
+          <div role="group" aria-label="Conference" className="flex gap-1 px-3 pt-3">
+            {conferences.map((c) => (
+              <button
+                key={c.conference}
+                type="button"
+                aria-pressed={query === "" && c.conference === shown}
+                onClick={() => { setShown(c.conference); setQ(""); }}
+                className="min-h-11 flex-1 rounded-full border border-navy/20 px-3 text-sm font-bold text-navy hover:bg-mist aria-pressed:border-navy aria-pressed:bg-navy aria-pressed:text-white md:min-h-8"
+              >
+                {c.conference}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="p-3">
           <label htmlFor={searchId} className="mb-1 block text-xs font-bold text-ink-muted">
             Team
@@ -43,7 +67,7 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search"
+            placeholder={conferences.length > 1 ? "Search all conferences" : "Search"}
             autoComplete="off"
             className="min-h-11 w-full rounded-lg border border-ink-muted/40 bg-white px-3 text-sm placeholder:text-ink-muted md:min-h-9"
           />
@@ -55,9 +79,8 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
         </div>
       </div>
       <ul>
-        {ids.map((id) => {
-          const t = byId.get(id)!;
-          const o = odds.get(id)!;
+        {rows.map(({ t, o, conference: c }) => {
+          const id = t.id;
           const selected = id === selectedId;
           const fill = t.color ?? NAVY;
           const ink = inkOn(fill);
@@ -77,7 +100,7 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate leading-5">{t.name}</span>
                   <span className={`block text-[11px] leading-4 tabular-nums ${selected ? "font-normal" : "text-ink-muted"}`}>
-                    {formatRecord(o.record, conference)}
+                    {formatRecord(o.record, c)}
                   </span>
                 </span>
                 <span className={`w-10 text-right tabular-nums ${o.status === "eliminated" && !selected ? "font-normal text-ink-muted" : ""}`}>
@@ -87,7 +110,7 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
             </li>
           );
         })}
-        {ids.length === 0 && <li className="px-3 py-2 text-sm text-ink-muted">No match</li>}
+        {rows.length === 0 && <li className="px-3 py-2 text-sm text-ink-muted">No match</li>}
       </ul>
     </div>
   );
