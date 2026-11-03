@@ -246,3 +246,41 @@ describe("help from elsewhere on a real season", () => {
     expect(faint).toBeGreaterThan(0);
   }, 30_000);
 });
+
+describe("locked games on a real season", () => {
+  // Kansas in the 2026 Big 12 with its likeliest way in locked: more than a dozen picks, many of them games elsewhere.
+  const big12 = () => seasonFromCfbd(JSON.parse(readFileSync("fixtures/big-12-2026.json", "utf8")) as CfbdSnapshot);
+
+  it("every locked game elsewhere shows the team's odds for its other side, however many games are locked", () => {
+    const s = big12();
+    const kansas = s.teams.find((t) => t.name === "Kansas")!.id;
+    const opts = { conference: "Big 12", teamId: kansas, iterations: 2000, seed: 1 };
+    const way = pathTree(s, opts).likeliest!;
+    const locks = Object.fromEntries(way.picks.map((p) => [p.gameId, p.winner]));
+    const tree = pathTree(s, { ...opts, locks });
+    const lockedElsewhere = tree.weeks.flatMap((w) => w.games).filter((g) => g.gameId in locks);
+    expect(lockedElsewhere.length).toBeGreaterThan(12);
+    for (const g of lockedElsewhere) {
+      const other = locks[g.gameId] === g.homeId ? g.ifAway : g.ifHome;
+      expect(other, `${g.home} vs ${g.away}`).not.toBe("—");
+    }
+  }, 60_000);
+
+  it("a locked game's other side matches the odds with that result picked instead", () => {
+    const s = big12();
+    const kansas = s.teams.find((t) => t.name === "Kansas")!.id;
+    const opts = { conference: "Big 12", teamId: kansas, iterations: 2000, seed: 1 };
+    const way = pathTree(s, opts).likeliest!;
+    const locks = Object.fromEntries(way.picks.map((p) => [p.gameId, p.winner]));
+    const tree = pathTree(s, { ...opts, locks });
+    let checked = 0;
+    for (const g of tree.weeks.flatMap((w) => w.games).filter((x) => x.gameId in locks)) {
+      const otherSide = locks[g.gameId] === g.homeId ? g.awayId : g.homeId;
+      const shown = otherSide === g.homeId ? g.ifHome : g.ifAway;
+      const swapped = pathTree(s, { ...opts, locks: { ...locks, [g.gameId]: otherSide }, depth: 0 });
+      expect(shown, `${g.home} vs ${g.away}`).toBe(swapped.weeks.flatMap((w) => w.games).find((x) => x.gameId === g.gameId)![otherSide === g.homeId ? "ifHome" : "ifAway"]);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(12);
+  }, 120_000);
+});
