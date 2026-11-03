@@ -131,7 +131,7 @@ export type Likeliest = {
   needs: string[];
   /** "Favorites win the other 11 games it needs", or null. */
   favorites: string | null;
-  /** "With these results Virginia gets in about 40% of the time, depending on the ranking tiebreak.", or null. */
+  /** "With these results Virginia gets in about 40% of the time, depending on the ranking tiebreak.", or null. The Big 12 note names total wins too. */
   note: string | null;
   /** The team's part: "Win all 4 left", "Win 3 of 4 left". */
   ownJob: string;
@@ -539,7 +539,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
       if (favorites > 0) elsewhere.push(elsewhere.length ? `the favorites win ${favorites} other game${favorites === 1 ? "" : "s"}` : `the favorites win ${favorites} game${favorites === 1 ? "" : "s"} elsewhere`);
       const parts = [own.length ? `${team} ${list(own)}` : "", elsewhere.length ? list(elsewhere) : ""].filter(Boolean);
       const what = parts.length ? parts.join("; and ") : `${team} needs nothing more`;
-      const note = tiebreak === null ? null : `With these results ${team} gets in ${often}, depending on the ranking tiebreak.`;
+      const note = tiebreak === null ? null : `With these results ${team} gets in ${often}, depending on ${conference === "Big 12" ? "total wins and the ranking tiebreak" : "the ranking tiebreak"}.`;
       likeliest = {
         picks: way.picks,
         named,

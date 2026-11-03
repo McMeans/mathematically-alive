@@ -1,8 +1,15 @@
-// Conference championship game participants under the ACC tiebreaker policy
-// (July 2026), plus a plain standings table. Pure: callers supply the winner
-// of every conference game, so a simulator can call this once per iteration.
+// Conference championship game participants under each conference's tiebreaker
+// policy, plus a plain standings table. Pure: callers supply the winner of every
+// unplayed game, so a simulator can call this once per iteration.
+//
+// Policies:
+// - "Big 12": the Big 12 Football Tiebreaking Procedures (2024 season document,
+//   the latest published): head-to-head, common opponents, next highest placed
+//   common opponent, conference strength of schedule, total wins, SportSource
+//   ranking, coin toss.
+// - Every other conference: the ACC tiebreaker policy (July 2026).
 
-import type { Game, Season } from "./season";
+import type { Classification, Game, Season } from "./season";
 
 export type ConferenceStanding = {
   teamId: number;
@@ -28,6 +35,9 @@ export type ConferenceData = {
   /** Conference games between each pair of teams, keyed by pairKey. */
   pairs: Map<number, Game[]>;
   ratings: Map<number, number | null>;
+  /** Every game each team plays, conference or not, for the Big 12's total-wins step. */
+  schedule: Map<number, Game[]>;
+  classes: Map<number, Classification>;
 };
 
 const pairKey = (a: number, b: number): number => (a < b ? a * 4294967296 + b : b * 4294967296 + a);
@@ -42,7 +52,16 @@ export function conferenceData(season: Season, conference: string): ConferenceDa
     if (list) list.push(g);
     else pairs.set(k, [g]);
   }
-  return { ids, games, pairs, ratings: new Map(season.teams.map((t) => [t.id, t.rating])) };
+  const schedule = new Map<number, Game[]>([...ids].map((id) => [id, []]));
+  for (const g of season.games) {
+    schedule.get(g.homeId)?.push(g);
+    schedule.get(g.awayId)?.push(g);
+  }
+  return {
+    ids, games, pairs, schedule,
+    ratings: new Map(season.teams.map((t) => [t.id, t.rating])),
+    classes: new Map(season.teams.map((t) => [t.id, t.classification])),
+  };
 }
 
 function winnerIn(g: Game, winnerOf: (game: Game) => number): number {
@@ -79,7 +98,11 @@ export function conferenceStandings(
     .map(({ teamId, wins, losses, pct }) => ({ teamId, wins, losses, pct }));
 }
 
-/** The two teams that play for the conference title: [seed 1, seed 2]. */
+/**
+ * The two teams that play for the conference title: [seed 1, seed 2]. `winnerOf` gives the winner of every
+ * conference game, played or not; for the Big 12 it is also asked about unplayed non-conference games, which
+ * count toward the total-wins step.
+ */
 export function championshipParticipants(
   season: Season,
   conference: string,
@@ -94,7 +117,10 @@ export function championshipFromData(
   data: ConferenceData,
   conference: string,
   winnerOf: (game: Game) => number,
-  opts: TiebreakOptions,
+  opts: TiebreakOptions & {
+    /** False: skip steps that need non-conference results (the Big 12's total wins), leaving them to `rank`. */
+    allGames?: boolean;
+  },
 ): [number, number] {
   if (data.ids.size < 2) throw new Error(`${conference} has fewer than two teams`);
   const table = rows(data, winnerOf);
@@ -117,8 +143,8 @@ export function championshipFromData(
     return top.length === 1 ? top[0] : top[Math.floor(opts.draw(top.length) * top.length)];
   };
 
-  /** Break a tie among 2+ teams of equal pct: place one team, or eliminate one. */
-  const breakTie = (ids: number[]): { placed?: number; eliminated?: number } => {
+  /** Break a tie among 2+ teams of equal pct under the ACC policy: place one team, or eliminate one. */
+  const accBreak = (ids: number[]): { placed?: number; eliminated?: number } => {
     if (ids.length === 2) {
       const [a, b] = ids;
       const net = h2h(a, b);
@@ -141,7 +167,7 @@ export function championshipFromData(
       const top = best(ids, record);
       // Head-to-head cut the tie down: start over among the teams left (two left go back to the two-team steps).
       if (top.length === 1) return { placed: top[0] };
-      return top.length < ids.length ? breakTie(top) : { placed: pickByRankThenDraw(top) };
+      return top.length < ids.length ? accBreak(top) : { placed: pickByRankThenDraw(top) };
     }
     const beatsAll = ids.filter((a) => ids.every((b) => a === b || h2h(a, b) > 0));
     if (beatsAll.length === 1) return { placed: beatsAll[0] };
@@ -149,6 +175,99 @@ export function championshipFromData(
     if (lostToAll.length === 1) return { eliminated: lostToAll[0] };
     return { placed: pickByRankThenDraw(ids) };
   };
+
+  const big12 = conference === "Big 12";
+  const rowOf = new Map(table.map((r) => [r.teamId, r]));
+  const pctOf = new Map(table.map((r) => [r.teamId, r.pct]));
+  /** Wins and losses of `id` in conference games against `opps`. */
+  const recordVs = (id: number, opps: Iterable<number>): [number, number] => {
+    let w = 0;
+    let l = 0;
+    for (const o of opps) {
+      for (const g of data.pairs.get(pairKey(id, o)) ?? []) {
+        if (winnerIn(g, winnerOf) === id) w++;
+        else l++;
+      }
+    }
+    return [w, l];
+  };
+  const pctVs = (id: number, opps: number[]): number => {
+    const [w, l] = recordVs(id, opps);
+    return w + l === 0 ? 0 : w / (w + l);
+  };
+  /** Strength of conference schedule: combined conference win pct of the team's conference opponents, per game. */
+  const sos = (id: number): number => {
+    let w = 0;
+    let n = 0;
+    for (const o of data.ids) {
+      if (o === id) continue;
+      const times = data.pairs.get(pairKey(id, o))?.length ?? 0;
+      if (times === 0) continue;
+      const r = rowOf.get(o)!;
+      w += times * r.wins;
+      n += times * r.games;
+    }
+    return n === 0 ? 0 : w / n;
+  };
+  /** Wins in the regular season, at most one of them over a team below FBS. */
+  const totalWins = (id: number): number => {
+    let wins = 0;
+    let lower = 0;
+    for (const g of data.schedule.get(id)!) {
+      const w = g.completed ? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId) : winnerIn(g, winnerOf);
+      if (w !== id) continue;
+      const opp = g.homeId === id ? g.awayId : g.homeId;
+      if (data.classes.get(opp) === "fbs") wins++;
+      else if (lower++ === 0) wins++;
+    }
+    return wins;
+  };
+
+  /**
+   * Break a tie among 2+ teams of equal pct under the Big 12 policy: the first step that tells the teams apart
+   * seeds its one best team, or, when several share the best mark, starts over among those (two left go back
+   * to the two-team steps).
+   */
+  const big12Break = (ids: number[]): { placed: number } => {
+    const decide = (score: (id: number) => number): { placed: number } | null => {
+      const top = best(ids, score);
+      if (top.length === ids.length) return null;
+      return top.length === 1 ? { placed: top[0] } : big12Break(top);
+    };
+    // a. Head-to-head: two teams by their games; more only when all played each other (record among them), else a
+    //    team that beat every other one.
+    if (ids.length === 2) {
+      const net = h2h(ids[0], ids[1]);
+      if (net !== 0) return { placed: net > 0 ? ids[0] : ids[1] };
+    } else if (ids.every((a) => ids.every((b) => a === b || played(a, b)))) {
+      const r = decide((id) => pctVs(id, ids.filter((o) => o !== id)));
+      if (r) return r;
+    } else {
+      const beatsAll = ids.filter((a) => ids.every((b) => a === b || h2h(a, b) > 0));
+      if (beatsAll.length === 1) return { placed: beatsAll[0] };
+    }
+    // b. Common conference opponents: those every tied team played.
+    const common = [...data.ids].filter((o) => !ids.includes(o) && ids.every((id) => played(id, o)));
+    const viaCommon = decide((id) => pctVs(id, common));
+    if (viaCommon) return viaCommon;
+    // c. The next highest placed common opponent, down the standings; a group tied there counts as one.
+    for (const level of [...new Set(common.map((o) => pctOf.get(o)!))].sort((a, b) => b - a)) {
+      const group = common.filter((o) => pctOf.get(o) === level);
+      const r = decide((id) => pctVs(id, group));
+      if (r) return r;
+    }
+    // d. Strength of conference schedule.
+    const viaSos = decide(sos);
+    if (viaSos) return viaSos;
+    // e. Total wins, when every game's result is known.
+    if (opts.allGames !== false) {
+      const r = decide(totalWins);
+      if (r) return r;
+    }
+    // f. SportSource ranking, then g. coin toss.
+    return { placed: pickByRankThenDraw(ids) };
+  };
+  const breakTie = (ids: number[]): { placed?: number; eliminated?: number } => (big12 ? big12Break(ids) : accBreak(ids));
 
   /** Order teams of equal pct best-first by repeated tie-breaking. */
   const orderEqual = (ids: number[]): number[] => {
@@ -168,11 +287,11 @@ export function championshipFromData(
     return [...out, ...rest, ...tail];
   };
 
-  /** "Tied Teams": best pct, plus alternate-game-count teams matching wins or losses. */
+  /** "Tied Teams": best pct, plus (ACC) alternate-game-count teams matching wins or losses. */
   const tiedTeams = (cands: Row[]): Row[] => {
     const top = best(cands, (r) => r.pct);
     const topSet = new Set(top);
-    const extra = cands.filter(
+    const extra = big12 ? [] : cands.filter(
       (r) =>
         !topSet.has(r) &&
         top.some((t) => t.games !== r.games && (t.wins === r.wins || t.losses === r.losses)),
