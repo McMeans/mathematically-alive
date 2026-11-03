@@ -213,12 +213,11 @@ export type SeasonWeek = {
    * (it only feeds the ranking used to break a tie).
    * `won` and `score` once it's final, else null.
    * `ifWin`/`ifLose`: the team's playoff odds (EXPERIMENTAL) either way, for display ("36%"); null once it's final.
-   * `note`: shown instead of the odds when the result can't move them, else null.
    * `winChance`: "97% to win"; null once it's final or locked.
    */
   nonConference: {
     gameId: number; opponentId: number; opponent: string; site: "home" | "away" | "neutral"; date: string; won: boolean | null; score: string | null;
-    ifWin: string | null; ifLose: string | null; note: string | null; winChance: string | null;
+    ifWin: string | null; ifLose: string | null; winChance: string | null;
   } | null;
   /**
    * Every game elsewhere that week: locked ones first, then those that matter, then the rest, biggest swing first.
@@ -682,7 +681,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
     w.nonConference = {
       gameId: g.id, opponentId: opp, opponent: name(opp), site: g.neutralSite ? "neutral" : home ? "home" : "away", date: when(g),
       won: final ? mine > theirs : null, score: final ? `${mine}-${theirs}` : null,
-      ifWin, ifLose, note: !final && ifWin !== "—" && ifWin === ifLose ? "Doesn't move playoff odds" : null,
+      ifWin, ifLose,
       winChance: final ? null : winChance(g),
     };
   }

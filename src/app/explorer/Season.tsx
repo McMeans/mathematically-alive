@@ -121,15 +121,12 @@ function Final({ played }: { played: NonNullable<SeasonWeek["played"]> }) {
   );
 }
 
-/**
- * The team's non-conference game that week. Not in the standings, so it can only move the playoff odds:
- * pickable with those odds either way, or a quiet card when the result can't move them.
- */
+/** The team's non-conference game that week: pickable with its playoff odds either way, or the result once it's final. */
 function NonConference({ game, win, lose, onWin, onLose }: {
   game: NonNullable<SeasonWeek["nonConference"]>; win: PickState; lose: PickState; onWin: () => void; onLose: () => void;
 }) {
   const vs = `${game.site === "away" ? "at" : "vs"} ${game.opponent}`;
-  if (!game.score && !game.note && game.ifWin && game.ifLose)
+  if (!game.score)
     return (
       <PickTable vs={vs} winChance={game.winChance} cfp nonConference
         win={{ conf: null, cfp: game.ifWin, state: win, onClick: onWin }} lose={{ conf: null, cfp: game.ifLose, state: lose, onClick: onLose }} />
@@ -137,13 +134,9 @@ function NonConference({ game, win, lose, onWin, onLose }: {
   return (
     <div className="flex flex-col gap-0.5 rounded-lg border border-dashed border-navy/20 px-2 py-1.5">
       <span className="text-[11px] text-ink-muted">
-        {game.score ? "Final · " : `${game.date} · `}{game.site === "away" ? "at" : "vs"} {game.opponent}{!game.score && game.winChance ? ` · ${game.winChance}` : ""}
+        Final · {vs}
       </span>
-      {game.score ? (
-        <span className={`text-sm font-bold ${game.won ? "text-turf" : "text-marker-text"}`}>{game.won ? "Won" : "Lost"} {game.score}</span>
-      ) : (
-        <span className="text-xs text-ink-soft">{game.note ?? `Non-conference: not in the ${CONFERENCE} standings`}</span>
-      )}
+      <span className={`text-sm font-bold ${game.won ? "text-turf" : "text-marker-text"}`}>{game.won ? "Won" : "Lost"} {game.score}</span>
     </div>
   );
 }

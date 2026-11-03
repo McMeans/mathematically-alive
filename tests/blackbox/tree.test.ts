@@ -731,7 +731,7 @@ describe("help from elsewhere", () => {
     // Already played: the result, next to the conference game still to come that week.
     const first = t.weeks.find((w) => w.week === 1)!;
     expect(first.own).not.toBeNull();
-    expect(first.nonConference).toMatchObject({ opponent: "Team6", site: "away", won: true, score: "21-14", ifWin: null, ifLose: null, note: null });
+    expect(first.nonConference).toMatchObject({ opponent: "Team6", site: "away", won: true, score: "21-14", ifWin: null, ifLose: null });
   });
 
   it("a non-conference game shows the playoff odds either way when the result can move them", () => {
@@ -740,18 +740,17 @@ describe("help from elsewhere", () => {
     const idle = Array.from({ length: 12 }, (_, i) => team(100 + i, "Idle"));
     const s2 = { ...s, teams: [...s.teams, team(5, "X"), ...idle], games: [...s.games, next] };
     const nc = explore(s2, { ...base, teamId: 1 }).tree.weeks.find((w) => w.week === other.week)!.nonConference!;
-    expect(nc.note).toBeNull();
     expect(parseFloat(nc.ifWin!)).toBeGreaterThan(parseFloat(nc.ifLose!));
   });
 
-  it("a non-conference game says it can't move the playoff odds when the title is the only way in", () => {
+  it("a non-conference game stays pickable, with equal playoff odds either way, when the title is the only way in", () => {
     const { s, other } = needsHelp();
     const next = game(1, 5, undefined, { conferenceGame: false, week: other.week });
     const strong = Array.from({ length: 11 }, (_, i) => team(100 + i, "Idle", 200));
     const s2 = { ...s, teams: [...s.teams, team(5, "X"), ...strong], games: [...s.games, next] };
     const nc = pathTree(s2, { ...base, teamId: 1 }).weeks.find((w) => w.week === other.week)!.nonConference!;
+    expect(nc.ifWin).toMatch(/%$/);
     expect(nc.ifWin).toBe(nc.ifLose);
-    expect(nc.note).toBe("Doesn't move playoff odds");
   });
 
   it("a locked non-conference game shows the playoff odds for both sides", () => {
