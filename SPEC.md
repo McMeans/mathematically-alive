@@ -144,6 +144,6 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - Ranking is a stand-in for SportSource.
 - Proofs and the likeliest search have budgets. Near the edge they say "open" or return null rather than guess.
 - The app covers the ACC and the Big 12 (`SUPPORTED_CONFERENCES` in `src/app/config.ts`). SEC and Big Ten still need their own tiebreak rules.
-- **Expanding conferences.** Next: SEC, Big Ten and Big 12. Like the ACC, each champion gets an automatic playoff bid, and as power-four teams they have the best at-large odds, so today's model and UI carry over.
+- **Expanding conferences.** Next: SEC and Big Ten. Like the ACC and Big 12, each champion gets an automatic playoff bid, and as power-four teams they have the best at-large odds, so today's model and UI carry over.
 - **Group of Six, later.** The 2026 format guarantees a spot only to the highest-ranked Group of Six conference champion, not to every champion. Winning the conference isn't enough on its own, and at-large bids are rare but have happened. Before adding a G6 conference, the playoff model needs that rule (champion and ranked above every other G6 champion), and the UI needs wording for it ("Must win the conference and be the top G6 champion", or similar, rather than "Must win ACC").
 - A future MCP server is planned on top of `src/core`.
