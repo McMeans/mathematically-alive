@@ -178,8 +178,8 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
                 onClick={() => setSheet(!sheet)}
                 className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-lg bg-mist px-3 text-left text-sm font-bold transition-colors hover:bg-navy/10"
               >
-                <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: team.color ?? NAVY }} />
-                <span className="flex-1">
+                <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: team.color ?? NAVY }} />
+                <span className="min-w-0 flex-1 truncate">
                   {team.name} <span className="font-normal text-ink-soft">· {me.record.wins}-{me.record.losses} ({me.record.conferenceWins}-{me.record.conferenceLosses} ACC)</span>
                 </span>
                 <span className="hidden text-xs font-normal text-ink-muted sm:inline">Change team</span>
@@ -209,7 +209,6 @@ export function Explorer({ teamId, teams, names, asOf, initial }: Props) {
             <StatTiles outlook={me} ifWinOut={path.ifWinOut} compact condensed={condensed} />
           </div>
         </div>
-
       </div>
 
       {/* On desktop the page is one screen tall and each column scrolls on its own. */}
