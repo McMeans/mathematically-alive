@@ -119,6 +119,8 @@ export type IterationTeams = {
   shift(teamId: number): number;
   /** Season-end ranking stand-in for the tiebreaker's ranking step; higher is better. */
   rank(teamId: number): number;
+  /** `rank` as if the game at index `flip` into `season.games` had gone the other way. */
+  rankIf(teamId: number, flip: number): number;
 };
 
 /** Simulate the season `iterations` times. Deterministic for a given seed. */
@@ -233,14 +235,16 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
     return t;
   };
   const shiftAt = (t: number): number => SHOCK_SD * normalAt(seed, current, SHIFT_SALT + t);
+  const rankAt = (id: number, flip: number): number => {
+    const t = indexOf(id);
+    let net = 0;
+    for (const i of gamesOf[t]) net += ((homeWonAt(i) !== (i === flip)) === (homeIdx[i] === t)) ? 1 : -1;
+    return rating[t] + shiftAt(t) + RANK_PER_NET_WIN * net + RANK_SD * normalAt(seed, current, RANK_SALT + t);
+  };
   const teamsNow: IterationTeams = {
     shift: (id) => shiftAt(indexOf(id)),
-    rank(id) {
-      const t = indexOf(id);
-      let net = 0;
-      for (const i of gamesOf[t]) net += (homeWonAt(i) === (homeIdx[i] === t)) ? 1 : -1;
-      return rating[t] + shiftAt(t) + RANK_PER_NET_WIN * net + RANK_SD * normalAt(seed, current, RANK_SALT + t);
-    },
+    rank: (id) => rankAt(id, -1),
+    rankIf: rankAt,
   };
   return {
     iterations,

@@ -195,12 +195,13 @@ export type SeasonWeek = {
     opponentId: number;
     opponent: string;
     site: "home" | "away" | "neutral";
-    oddsIfWin: number | null;
-    oddsIfLose: number | null;
-    /** For display: "In", "Out", "12%", "0.4%", or "—" when too few simulated seasons go that way. A locked game's other side is worked out by itself. */
+    /** Title-game odds as if that result were picked: the same simulated seasons with only this game changed. */
+    oddsIfWin: number;
+    oddsIfLose: number;
+    /** For display: "In", "Out", "12%" or "0.4%"; what picking that result would show. */
     ifWin: string;
     ifLose: string;
-    /** The team's playoff odds (EXPERIMENTAL) either way ("41%"); null when it must win the conference (`mustWinConference`), so only the title matters. */
+    /** The team's playoff odds (EXPERIMENTAL) as if that result were picked ("41%"); null when it must win the conference (`mustWinConference`), so only the title matters. */
     cfpIfWin: string | null;
     cfpIfLose: string | null;
     /** "58% to win"; null once the game is locked. */
@@ -212,7 +213,7 @@ export type SeasonWeek = {
    * The team's non-conference game that week: on the schedule, but not in the conference standings
    * (it only feeds the ranking used to break a tie).
    * `won` and `score` once it's final, else null.
-   * `ifWin`/`ifLose`: the team's playoff odds (EXPERIMENTAL) either way, for display ("36%"); null once it's final.
+   * `ifWin`/`ifLose`: the team's playoff odds (EXPERIMENTAL) as if that result were picked, for display ("36%"); null once it's final.
    * `winChance`: "97% to win"; null once it's final or locked.
    */
   nonConference: {
@@ -263,8 +264,6 @@ const MAX_DEPTH = 12;
 // Odds for the other side of a locked game: a small simulation each, for at most this many games per call.
 const SWAP_ITERATIONS = 2_000;
 const MAX_SWAP_SIMS = 12;
-// The same for a locked game's other-side playoff odds, counted apart so they never starve the title odds.
-const MAX_PLAYOFF_SIMS = 12;
 // Seasons simulated to put a chance on the ranking tiebreak a likeliest way in needs.
 const TIEBREAK_ITERATIONS = 2_000;
 // How much likelier a way through the ranking tiebreak has to be than a sure way to be shown instead.
@@ -561,7 +560,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
   }
 
   // The season week by week: the team's own game with its odds either way, and the games elsewhere that matter.
-  // A locked game's other side: the sample can't say (every season has the lock), so prove it, else run a small simulation.
+  // A locked game elsewhere: its other side can't come from the sample (every season has the lock), so prove it, else run a small simulation.
   let swapSims = 0;
   const swapped = (gameId: number, winner: number): string => {
     const swap = { ...opts.locks, [gameId]: winner };
@@ -595,48 +594,28 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
     if (!w) byWeek.set(g.week, (w = { week: g.week, label: when(g), own: null, played: null, nonConference: null, games: [], quiet: 0 }));
     return w;
   };
-  // Playoff odds by each of the team's own results, and its chance to win each game.
+  // Title-game and playoff odds as if each of the team's own results were picked, and its chance to win each game.
   const me = (outlook ?? seasonOutlook(season, opts, sim).teams).find((o) => o.teamId === teamId)!;
-  const playoffById = new Map(me.games.map((x) => [x.gameId, x]));
+  const ifPicked = new Map(me.games.map((x) => [x.gameId, x]));
   // Playoff odds are never proven, so they never show a flat 0% or 100%, whatever the title-game status.
   const playoffOdds = (p: number) => formatSideOdds(p, "alive");
-  let playoffSims = 0;
   const winChance = (g: Game): string | null => {
     if (opts.locks?.[g.id] !== undefined) return null;
     const pHome = gameWinProbability(season, g);
     return `${formatOdds(g.homeId === teamId ? pHome : 1 - pHome)} to win`;
   };
-  const playoffIf = (gameId: number, winner: number, odds: number | null): string => {
-    const locked = opts.locks?.[gameId];
-    // Never in at large: only the title gets it in, which this game can't change.
-    if (locked === winner || (locked !== undefined && me.atLarge === 0)) return playoffOdds(me.playoff);
-    if (locked === undefined) return odds === null ? "—" : playoffOdds(odds);
-    if (playoffSims++ >= MAX_PLAYOFF_SIMS) return "—";
-    const swap = { ...opts.locks, [gameId]: winner };
-    const n = Math.min(SWAP_ITERATIONS, iterations);
-    const o = seasonOutlook(season, { conference, iterations: n, seed, locks: swap }).teams.find((t) => t.teamId === teamId)!;
-    return playoffOdds(o.playoff);
-  };
-  levels.forEach(({ g }, k) => {
+  levels.forEach(({ g }) => {
     const w = weekOf(g);
     const opp = g.homeId === teamId ? g.awayId : g.homeId;
-    const bit = 1 << (depth - 1 - k);
-    let winN = 0, winIn = 0, loseN = 0, loseIn = 0;
-    for (let b = 0; b < size; b++) {
-      if (b & bit) { loseN += count[b]; loseIn += inTitle[b]; }
-      else { winN += count[b]; winIn += inTitle[b]; }
-    }
-    const oddsIfWin = winN >= minSample ? winIn / winN : null;
-    const oddsIfLose = loseN >= minSample ? loseIn / loseN : null;
-    const lockedTo = opts.locks?.[g.id];
+    const f = ifPicked.get(g.id)!;
     w.label = when(g);
     w.own = {
       gameId: g.id, opponentId: opp, opponent: name(opp), site: g.neutralSite ? "neutral" : g.homeId === teamId ? "home" : "away",
-      oddsIfWin, oddsIfLose,
-      ifWin: lockedTo === opp ? swapped(g.id, teamId) : verdict(oddsIfWin, g.id, teamId),
-      ifLose: lockedTo === teamId ? swapped(g.id, opp) : verdict(oddsIfLose, g.id, opp),
-      cfpIfWin: mustWinConference(me) ? null : playoffIf(g.id, teamId, playoffById.get(g.id)?.ifWin ?? null),
-      cfpIfLose: mustWinConference(me) ? null : playoffIf(g.id, opp, playoffById.get(g.id)?.ifLose ?? null),
+      oddsIfWin: f.titleIfWin, oddsIfLose: f.titleIfLose,
+      ifWin: verdict(f.titleIfWin, g.id, teamId),
+      ifLose: verdict(f.titleIfLose, g.id, opp),
+      cfpIfWin: mustWinConference(me) ? null : playoffOdds(f.playoffIfWin),
+      cfpIfLose: mustWinConference(me) ? null : playoffOdds(f.playoffIfLose),
       winChance: winChance(g),
     };
   });
@@ -681,9 +660,9 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
     const final = g.completed && mine != null && theirs != null;
     if (!w.own && !w.played) w.label = when(g);
     const opp = home ? g.awayId : g.homeId;
-    const p = playoffById.get(g.id);
-    const ifWin = final ? null : playoffIf(g.id, teamId, p?.ifWin ?? null);
-    const ifLose = final ? null : playoffIf(g.id, opp, p?.ifLose ?? null);
+    const f = ifPicked.get(g.id);
+    const ifWin = f ? playoffOdds(f.playoffIfWin) : null;
+    const ifLose = f ? playoffOdds(f.playoffIfLose) : null;
     w.nonConference = {
       gameId: g.id, opponentId: opp, opponent: name(opp), site: g.neutralSite ? "neutral" : home ? "home" : "away", date: when(g),
       won: final ? mine > theirs : null, score: final ? `${mine}-${theirs}` : null,

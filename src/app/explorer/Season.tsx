@@ -78,7 +78,7 @@ function Week({ w, base, teamId, locks, likely, onPick }: { w: SeasonWeek; base:
           lose={{ conf: own.ifLose, cfp: own.cfpIfLose, state: state(own.gameId, own.opponentId), onClick: () => onPick(own.gameId, own.opponentId) }}
         />
       ) : w.played || w.nonConference ? null : (
-        <span className="rounded-lg border border-dashed border-navy/20 px-2 py-2 text-xs text-ink-muted">No game this week</span>
+        <span className={`flex items-center justify-center rounded-lg border border-dashed border-navy/20 px-2 text-xs text-ink-muted ${CARD_H}`}>No game this week</span>
       )}
       {w.played && <Final played={w.played} />}
       {w.nonConference && (
@@ -109,13 +109,26 @@ function Week({ w, base, teamId, locks, likely, onPick }: { w: SeasonWeek; base:
   );
 }
 
+// Every card in a week's first slot is the height of the Win/Lose table, so the weeks line up.
+const CARD_H = "h-[7.5rem]";
+
 /** The team's game this week that's already final. */
 function Final({ played }: { played: NonNullable<SeasonWeek["played"]> }) {
+  return <FinalCard vs={`${played.site === "away" ? "at" : "vs"} ${played.opponent}`} won={played.won} score={played.score} />;
+}
+
+/** A final result, laid out like the Win/Lose table: opponent top left, the result in the middle, the Non-con tag bottom left. */
+function FinalCard({ vs, won, score, nonConference }: { vs: string; won: boolean; score: string; nonConference?: boolean }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-lg border border-navy/15 bg-white px-2 py-1.5">
-      <span className="text-[11px] text-ink-muted">Final · {played.site === "away" ? "at" : "vs"} {played.opponent}</span>
-      <span className={`text-sm font-bold ${played.won ? "text-turf" : "text-marker-text"}`}>
-        {played.won ? "Won" : "Lost"} {played.score}
+    <div className={`flex flex-col justify-between rounded-lg border border-navy/15 bg-white p-1.5 ${CARD_H}`}>
+      <span className="flex h-4 items-center justify-between gap-1 px-0.5 text-[11px] text-ink-muted">
+        <span className="truncate">{vs}</span><span className="shrink-0">Final</span>
+      </span>
+      <span className={`px-0.5 font-display text-xl font-bold ${won ? "text-turf" : "text-marker-text"}`}>
+        {won ? "Won" : "Lost"} {score}
+      </span>
+      <span className="flex h-4 items-center px-0.5">
+        {nonConference && <span className="whitespace-nowrap rounded border border-navy/20 px-1 text-[10px] leading-4 text-ink-muted">{LABELS.nonConference}</span>}
       </span>
     </div>
   );
@@ -131,14 +144,7 @@ function NonConference({ game, win, lose, onWin, onLose }: {
       <PickTable vs={vs} winChance={game.winChance} cfp nonConference
         win={{ conf: null, cfp: game.ifWin, state: win, onClick: onWin }} lose={{ conf: null, cfp: game.ifLose, state: lose, onClick: onLose }} />
     );
-  return (
-    <div className="flex flex-col gap-0.5 rounded-lg border border-dashed border-navy/20 px-2 py-1.5">
-      <span className="text-[11px] text-ink-muted">
-        Final · {vs}
-      </span>
-      <span className={`text-sm font-bold ${game.won ? "text-turf" : "text-marker-text"}`}>{game.won ? "Won" : "Lost"} {game.score}</span>
-    </div>
-  );
+  return <FinalCard vs={vs} won={game.won!} score={game.score} nonConference />;
 }
 
 /**
@@ -176,7 +182,7 @@ function PickTable({ vs, winChance, cfp, nonConference, win, lose }: {
     );
   };
   return (
-    <div role="group" aria-label={nonConference ? `${vs}, non-conference` : vs} className="flex flex-col gap-1 rounded-lg bg-navy p-1.5">
+    <div role="group" aria-label={nonConference ? `${vs}, non-conference` : vs} className={`flex flex-col gap-1 rounded-lg bg-navy p-1.5 ${CARD_H}`}>
       <span className={`grid h-4 items-center pl-0.5 pr-2 text-[10px] text-white/60 ${cols}`}>
         <span className="truncate text-[11px] text-white/75">{vs}</span>
         <span className="text-right">{LABELS.conference}</span>

@@ -59,7 +59,7 @@ For each conference team, `seasonOutlook` gives:
 - `status`: clinched, eliminated or alive, from the proof;
 - `playoff`: **experimental**, not the committee. The conference champion always gets in. Any other FBS team gets in when it ranks in the top 11 by `wins − 1.5·losses + rating/10`.
 - `atLarge`: the share of seasons it gets in without winning the conference. 0 means it must win the conference (`mustWinConference`), and the app shows "Must win ACC" instead of a playoff percentage.
-- `games`: playoff odds by the result of each of its unplayed games.
+- `games` (only for `OutlookOptions.teamId`): its title-game and playoff odds if it wins or loses each unplayed game. Each simulated season is replayed with only that game flipped (the title race rerun, ranking included), so the numbers equal what picking that result shows. A lock changes only its own game's draw, which is what makes this exact. Splitting the seasons by how the game went instead would be biased: seasons where a team loses lean toward seasons it drew a weak rating, so it also loses more of its other games.
 
 ### Proofs (`proof.ts`)
 
@@ -113,7 +113,7 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - Panels:
   - Team list with odds.
   - Stat tiles: title game, title, playoff and if-win-out.
-  - The season by week. Own-game buttons and elsewhere chips can be clicked to lock a result. Each own game (conference or not) is a small table: Win and Lose rows under ACC and CFP columns, the chance to win, and a "Non-con" tag on non-conference games. Non-conference games show "—" for ACC, since they can't move the title race. For a team that must win the conference, conference cards drop the CFP column. Its non-conference cards keep it (the same odds either way) so they stay pickable and a pick on them stays visible.
+  - The season by week. Own-game buttons and elsewhere chips can be clicked to lock a result. Each own game (conference or not) is a small table: Win and Lose rows under ACC and CFP columns, the chance to win, and a "Non-con" tag on non-conference games. Each number is what picking that result would show (see `games` above). Non-conference games show "—" for ACC; they move the title race only slightly, through the ranking tiebreak. For a team that must win the conference, conference cards drop the CFP column. Its non-conference cards keep it so they stay pickable and a pick on them stays visible. Final results, byes and the tables are all the same height, so the weeks line up.
   - The race table.
   - The likeliest way in card.
 - **Brand:** see `CLAUDE.md`. Space Grotesk and Inter; navy, turf, marker and mist colors; light-only.

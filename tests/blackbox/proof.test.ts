@@ -84,7 +84,7 @@ describe("proven clinch and elimination", () => {
     const r = explore(s, { ...o, teamId: 3 });
     expect(r.path).toEqual(teamPath(s, { ...o, teamId: 3 }));
     expect(r.tree).toEqual(pathTree(s, { ...o, teamId: 3 }));
-    expect(r.outlook).toEqual(seasonOutlook(s, o).teams);
+    expect(r.outlook).toEqual(seasonOutlook(s, { ...o, teamId: 3 }).teams);
   });
 });
 

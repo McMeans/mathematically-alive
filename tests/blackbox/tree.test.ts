@@ -657,9 +657,10 @@ describe("help from elsewhere", () => {
     const t = pathTree(s, { ...base, teamId: 1 });
     expect(t.weeks.map((w) => [w.week, w.label])).toEqual([[1, "Nov 7"], [2, "Nov 14"]]);
     const [first, second] = t.weeks;
-    const [win, loss] = t.root.children;
-    expect(first.own).toMatchObject({ gameId: upset.id, opponent: "Team2", site: "home", oddsIfWin: win.odds, oddsIfLose: loss.odds });
-    expect(first.own!.ifWin).toBe(formatFine(win.odds!));
+    // The odds on each side are what picking that result shows.
+    const pick = (winner: number) => seasonOutlook(s, { ...base, locks: { [upset.id]: winner } }).teams.find((o) => o.teamId === 1)!.titleGame;
+    expect(first.own).toMatchObject({ gameId: upset.id, opponent: "Team2", site: "home", oddsIfWin: pick(1), oddsIfLose: pick(2) });
+    expect(first.own!.ifWin).toBe(formatFine(pick(1)));
     expect(first.games).toEqual([]);
     expect(second.own).toBeNull();
     const h = t.help.find((x) => x.gameId === other.id)!;
@@ -743,8 +744,8 @@ describe("help from elsewhere", () => {
     const r = explore(s2, { ...base, teamId: 1 });
     const nc = r.tree.weeks.find((w) => w.week === other.week)!.nonConference!;
     const odds = r.outlook.find((o) => o.teamId === 1)!.games.find((x) => x.gameId === next.id)!;
-    expect(odds.ifWin!).toBeGreaterThan(odds.ifLose!);
-    expect([nc.ifWin, nc.ifLose]).toEqual([formatFine(odds.ifWin!), formatFine(odds.ifLose!)]);
+    expect(odds.playoffIfWin).toBeGreaterThan(odds.playoffIfLose);
+    expect([nc.ifWin, nc.ifLose]).toEqual([formatFine(odds.playoffIfWin), formatFine(odds.playoffIfLose)]);
   });
 
   it("a non-conference game stays pickable, with equal playoff odds either way, when the title is the only way in", () => {
