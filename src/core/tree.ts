@@ -263,6 +263,8 @@ const MAX_DEPTH = 12;
 // Odds for the other side of a locked game: a small simulation each, for at most this many games per call.
 const SWAP_ITERATIONS = 2_000;
 const MAX_SWAP_SIMS = 12;
+// The same for a locked game's other-side playoff odds, counted apart so they never starve the title odds.
+const MAX_PLAYOFF_SIMS = 12;
 // Seasons simulated to put a chance on the ranking tiebreak a likeliest way in needs.
 const TIEBREAK_ITERATIONS = 2_000;
 // How much likelier a way through the ranking tiebreak has to be than a sure way to be shown instead.
@@ -282,8 +284,10 @@ const plural = (n: number, one: string, many: string): string => `${n} ${n === 1
 type Step = { opp: string; win: boolean };
 type Peak = Omit<NonNullable<HelpGame["scenario"]>, "line">;
 
-/** `shared`: a simulation of the same season, iterations, seed and locks to reuse. */
-/** `outlook`: the conference's outlook from the same simulation, to reuse. */
+/**
+ * `shared`: a simulation of the same season, iterations, seed and locks to reuse.
+ * `outlook`: the conference's outlook from that same simulation, to reuse.
+ */
 export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, outlook?: TeamOutlook[]): PathTree {
   const { conference, teamId, iterations, seed } = opts;
   const data = conferenceData(season, conference);
@@ -594,7 +598,9 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
   // Playoff odds by each of the team's own results, and its chance to win each game.
   const me = (outlook ?? seasonOutlook(season, opts, sim).teams).find((o) => o.teamId === teamId)!;
   const playoffById = new Map(me.games.map((x) => [x.gameId, x]));
-  const status = statusOf(root.outcome);
+  // Playoff odds are never proven, so they never show a flat 0% or 100%, whatever the title-game status.
+  const playoffOdds = (p: number) => formatSideOdds(p, "alive");
+  let playoffSims = 0;
   const winChance = (g: Game): string | null => {
     if (opts.locks?.[g.id] !== undefined) return null;
     const pHome = gameWinProbability(season, g);
@@ -603,13 +609,13 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
   const playoffIf = (gameId: number, winner: number, odds: number | null): string => {
     const locked = opts.locks?.[gameId];
     // Never in at large: only the title gets it in, which this game can't change.
-    if (locked === winner || (locked !== undefined && me.atLarge === 0)) return formatSideOdds(me.playoff, status);
-    if (locked === undefined) return odds === null ? "—" : formatSideOdds(odds, status);
-    if (swapSims++ >= MAX_SWAP_SIMS) return "—";
+    if (locked === winner || (locked !== undefined && me.atLarge === 0)) return playoffOdds(me.playoff);
+    if (locked === undefined) return odds === null ? "—" : playoffOdds(odds);
+    if (playoffSims++ >= MAX_PLAYOFF_SIMS) return "—";
     const swap = { ...opts.locks, [gameId]: winner };
     const n = Math.min(SWAP_ITERATIONS, iterations);
     const o = seasonOutlook(season, { conference, iterations: n, seed, locks: swap }).teams.find((t) => t.teamId === teamId)!;
-    return formatSideOdds(o.playoff, status);
+    return playoffOdds(o.playoff);
   };
   levels.forEach(({ g }, k) => {
     const w = weekOf(g);

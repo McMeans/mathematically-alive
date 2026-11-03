@@ -30,7 +30,8 @@ export type TeamOutlook = {
   atLarge: number;
   /**
    * Playoff odds by the result of each of the team's unplayed games (conference or not), in schedule order.
-   * Null when too few simulated seasons go that way (always so for a locked game's other side).
+   * Null when too few simulated seasons go that way (always so for a locked game's other side), except for
+   * a non-conference game of a team that never gets in at large: its playoff odds either way.
    */
   games: { gameId: number; ifWin: number | null; ifLose: number | null }[];
   /** Proven over every combination of remaining results: "clinched" / "eliminated" a title-game spot, else "alive". */
@@ -182,8 +183,8 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
         const all = (fbsIndex.has(id) ? playoff[fbsIndex.get(id)!] : (outside.get(id) ?? 0)) / n;
         return {
           gameId: season.games[t.i].id,
-          ifWin: t.winN >= MIN_SAMPLE ? (only ? all : t.winIn / t.winN) : null,
-          ifLose: t.loseN >= MIN_SAMPLE ? (only ? all : t.loseIn / t.loseN) : null,
+          ifWin: only ? all : t.winN >= MIN_SAMPLE ? t.winIn / t.winN : null,
+          ifLose: only ? all : t.loseN >= MIN_SAMPLE ? t.loseIn / t.loseN : null,
         };
       }),
       status: statusOf(titleGame.get(id)! / n, id),

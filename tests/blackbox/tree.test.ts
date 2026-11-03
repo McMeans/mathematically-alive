@@ -754,6 +754,19 @@ describe("help from elsewhere", () => {
     expect(nc.ifWin).toBe(nc.ifLose);
   });
 
+  it("a team that has clinched the title game never shows a flat 100% playoff chance", () => {
+    nextId = 0;
+    // Team 1 is in; with fewer teams than playoff spots, it makes the playoff in every simulated season.
+    const s = season([game(1, 3, 1), game(1, 4, 1), game(2, 3, 2), game(2, 4, 2), game(1, 2), game(3, 4)]);
+    s.teams.push(team(9, "Other"));
+    const nc = game(9, 1, undefined, { conferenceGame: false });
+    s.games.push(nc);
+    const t = pathTree(s, { ...base, teamId: 1 });
+    expect(t.root.outcome).toBe("in");
+    const week = t.weeks.find((w) => w.nonConference?.gameId === nc.id)!.nonConference!;
+    expect(week.ifWin).toBe(">99%");
+  });
+
   it("a locked non-conference game shows the playoff odds for both sides", () => {
     const { s, other } = needsHelp();
     const next = game(1, 5, undefined, { conferenceGame: false, week: other.week });
