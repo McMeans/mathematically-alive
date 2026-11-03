@@ -1,11 +1,10 @@
 "use client";
 import { useState } from "react";
-import { formatRecord, formatSideOdds, formatTitleOdds, oddsLabels, type Impact, type SeasonWeek, type TeamOutlook } from "@/core";
-import { CONFERENCE } from "@/app/config";
+import { formatRecord, formatSideOdds, formatTitleOdds, type Impact, type SeasonWeek, type TeamOutlook } from "@/core";
 import type { Locks, TeamInfo } from "./Explorer";
 import { Beta, playoffText } from "./Panels";
+import { useConference } from "./conference";
 
-const LABELS = oddsLabels(CONFERENCE);
 type PickState = "picked" | "likely" | "open";
 
 const label = "text-[11px] font-semibold uppercase tracking-wide text-ink-muted";
@@ -119,6 +118,7 @@ function Final({ played }: { played: NonNullable<SeasonWeek["played"]> }) {
 
 /** A final result, laid out like the Win/Lose table: opponent top left, the result in the middle, the Non-con tag bottom left. */
 function FinalCard({ vs, won, score, nonConference }: { vs: string; won: boolean; score: string; nonConference?: boolean }) {
+  const { labels } = useConference();
   return (
     <div className={`flex flex-col justify-between rounded-lg border border-navy/15 bg-white p-1.5 ${CARD_H}`}>
       <span className="flex h-4 items-center justify-between gap-1 px-0.5 text-[11px] text-ink-muted">
@@ -128,7 +128,7 @@ function FinalCard({ vs, won, score, nonConference }: { vs: string; won: boolean
         {won ? "Won" : "Lost"} {score}
       </span>
       <span className="flex h-4 items-center px-0.5">
-        {nonConference && <span className="whitespace-nowrap rounded border border-navy/20 px-1 text-[10px] leading-4 text-ink-muted">{LABELS.nonConference}</span>}
+        {nonConference && <span className="whitespace-nowrap rounded border border-navy/20 px-1 text-[10px] leading-4 text-ink-muted">{labels.nonConference}</span>}
       </span>
     </div>
   );
@@ -164,15 +164,16 @@ const darkTone = (odds: string) => (odds === "In" ? "font-bold text-[#8FE3B4]" :
 
 type PickRow = { conf: string | null; cfp: string | null; state: PickState; onClick: () => void };
 
-// Win and Lose rows under ACC and CFP columns, the same shape for every game so the weeks line up.
+// Win and Lose rows under conference and CFP columns, the same shape for every game so the weeks line up.
 // `conf` null: a non-conference game, which can't move the title odds ("—"). `cfp` false: no CFP column.
 function PickTable({ vs, winChance, cfp, nonConference, win, lose }: {
   vs: string; winChance: string | null; cfp: boolean; nonConference?: boolean; win: PickRow; lose: PickRow;
 }) {
+  const { labels } = useConference();
   const cols = cfp ? "grid-cols-[1fr_2.75rem_2.75rem]" : "grid-cols-[1fr_2.75rem]";
   const row = (text: string, r: PickRow) => {
     const look = r.state === "picked" ? "bg-turf text-white" : r.state === "likely" ? "bg-white/10 text-white outline-dashed outline-1 -outline-offset-2 outline-white/60 hover:bg-white/20" : "bg-white/10 text-white hover:bg-white/20";
-    const label = [r.conf && `${LABELS.conference} ${r.conf}`, r.cfp && `${LABELS.cfp} ${r.cfp}`].filter(Boolean).join(", ");
+    const label = [r.conf && `${labels.conference} ${r.conf}`, r.cfp && `${labels.cfp} ${r.cfp}`].filter(Boolean).join(", ");
     return (
       <button type="button" aria-label={`${text}: ${label}`} aria-pressed={r.state === "picked"} onClick={r.onClick} className={`press grid h-8 items-center rounded-md px-2 text-xs ${cols} ${look}`}>
         <span className="text-left font-bold">{text}</span>
@@ -185,13 +186,13 @@ function PickTable({ vs, winChance, cfp, nonConference, win, lose }: {
     <div role="group" aria-label={nonConference ? `${vs}, non-conference` : vs} className={`flex flex-col gap-1 rounded-lg bg-navy p-1.5 ${CARD_H}`}>
       <span className={`grid h-4 items-center pl-0.5 pr-2 text-[10px] text-white/60 ${cols}`}>
         <span className="truncate text-[11px] text-white/75">{vs}</span>
-        <span className="text-right">{LABELS.conference}</span>
-        {cfp && <span className="text-right">{LABELS.cfp}</span>}
+        <span className="text-right">{labels.conference}</span>
+        {cfp && <span className="text-right">{labels.cfp}</span>}
       </span>
       {row("Win", win)}
       {row("Lose", lose)}
       <span className="flex h-4 items-center justify-between gap-1 px-0.5 text-[11px] text-white/75">
-        <span>{nonConference && <span className="whitespace-nowrap rounded border border-white/40 px-1 text-[10px] leading-4">{LABELS.nonConference}</span>}</span>
+        <span>{nonConference && <span className="whitespace-nowrap rounded border border-white/40 px-1 text-[10px] leading-4">{labels.nonConference}</span>}</span>
         {winChance && <span className="shrink-0">{winChance}</span>}
       </span>
     </div>
@@ -247,6 +248,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
   onPick: PickFn;
   onReset: () => void;
 }) {
+  const { conference, labels } = useConference();
   // Every pick is in some week: the team's own game (conference or not) or a locked game elsewhere.
   const picks = weeks.flatMap((w) => {
     const out: { id: number; what: string; when: string }[] = [];
@@ -278,7 +280,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
           <div>
             <h2 className="font-display text-2xl font-bold">{team.name}</h2>
             <p className="text-sm text-ink-soft">
-              {formatRecord(me.record, CONFERENCE)}{has && " with your picks"}
+              {formatRecord(me.record, conference)}{has && " with your picks"}
             </p>
           </div>
           {has && (
@@ -291,14 +293,14 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
         <section className="flex flex-col gap-3 rounded-xl bg-mist p-4">
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-xs text-ink-muted">{has ? `${LABELS.titleGame}, with your picks` : LABELS.titleGame}</p>
+              <p className="text-xs text-ink-muted">{has ? `${labels.titleGame}, with your picks` : labels.titleGame}</p>
               <p key={verdict} className={`animate-rise font-display text-5xl font-bold leading-none ${me.titleGame >= 0.5 || me.status === "clinched" ? "text-turf" : "text-marker-text"}`}>{verdict}</p>
             </div>
             {has && <p className="text-xs text-ink-muted">Today {titleOdds(today)}</p>}
           </div>
           <div className="flex flex-col gap-1 border-t border-navy/10 pt-2 text-sm text-ink-soft">
-            <p className="flex justify-between">{LABELS.champion}<span className="font-bold text-navy">{sideOdds(me.champion, me)}</span></p>
-            <p className="flex justify-between"><span className="flex items-center gap-1">{LABELS.playoff}<Beta /></span><span className="font-bold text-navy">{playoffText(me, sideOdds(me.playoff, me))}</span></p>
+            <p className="flex justify-between">{labels.champion}<span className="font-bold text-navy">{sideOdds(me.champion, me)}</span></p>
+            <p className="flex justify-between"><span className="flex items-center gap-1">{labels.playoff}<Beta /></span><span className="font-bold text-navy">{playoffText(me, sideOdds(me.playoff, me), labels)}</span></p>
           </div>
         </section>
       </div>
@@ -342,10 +344,11 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
 }
 
 function RaceRow({ o, name, me }: { o: TeamOutlook; name: string; me: boolean }) {
+  const { labels } = useConference();
   return (
     <div className={`flex items-center gap-2 rounded-md px-1.5 py-1 ${me ? "bg-mist" : ""}`}>
       <span className="w-28 truncate text-sm font-semibold">{name}</span>
-      <span className="w-8 text-xs text-ink-muted" title={LABELS.conferenceRecord}>{o.record.conferenceWins}-{o.record.conferenceLosses}</span>
+      <span className="w-8 text-xs text-ink-muted" title={labels.conferenceRecord}>{o.record.conferenceWins}-{o.record.conferenceLosses}</span>
       <span className="h-1.5 flex-1 rounded-full bg-navy/10">
         <span className={`block h-1.5 rounded-full transition-[width] duration-500 ease-out ${me ? "bg-marker" : "bg-navy"}`} style={{ width: `${Math.max(3, Math.round(o.titleGame * 100))}%` }} />
       </span>

@@ -1,11 +1,9 @@
 "use client";
 import Link from "next/link";
 import { useId, useState } from "react";
-import { formatChance, formatRecord, mustWinConference, oddsLabels, type TeamOutlook, type TeamPath } from "@/core";
-import { CONFERENCE } from "@/app/config";
+import { formatChance, formatRecord, mustWinConference, type OddsLabels, type TeamOutlook, type TeamPath } from "@/core";
 import { NAVY, pct, type GameInfo, type TeamInfo } from "./Explorer";
-
-const LABELS = oddsLabels(CONFERENCE);
+import { useConference } from "./conference";
 
 /** White or navy text, whichever reads better on the team color (WCAG relative luminance). */
 function inkOn(hex: string): string {
@@ -25,6 +23,7 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
   /** Called on a plain click, before navigation, so the row can switch at once. */
   onSelect?: (id: number) => void;
 }) {
+  const { conference } = useConference();
   const [q, setQ] = useState("");
   // Rendered twice (desktop column and phone sheet), so the label needs a per-copy id.
   const searchId = useId();
@@ -78,7 +77,7 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate leading-5">{t.name}</span>
                   <span className={`block text-[11px] leading-4 tabular-nums ${selected ? "font-normal" : "text-ink-muted"}`}>
-                    {formatRecord(o.record, CONFERENCE)}
+                    {formatRecord(o.record, conference)}
                   </span>
                 </span>
                 <span className={`w-10 text-right tabular-nums ${o.status === "eliminated" && !selected ? "font-normal text-ink-muted" : ""}`}>
@@ -95,11 +94,12 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
 }
 
 export function Beta() {
-  return <span className="rounded border border-marker-text px-1 text-[10px] font-bold leading-4 text-marker-text">{LABELS.beta}</span>;
+  const { labels } = useConference();
+  return <span className="rounded border border-marker-text px-1 text-[10px] font-bold leading-4 text-marker-text">{labels.beta}</span>;
 }
 
-/** The playoff odds, or "Must win ACC" when the team only gets in as champion (then they'd just repeat the Win ACC odds). */
-export const playoffText = (o: TeamOutlook, odds: string) => (mustWinConference(o) ? LABELS.mustWin : odds);
+/** The playoff odds, or "Must win <conference>" when the team only gets in as champion (then they'd just repeat the Win <conference> odds). */
+export const playoffText = (o: TeamOutlook, odds: string, labels: OddsLabels) => (mustWinConference(o) ? labels.mustWin : odds);
 
 function Tile({ label, value, tone, badge, small }: { label: string; value: string; tone: string; badge?: boolean; small?: boolean }) {
   return (
@@ -114,11 +114,12 @@ function Tile({ label, value, tone, badge, small }: { label: string; value: stri
 }
 
 export function StatTiles({ outlook, ifWinOut, compact, condensed }: { outlook: TeamOutlook; ifWinOut: number | null; compact?: boolean; condensed?: boolean }) {
+  const { labels } = useConference();
   // One slim row, for the pinned phone bar once the page has scrolled.
   if (condensed)
     return (
       <dl className="flex animate-rise items-baseline justify-between gap-3 text-xs text-ink-muted">
-        {([[LABELS.titleGame, formatChance(outlook.titleGame, outlook.status), "text-turf", false], [LABELS.champion, pct(outlook.champion), "text-navy", false], [LABELS.playoff, playoffText(outlook, pct(outlook.playoff)), "text-navy", true]] as const).map(([label, value, tone, badge]) => (
+        {([[labels.titleGame, formatChance(outlook.titleGame, outlook.status), "text-turf", false], [labels.champion, pct(outlook.champion), "text-navy", false], [labels.playoff, playoffText(outlook, pct(outlook.playoff), labels), "text-navy", true]] as const).map(([label, value, tone, badge]) => (
           <div key={label} className="flex items-baseline gap-1.5">
             <dt className="flex items-center gap-1">{label}{badge && <Beta />}</dt>
             <dd className={`font-display text-base font-bold ${tone}`}>{value}</dd>
@@ -128,10 +129,10 @@ export function StatTiles({ outlook, ifWinOut, compact, condensed }: { outlook: 
     );
   return (
     <dl className={`grid gap-2 ${compact ? "grid-cols-3" : "grid-cols-2"}`}>
-      <Tile label={LABELS.titleGame} value={formatChance(outlook.titleGame, outlook.status)} tone="text-turf" />
-      <Tile label={LABELS.champion} value={pct(outlook.champion)} tone="text-navy" />
-      <Tile label={LABELS.playoff} value={playoffText(outlook, pct(outlook.playoff))} tone="text-navy" badge small={mustWinConference(outlook)} />
-      {!compact && <Tile label={LABELS.winOut} value={pct(ifWinOut)} tone="text-navy" />}
+      <Tile label={labels.titleGame} value={formatChance(outlook.titleGame, outlook.status)} tone="text-turf" />
+      <Tile label={labels.champion} value={pct(outlook.champion)} tone="text-navy" />
+      <Tile label={labels.playoff} value={playoffText(outlook, pct(outlook.playoff), labels)} tone="text-navy" badge small={mustWinConference(outlook)} />
+      {!compact && <Tile label={labels.winOut} value={pct(ifWinOut)} tone="text-navy" />}
     </dl>
   );
 }
@@ -145,6 +146,7 @@ export function Stats({ team, outlook, me, path, teamId, own, names }: {
   own: GameInfo[];
   names: Record<number, string>;
 }) {
+  const { conference } = useConference();
   const games = me.record.wins + me.record.losses + own.length;
   const wins = me.expectedWins;
   const big = path.keyGames.find((k) => k.homeId === teamId || k.awayId === teamId);
@@ -159,7 +161,7 @@ export function Stats({ team, outlook, me, path, teamId, own, names }: {
           <h2 className="font-display text-2xl font-bold">{team.name}</h2>
         </div>
         <p className="mt-1 text-sm text-ink-soft">
-          {formatRecord(me.record, CONFERENCE)}
+          {formatRecord(me.record, conference)}
         </p>
       </div>
       <StatTiles outlook={me} ifWinOut={path.ifWinOut} />

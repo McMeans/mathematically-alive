@@ -2,19 +2,30 @@
 import { explore, seasonOutlook, type Season } from "@/core";
 import data from "./data/season.json";
 
-import { CONFERENCE, ITERATIONS, SEED } from "./config";
-
-export { CONFERENCE };
+import { ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
 
 export const season = data as Season;
-export const accTeams = season.teams.filter((t) => t.conference === CONFERENCE);
 
-/** Team list odds for pages without a selected team. */
-export const baseOutlook = seasonOutlook(season, { conference: CONFERENCE, iterations: ITERATIONS, seed: SEED });
+/** Teams in a supported conference: the ones with a page. */
+export const supportedTeams = season.teams.filter((t) => t.conference !== null && SUPPORTED_CONFERENCES.includes(t.conference));
 
-/** Outlook, path and tree for one team from one shared simulation, with no locks. */
-export const baseExplore = (teamId: number) =>
-  explore(season, { conference: CONFERENCE, teamId, iterations: ITERATIONS, seed: SEED });
+/** The supported conference a team plays in, or null if it has no page. */
+export function conferenceOf(teamId: number): string | null {
+  return supportedTeams.find((t) => t.id === teamId)?.conference ?? null;
+}
+
+/** Teams in one conference, in data order. */
+export const conferenceTeams = (conference: string) => season.teams.filter((t) => t.conference === conference);
+
+/** Team list odds for every supported conference, for pages without a selected team. */
+export const baseOutlooks = SUPPORTED_CONFERENCES.map((conference) => ({
+  conference,
+  outlook: seasonOutlook(season, { conference, iterations: ITERATIONS, seed: SEED }),
+}));
+
+/** Outlook, path and tree for one team from one shared simulation in its conference, with no locks. */
+export const baseExplore = (teamId: number, conference: string) =>
+  explore(season, { conference, teamId, iterations: ITERATIONS, seed: SEED });
 
 const asOfFormat = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short",
