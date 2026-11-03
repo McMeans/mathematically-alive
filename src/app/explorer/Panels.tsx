@@ -94,8 +94,8 @@ export function TeamList({ teams, order, outlook, selectedId, onSelect }: {
   );
 }
 
-function Beta() {
-  return <span className="rounded border border-marker-text px-1 text-[10px] font-bold leading-4 text-marker-text">BETA</span>;
+export function Beta() {
+  return <span className="rounded border border-marker-text px-1 text-[10px] font-bold leading-4 text-marker-text">{LABELS.beta}</span>;
 }
 
 function Tile({ label, value, tone, badge }: { label: string; value: string; tone: string; badge?: boolean }) {
