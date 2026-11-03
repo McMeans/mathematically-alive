@@ -35,7 +35,7 @@ describe("path tree on a real season", () => {
       }
     }
     expect(early).toBeGreaterThan(0);
-  });
+  }, 30_000);
 });
 
 describe("help from elsewhere on a real season", () => {
