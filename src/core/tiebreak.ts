@@ -217,6 +217,8 @@ export function championshipFromData(
       const w = g.completed ? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId) : winnerIn(g, winnerOf);
       if (w !== id) continue;
       const opp = g.homeId === id ? g.awayId : g.homeId;
+      // An opponent missing from the season's teams counts as below FBS, the conservative reading (at most one such
+      // win counts). seasonFromCfbd adds every opponent with its classification, so this doesn't happen on real data.
       if (data.classes.get(opp) === "fbs") wins++;
       else if (lower++ === 0) wins++;
     }
