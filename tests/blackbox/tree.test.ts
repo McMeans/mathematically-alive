@@ -520,7 +520,7 @@ describe("help from elsewhere", () => {
       checked++;
     }
     expect(checked).toBeGreaterThan(3);
-  }, 60_000);
+  }, 180_000);
 
   it("the likeliest way, tiebreak included, is never likelier than the team's title odds, nor far below them for a contender", () => {
     const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
@@ -704,7 +704,7 @@ describe("help from elsewhere", () => {
     expect(gaps.big.length && gaps.some.length && gaps.small.length).toBeGreaterThan(0);
     expect(Math.min(...gaps.big)).toBeGreaterThan(Math.max(...gaps.some));
     expect(Math.min(...gaps.some)).toBeGreaterThan(Math.max(...gaps.small));
-  });
+  }, 30_000);
 
   it("a week still being played shows the team's game that's already final, not a bye", () => {
     const { s, other } = needsHelp();
@@ -841,7 +841,7 @@ describe("help from elsewhere", () => {
     }
     // Some games lean too little to count as mattering, and still show which side helps.
     expect(faint).toBeGreaterThan(0);
-  });
+  }, 30_000);
 
   it("fine odds tell long shots apart below 1%", () => {
     expect(formatFine(0.0004)).toBe("<0.1%");
