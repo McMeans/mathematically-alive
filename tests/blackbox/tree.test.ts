@@ -558,11 +558,11 @@ describe("help from elsewhere", () => {
     expect(own.cfpIfLose).toBeNull();
   });
 
-  it("a locked game shows no chance to win", () => {
+  it("a locked game still shows the team's chance to win it", () => {
     const { s } = needsHelp();
     const first = pathTree(s, { ...base, teamId: 1 }).weeks.find((w) => w.own)!.own!;
     const locked = pathTree(s, { ...base, teamId: 1, locks: { [first.gameId]: 1 } }).weeks.find((w) => w.own?.gameId === first.gameId)!.own!;
-    expect(locked.winChance).toBeNull();
+    expect(locked.winChance).toBe(first.winChance);
   });
 
   it("records count locked results as played", () => {

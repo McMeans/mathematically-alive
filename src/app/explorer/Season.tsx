@@ -13,7 +13,7 @@ type PickFn = (gameId: number, winner: number | undefined) => void;
 
 /**
  * The rest of the season as week columns. Every button shows the team's odds if that result happens,
- * given the picks so far; a green outline marks the likeliest way in, navy a locked pick.
+ * given the picks so far; a dashed outline marks the likeliest way in. A picked win fills green, a picked loss red.
  */
 export function SeasonWeeks({ weeks, base, teamId, locks, likely, onPick }: {
   weeks: SeasonWeek[];
@@ -175,8 +175,9 @@ function PickTable({ vs, winChance, cfp, nonConference, win, lose }: {
 }) {
   const { labels } = useConference();
   const cols = cfp ? "grid-cols-[1fr_2.75rem_2.75rem]" : "grid-cols-[1fr_2.75rem]";
-  const row = (text: string, r: PickRow) => {
-    const look = r.state === "picked" ? "bg-turf text-white" : r.state === "likely" ? "bg-white/10 text-white outline-dashed outline-1 -outline-offset-2 outline-white/60 hover:bg-white/20" : "bg-white/10 text-white hover:bg-white/20";
+  // A picked win fills green, a picked loss red.
+  const row = (text: string, r: PickRow, fill: string) => {
+    const look = r.state === "picked" ? `${fill} text-white` : r.state === "likely" ? "bg-white/10 text-white outline-dashed outline-1 -outline-offset-2 outline-white/60 hover:bg-white/20" : "bg-white/10 text-white hover:bg-white/20";
     const label = [r.conf && `${labels.conference} ${r.conf}`, r.cfp && `${labels.cfp} ${r.cfp}`].filter(Boolean).join(", ");
     return (
       <button type="button" aria-label={`${text}: ${label}`} aria-pressed={r.state === "picked"} onClick={r.onClick} className={`press grid h-8 items-center rounded-md px-2 text-xs ${cols} ${look}`}>
@@ -193,8 +194,8 @@ function PickTable({ vs, winChance, cfp, nonConference, win, lose }: {
         <span className="text-right">{labels.conference}</span>
         {cfp && <span className="text-right">{labels.cfp}</span>}
       </span>
-      {row("Win", win)}
-      {row("Lose", lose)}
+      {row("Win", win, "bg-turf")}
+      {row("Lose", lose, "bg-red-600")}
       <span className="flex h-4 items-center justify-between gap-1 px-0.5 text-[11px] text-white/75">
         <span>{nonConference && <span className="whitespace-nowrap rounded border border-white/40 px-1 text-[10px] leading-4">{labels.nonConference}</span>}</span>
         {winChance && <span className="shrink-0">{winChance}</span>}

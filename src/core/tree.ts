@@ -206,8 +206,8 @@ export type SeasonWeek = {
     /** The team's playoff odds (EXPERIMENTAL) as if that result were picked ("41%"); null when it must win the conference (`mustWinConference`), so only the title matters. */
     cfpIfWin: string | null;
     cfpIfLose: string | null;
-    /** "58% to win"; null once the game is locked. */
-    winChance: string | null;
+    /** "58% to win", from the game itself, so a locked pick still shows it. */
+    winChance: string;
   } | null;
   /** The team's conference game that week when it's already final; null otherwise. */
   played: { gameId: number; opponent: string; site: "home" | "away" | "neutral"; won: boolean; score: string } | null;
@@ -218,7 +218,7 @@ export type SeasonWeek = {
    * `ifWin`/`ifLose`: the team's playoff odds (EXPERIMENTAL) as if that result were picked, for display ("36%"); null once it's final.
    * `titleIfWin`/`titleIfLose`: its title-game odds the same way, where the conference's tiebreak counts non-conference
    * results (the Big 12's total wins); null elsewhere (the result reaches the title race only through the ranking) or once final.
-   * `winChance`: "97% to win"; null once it's final or locked.
+   * `winChance`: "97% to win", locked or not; null once it's final.
    */
   nonConference: {
     gameId: number; opponentId: number; opponent: string; site: "home" | "away" | "neutral"; date: string; won: boolean | null; score: string | null;
@@ -622,8 +622,8 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
   const ifPicked = new Map(me.games.map((x) => [x.gameId, x]));
   // Playoff odds are never proven, so they never show a flat 0% or 100%, whatever the title-game status.
   const playoffOdds = (p: number) => formatSideOdds(p, "alive");
-  const winChance = (g: Game): string | null => {
-    if (opts.locks?.[g.id] !== undefined) return null;
+  // Kept when the game is locked, so a pick still shows how likely that result was.
+  const winChance = (g: Game): string => {
     const pHome = gameWinProbability(season, g);
     return `${formatOdds(g.homeId === teamId ? pHome : 1 - pHome)} to win`;
   };
