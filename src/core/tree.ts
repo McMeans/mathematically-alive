@@ -142,7 +142,7 @@ export type Likeliest = {
   note: string | null;
   /** The team's part: "Win all 4 left", "Win 3 of 4 left". */
   ownJob: string;
-  /** The same, short, under the team's name on the card: "wins all 4", "wins 3 of 4". */
+  /** The same, short, under the team's name on the card: "wins all 4", "wins both", "wins 3 of 4", "2 wins, 1 loss". */
   ownSummary: string;
   /**
    * The team's games left, in kickoff order: the opponent, the team's chance to win, and the result the way
@@ -811,15 +811,20 @@ function wayParts(
   const ownLeft = choices.filter(({ g }) => isOwn(g)).length;
   const ownPicks = picks.filter((x) => isOwn(x.g));
   const ownWins = ownPicks.filter((x) => x.winner === teamId).length;
-  // A way can need the team to lose (a tiebreak quirk); say so rather than "Win 0 of 3".
+  // A way can need the team to lose (a tiebreak quirk); say so rather than "Win 0 of 3", and name both when it
+  // needs some of each.
   const ownLosses = ownPicks.length - ownWins;
+  const ownEither = ownLeft - ownPicks.length;
   const [verb, did] = ownWins > 0 ? ["Win", ownWins] : ["Lose", ownLosses];
+  const mixed = ownWins > 0 && ownLosses > 0;
   const ownJob = ownPicks.length === 0
     ? "Its own results don't matter on this way in"
+    : mixed ? `Win ${ownWins} and lose ${ownLosses} of ${ownLeft} left`
     : did === ownLeft ? (ownLeft === 1 ? `${verb} its last game` : `${verb} all ${ownLeft} left`) : `${verb} ${did} of ${ownLeft} left`;
   const ownSummary = ownPicks.length === 0
     ? "either way"
-    : `${verb.toLowerCase()}s ${did === ownLeft ? (ownLeft === 1 ? "its last game" : `all ${ownLeft}`) : `${did} of ${ownLeft}`}`;
+    : mixed ? [count(ownWins, "win", "wins"), count(ownLosses, "loss", "losses"), ownEither ? `${ownEither} either way` : ""].filter(Boolean).join(", ")
+    : `${verb.toLowerCase()}s ${did === ownLeft ? (ownLeft === 1 ? "its last game" : ownLeft === 2 ? "both" : `all ${ownLeft}`) : `${did} of ${ownLeft}`}`;
   const ownChance = ownPicks.reduce((a, x) => a * x.p, 1);
   const byKickoff = (a: Game, b: Game) => (Date.parse(a.start) || 0) - (Date.parse(b.start) || 0) || a.week - b.week || a.id - b.id;
   const ownPicked = new Map(ownPicks.map((x) => [x.gameId, x.winner]));
@@ -903,7 +908,8 @@ function waySummary(parts: Pick<Likeliest, "ownGames" | "rivals">, favorites: nu
   const wins = parts.ownGames.filter((g) => g.result === "win").length;
   const losses = parts.ownGames.filter((g) => g.result === "lose").length;
   const out: string[] = [];
-  if (wins > 0) out.push(wins === left ? "win out" : `win ${wins} of ${left}`);
+  if (wins > 0 && losses > 0) out.push(`win ${wins} and lose ${losses} of ${left}`);
+  else if (wins > 0) out.push(wins === left ? "win out" : `win ${wins} of ${left}`);
   else if (losses > 0) out.push(losses === left ? "lose out" : `lose ${losses} of ${left}`);
   const byLosses = new Map<number, string[]>();
   for (const r of parts.rivals) byLosses.set(r.needs, [...(byLosses.get(r.needs) ?? []), r.team]);

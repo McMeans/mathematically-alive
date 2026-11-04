@@ -152,6 +152,30 @@ describe("help from elsewhere on a real season", () => {
     expect(checked).toBeGreaterThan(20);
   }, 60_000);
 
+  it("California four weeks out: the card's wording, word for word", () => {
+    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const full = seasonFromCfbd(snap);
+    const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
+    const cut: Season = {
+      ...full,
+      games: full.games.map((g) => (g.week > last - 4 ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
+    };
+    const cal = cut.teams.find((t) => t.name === "California")!;
+    const way = pathTree(cut, { conference: "ACC", teamId: cal.id, iterations: 500, seed: 1 }).likeliest!;
+    expect(way.title).toBe("What California needs");
+    expect(way.scope).toBe("On its likeliest way in");
+    expect(way.ownJob).toBe("Win all 2 left");
+    expect(way.ownSummary).toBe("wins both");
+    expect(way.summary).toBe("Win out, Duke and Virginia each lose twice, Miami, Louisville and SMU each lose once");
+    expect(way.rivals.map((r) => [r.team, r.summary])).toEqual([
+      ["Duke", "2 losses, 1 win"],
+      ["Virginia", "2 losses"],
+      ["Miami", "1 loss, 1 win, 1 either way"],
+      ["Louisville", "1 loss, 1 win"],
+      ["SMU", "1 loss"],
+    ]);
+  }, 30_000);
+
   it("the team's own part reads as a count of the results the way needs from it", () => {
     const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
     const full = seasonFromCfbd(snap);
@@ -170,12 +194,16 @@ describe("help from elsewhere on a real season", () => {
         const wins = way.ownGames.filter((g) => g.result === "win").length;
         const losses = way.ownGames.filter((g) => g.result === "lose").length;
         const [verb, n] = wins > 0 ? ["win", wins] : ["lose", losses];
-        if (n === 0) {
+        if (wins > 0 && losses > 0) {
+          // Needs some of each: both are named.
+          expect(way.ownJob).toBe(`Win ${wins} and lose ${losses} of ${left} left`);
+          expect(way.summary.startsWith(`Win ${wins} and lose ${losses} of ${left}`)).toBe(true);
+        } else if (n === 0) {
           expect(way.ownSummary).toBe("either way");
           expect(way.ownJob).toBe("Its own results don't matter on this way in");
           seen.add("either way");
         } else if (n === left) {
-          expect(way.ownSummary).toBe(left === 1 ? `${verb}s its last game` : `${verb}s all ${left}`);
+          expect(way.ownSummary).toBe(left === 1 ? `${verb}s its last game` : left === 2 ? `${verb}s both` : `${verb}s all ${left}`);
           expect(way.summary.startsWith(`${verb[0].toUpperCase()}${verb.slice(1)} out`)).toBe(true);
         } else {
           expect(way.ownSummary).toBe(`${verb}s ${n} of ${left}`);
