@@ -4,12 +4,14 @@ import { formatOdds, formatRecord, type PathTree, type TeamOutlook, type TeamPat
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
 import { Logo } from "@/app/Logo";
 import { WayCard } from "./WayIn";
-import { byOdds, SeasonWeeks, WhatIf } from "./Season";
+import { SeasonWeeks, WhatIf } from "./Season";
 import { StatTiles, TeamList } from "./Panels";
 import { ConferenceProvider } from "./conference";
 
 export type GameInfo = { id: number; homeId: number; awayId: number; week: number; start: string };
 export type TeamInfo = { id: number; name: string; color: string | null; altColor: string | null };
+/** One conference in the team picker: its teams and their odds today. */
+export type ConferenceList = { conference: string; teams: TeamInfo[]; outlook: TeamOutlook[] };
 export type Result = { outlook: TeamOutlook[]; path: TeamPath; tree: PathTree };
 export type Locks = Record<number, number>;
 
@@ -17,6 +19,7 @@ type Props = {
   teamId: number;
   conference: string;
   teams: TeamInfo[];
+  conferences: ConferenceList[];
   names: Record<number, string>;
   asOf: string;
   initial: Result;
@@ -26,7 +29,7 @@ export const NAVY = "#14213D";
 export const pct = (p: number | null) => (p === null ? "—" : formatOdds(p));
 export const oddsTone = (p: number | null) => (p === null ? "text-navy" : p >= 0.5 ? "text-turf" : p < 0.1 ? "text-marker-text" : "text-navy");
 
-export function Explorer({ teamId, conference, teams, names, asOf, initial }: Props) {
+export function Explorer({ teamId, conference, teams, conferences, names, asOf, initial }: Props) {
   const [locks, setLocks] = useState<Locks>({});
   const [result, setResult] = useState<Result>(initial);
   const [busy, setBusy] = useState(false);
@@ -118,8 +121,6 @@ export function Explorer({ teamId, conference, teams, names, asOf, initial }: Pr
   const { outlook, path, tree } = result;
   const me = outlook.find((o) => o.teamId === teamId)!;
   const team = teams.find((t) => t.id === teamId)!;
-  // Best odds first, by the odds the list shows (today's, before any picks).
-  const order = useMemo(() => [...initial.outlook].sort(byOdds(names)).map((o) => o.teamId), [initial, names]);
   const hasLocks = Object.keys(locks).length > 0;
   const likeliest = tree.likeliest;
   // Outline only what the card names: the team's own results and the non-favorites it needs.
@@ -140,9 +141,8 @@ export function Explorer({ teamId, conference, teams, names, asOf, initial }: Pr
 
   const list = (
     <TeamList
-      teams={teams}
-      order={order}
-      outlook={initial.outlook}
+      conferences={conferences}
+      names={names}
       selectedId={going ?? teamId}
       onSelect={(id) => {
         if (id !== teamId) setGoing(id);
@@ -216,12 +216,12 @@ export function Explorer({ teamId, conference, teams, names, asOf, initial }: Pr
 
         {/* On desktop the page is one screen tall and each column scrolls on its own. */}
         <div className="grid flex-1 md:min-h-0 md:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[260px_minmax(0,1fr)_340px]">
-          <nav aria-label={`${conference} teams`} className="scroll-thin hidden border-r border-ink-muted/25 xl:block xl:overflow-y-auto">
+          <nav aria-label="Teams" className="scroll-thin hidden border-r border-ink-muted/25 xl:block xl:overflow-y-auto">
             {list}
           </nav>
 
           <main aria-busy={going !== null} className="scroll-thin relative min-w-0 p-4 md:overflow-y-auto md:p-6">
-            {going !== null && <Loading name={teams.find((t) => t.id === going)?.name} />}
+            {going !== null && <Loading name={names[going]} />}
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="font-display text-xl font-bold">
                 Play out the season

@@ -4,7 +4,7 @@ What the app is, how its numbers are made, and the rules the code follows. Read 
 
 ## What it is
 
-A Next.js site. Pick a college football team and see what has to happen for it to reach its conference championship game. A team's page uses its own conference; the supported ones are listed in `SUPPORTED_CONFERENCES` (`src/app/config.ts`), only the ACC for now. A playoff estimate exists but is experimental.
+A Next.js site. Pick a college football team and see what has to happen for it to reach its conference championship game. A team's page uses its own conference; the supported ones are listed in `SUPPORTED_CONFERENCES` (`src/app/config.ts`): the ACC and the Big 12. A playoff estimate exists but is experimental.
 
 It answers three questions for the picked team:
 
@@ -17,9 +17,9 @@ Users can lock results ("what if Miami loses to Wake Forest?") and every number 
 ## Data
 
 - **Source:** CollegeFootballData (CFBD) free tier. Teams, games, betting lines, SP+ ratings. `scripts/fetch-season.ts` makes 4 API calls and writes `data/season-<year>.json`. It needs `CFBD_API_KEY` in `.env.local`. The key is build-time only and must never reach the client or a log.
-- **Build:** `scripts/build-data.ts` turns the newest snapshot in `data/` (or the committed fixture when there is none) into `src/app/data/season.json`, which is gitignored. So `next build` and CI never need a key. It runs before `lint`, `typecheck` and `build`.
+- **Build:** `scripts/build-data.ts` turns the newest snapshot in `data/` (or, when there is none, every committed fixture for the newest year, merged) into `src/app/data/season.json`, which is gitignored. So `next build` and CI never need a key. It runs before `lint`, `typecheck` and `build`.
 - **Model:** `src/core/season.ts`, via `seasonFromCfbd`. A `Season` has teams (id, conference, FBS or not, colors, SP+ rating) and games (week, kickoff, neutral site, conference game, home/away, score once completed, spread).
-- **Fixtures:** `fixtures/acc-2025.json` (full season) and `fixtures/acc-2026.json` (mid-season, through week 9) are raw snapshots made by `scripts/make-fixture.ts`. Never hand-edit them.
+- **Fixtures:** `fixtures/acc-2025.json` and `fixtures/big-12-2025.json` (full season), and `fixtures/acc-2026.json` and `fixtures/big-12-2026.json` (mid-season, through week 9), are raw snapshots made by `scripts/make-fixture.ts` (`pnpm fixture [year] [conference]`). Never hand-edit them. Without `data/`, the build merges every fixture for the newest year.
 
 ## How the stats work
 
@@ -124,7 +124,7 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - `/`: team list. `/team/[id]`: the explorer for that team (`ExplorerPage`, `explorer/*`).
 - The first numbers are computed at build time. What-ifs run in a Web Worker (`sim.worker.ts`) so the main thread never blocks. Explore's worst case is about 2.6 s.
 - Panels:
-  - Team list with odds.
+  - Team list with odds. One tab per supported conference (the team's own selected), and a search that looks through every conference.
   - Stat tiles: title game, title, playoff and if-win-out.
   - The season by week. Own-game buttons and elsewhere chips can be clicked to lock a result. Each own game (conference or not) is a small table: Win and Lose rows under ACC and CFP columns, the chance to win, and a "Non-con" tag on non-conference games. Each number is what picking that result would show (see `games` above). Non-conference games show "—" for ACC; they move the title race only slightly, through the ranking tiebreak. For a team that must win the conference, conference cards drop the CFP column. Its non-conference cards keep it so they stay pickable and a pick on them stays visible. Final results, byes and the tables are all the same height, so the weeks line up.
   - The race table.
@@ -143,7 +143,7 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - The playoff model is a rough placeholder, not the committee.
 - Ranking is a stand-in for SportSource.
 - Proofs and the likeliest search have budgets. Near the edge they say "open" or return null rather than guess.
-- The core has ACC and Big 12 tiebreak rules. The app shows only the ACC until the Big 12 is switched on there. SEC and Big Ten still need their own rules.
+- The app covers the ACC and the Big 12. SEC and Big Ten still need their own tiebreak rules.
 - **Expanding conferences.** Next: SEC and Big Ten. Like the ACC and Big 12, each champion gets an automatic playoff bid, and as power-four teams they have the best at-large odds, so today's model and UI carry over.
 - **Group of Six, later.** The 2026 format guarantees a spot only to the highest-ranked Group of Six conference champion, not to every champion. Winning the conference isn't enough on its own, and at-large bids are rare but have happened. Before adding a G6 conference, the playoff model needs that rule (champion and ranked above every other G6 champion), and the UI needs wording for it ("Must win the conference and be the top G6 champion", or similar, rather than "Must win ACC").
 - A future MCP server is planned on top of `src/core`.
