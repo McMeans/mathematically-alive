@@ -261,9 +261,8 @@ export type PathTree = {
 };
 
 const MAX_DEPTH = 12;
-// Odds for the other side of a locked game: a small simulation each, for at most this many games per call.
+// Seasons of the shared sample replayed, with one game flipped, for the other side of each locked game.
 const SWAP_ITERATIONS = 2_000;
-const MAX_SWAP_SIMS = 12;
 // Seasons simulated to put a chance on the ranking tiebreak a likeliest way in needs.
 const TIEBREAK_ITERATIONS = 2_000;
 // How much likelier a way through the ranking tiebreak has to be than a sure way to be shown instead.
@@ -560,19 +559,38 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
   }
 
   // The season week by week: the team's own game with its odds either way, and the games elsewhere that matter.
-  // A locked game elsewhere: its other side can't come from the sample (every season has the lock), so prove it, else run a small simulation.
-  let swapSims = 0;
-  const swapped = (gameId: number, winner: number): string => {
-    const swap = { ...opts.locks, [gameId]: winner };
-    const settled = (s: ProvenStatus) => (s === "clinched" ? "In" : s === "eliminated" ? "Out" : null);
-    // A quick proof, then the simulation; the full proof only when the simulation is all one way.
-    const quick = settled(provenStatus(season, conference, teamId, swap, QUICK_BUDGET));
-    if (quick) return quick;
-    if (swapSims++ >= MAX_SWAP_SIMS) return settled(proven(swap)) ?? "—";
-    const p = simulatedOdds(swap, Math.min(SWAP_ITERATIONS, iterations));
-    if (p > 0 && p < 1) return formatFine(p);
-    return settled(proven(swap)) ?? (p === 0 ? "<0.1%" : ">99%");
-  };
+  // A locked game elsewhere: its other side can't come from the sample as it stands (every season has the lock).
+  // A quick proof first; otherwise flip that one game in the first SWAP_ITERATIONS simulated seasons, as a pick
+  // of the other side would (a lock changes only its own game's draw), with the full proof only when that is all
+  // one way. Every locked game gets a value, however many there are.
+  const settled = (st: ProvenStatus) => (st === "clinched" ? "In" : st === "eliminated" ? "Out" : null);
+  const swappedShown = new Map<number, string>();
+  const toFlip: { g: Game; gi: number; other: number }[] = [];
+  for (const g of data.games) {
+    const locked = opts.locks?.[g.id];
+    if (locked === undefined || g.completed || g.homeId === teamId || g.awayId === teamId) continue;
+    const other = locked === g.homeId ? g.awayId : g.homeId;
+    const quick = settled(provenStatus(season, conference, teamId, { ...opts.locks, [g.id]: other }, QUICK_BUDGET));
+    if (quick) swappedShown.set(g.id, quick);
+    else toFlip.push({ g, gi: gameIndex.get(g.id)!, other });
+  }
+  if (toFlip.length > 0) {
+    const hits = new Int32Array(toFlip.length);
+    const n = Math.min(SWAP_ITERATIONS, sim.iterations);
+    sim.forEachIteration((it, winnerAt, teams) => {
+      if (it >= n) return;
+      toFlip.forEach(({ g, gi, other }, k) => {
+        const flipped = (x: Game): number => (x.id === g.id ? other : winnerAt(gameIndex.get(x.id)!));
+        const [x, y] = championshipFromData(data, conference, flipped, { draw: mulberry32(mix(seed, it, 1)), rank: (id) => teams.rankIf(id, gi) });
+        if (x === teamId || y === teamId) hits[k]++;
+      });
+    });
+    toFlip.forEach(({ g, other }, k) => {
+      const p = hits[k] / n;
+      swappedShown.set(g.id, p > 0 && p < 1 ? formatFine(p) : settled(proven({ ...opts.locks, [g.id]: other })) ?? (p === 0 ? "<0.1%" : ">99%"));
+    });
+  }
+  const swapped = (gameId: number): string => swappedShown.get(gameId)!;
   const proofOf = (gameId: number, winner: number) => proven({ ...opts.locks, [gameId]: winner });
   const verdict = (odds: number | null, gameId: number, winner: number): string => {
     if (odds === 1 || odds === 0) {
@@ -627,7 +645,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
     if (locked !== undefined) {
       const mine = formatTitleOdds(titleGame, statusOf(root.outcome));
       w.games.push({ gameId: g.id, homeId: g.homeId, awayId: g.awayId, home: name(g.homeId), away: name(g.awayId),
-        ifHome: locked === g.homeId ? mine : swapped(g.id, g.homeId), ifAway: locked === g.awayId ? mine : swapped(g.id, g.awayId), swing: Infinity, likely: null, matters: true, helps: null, impact: null });
+        ifHome: locked === g.homeId ? mine : swapped(g.id), ifAway: locked === g.awayId ? mine : swapped(g.id), swing: Infinity, likely: null, matters: true, helps: null, impact: null });
     } else if (h) {
       const side = (odds: number | null, proof: "in" | "out" | null) =>
         odds === null && proof === null ? "—" : formatTitleOdds(odds ?? 0, statusOf(proof));
