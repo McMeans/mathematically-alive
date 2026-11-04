@@ -17,7 +17,11 @@ const BUDGET = 30_000;
 export function provenStatus(season: Season, conference: string, teamId: number, locks: Record<number, number> = {}, budget = BUDGET): ProvenStatus {
   const data = conferenceData(season, conference);
   if (!canGetIn(data, conference, teamId, locks, true, budget)) return "eliminated";
-  if (!canFinish(data, conference, teamId, locks, true, false, { left: budget })) return "clinched";
+  // A search for a way out that finds one settles it: the team isn't in for sure, and the one-rival check below
+  // could only agree. Only an answer cut short by the budget or the draw limit goes on to that check.
+  const out = { yes: false };
+  if (!canFinish(data, conference, teamId, locks, true, false, { left: budget }, undefined, true, out)) return "clinched";
+  if (out.yes) return "open";
   return oneRivalLeft(data, conference, teamId, locks, budget) ? "clinched" : "open";
 }
 
@@ -26,8 +30,15 @@ export function provenStatus(season: Season, conference: string, teamId: number,
  * clinches the search above runs out of budget on: each other team's elimination is a smaller search.
  */
 function oneRivalLeft(data: ConferenceData, conference: string, teamId: number, locks: Record<number, number>, budget: number): boolean {
+  // Most wins so far first (played and locked): those teams can usually get in, found in a few probes, and two of
+  // them end the check. Each team's answer doesn't depend on the order, so neither does the result.
+  const wins = new Map<number, number>([...data.ids].map((id) => [id, 0]));
+  for (const g of data.games) {
+    const w = g.completed ? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId) : locks[g.id];
+    if (w !== undefined) wins.set(w, wins.get(w)! + 1);
+  }
   let rivals = 0;
-  for (const id of data.ids) {
+  for (const id of [...data.ids].sort((a, b) => wins.get(b)! - wins.get(a)!)) {
     if (id === teamId) continue;
     // Out of budget counts as "can get in", so the answer stays a proof.
     if (canGetIn(data, conference, id, locks, true, budget) && ++rivals > 1) return false;
@@ -86,7 +97,7 @@ const MAX_DRAWS = 2_000;
  * the team in, or with `out`, leaves it out? The team wins its ranking and draw steps with `luck`,
  * loses them without. Too many draw outcomes to try counts as yes.
  */
-function someDraw(data: ConferenceData, conference: string, teamId: number, winnerOf: (g: Game) => number, luck: boolean, out: boolean): boolean {
+function someDraw(data: ConferenceData, conference: string, teamId: number, winnerOf: (g: Game) => number, luck: boolean, out: boolean, guess?: { made: boolean }): boolean {
   if (surelyOut(data, teamId, winnerOf)) return out;
   const rank = (id: number) => (id === teamId ? (luck ? Infinity : -Infinity) : 0);
   const choice: number[] = [];
@@ -107,6 +118,7 @@ function someDraw(data: ConferenceData, conference: string, teamId: number, winn
     if (i < 0) return false;
     choice[i]++;
   }
+  if (guess) guess.made = true;
   return true;
 }
 
@@ -352,6 +364,8 @@ function canFinish(
   pool: { left: number } = { left: BUDGET },
   witness?: Map<number, number>,
   everyDraw = true,
+  /** Set to whether a true answer for a way out is certain: a result set was found, not a budget or draw limit hit. */
+  certain?: { yes: boolean },
 ): boolean {
   const ids = [...data.ids];
   const fixed = new Map<number, number>();
@@ -380,6 +394,7 @@ function canFinish(
   const myGames = games.get(teamId)!;
   let budget = pool.left;
   let gaveUp = false;
+  let guessed = false;
 
   const dfs = (k: number): boolean => {
     if (--budget < 0) { gaveUp = true; return true; }
@@ -388,9 +403,11 @@ function canFinish(
     if (!wantOut && cannotGetIn(ids, teamId, myGames, myMin, myMax, games, wins, left, open, k)) return false;
     if (wantOut && spreadOk && cannotMissOut(ids, teamId, myGames, myMin, games, wins, left, open, k)) return false;
     if (k === open.length) {
+      const guess = { made: false };
       const ok = everyDraw
-        ? someDraw(data, conference, teamId, (g) => fixed.get(g.id)!, luck, wantOut)
+        ? someDraw(data, conference, teamId, (g) => fixed.get(g.id)!, luck, wantOut, guess)
         : firstDraw(data, conference, teamId, (g) => fixed.get(g.id)!, luck) !== wantOut;
+      if (ok && guess.made) guessed = true;
       if (ok && witness) for (const [id, w] of fixed) witness.set(id, w);
       return ok;
     }
@@ -436,5 +453,6 @@ function canFinish(
   }
   const r = dfs(0);
   pool.left = Math.max(0, budget);
+  if (certain) certain.yes = r && !gaveUp && !guessed;
   return r || gaveUp;
 }
