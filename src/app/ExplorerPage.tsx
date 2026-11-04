@@ -1,6 +1,6 @@
 // Server side of the one-page view: base (no what-if) numbers for a team, handed to the client Explorer.
 import { Explorer, type ConferenceList, type TeamInfo } from "./explorer/Explorer";
-import { asOf, baseExplore, baseOutlooks, conferenceOf, conferenceTeams, season } from "./season";
+import { asOf, baseExplore, baseOutlooks, conferenceOf, conferenceTeams, season, through } from "./season";
 
 export function ExplorerPage({ teamId }: { teamId: number }) {
   const conference = conferenceOf(teamId);
@@ -25,6 +25,7 @@ export function ExplorerPage({ teamId }: { teamId: number }) {
       conferences={conferences}
       names={names}
       asOf={asOf}
+      through={through}
       initial={base}
     />
   );

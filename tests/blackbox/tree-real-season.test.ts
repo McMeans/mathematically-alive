@@ -85,7 +85,7 @@ describe("help from elsewhere on a real season", () => {
         if (!way) continue;
         // One combination of results can't be likelier than every way in together (allowing for sampling noise).
         expect(way.overall).toBeLessThanOrEqual(tree.titleGame + 0.03);
-        expect(way.heading).toBe(`${formatOdds(way.overall)} chance`);
+        expect(way.line).toContain(`(${formatOdds(way.overall)} chance)`);
         if (way.needsTiebreak) {
           // A way through the ranking tiebreak counts the chance of winning it, and says so.
           expect(way.overall).toBeCloseTo(way.chance * way.tiebreak!, 12);
@@ -157,6 +157,7 @@ describe("help from elsewhere on a real season", () => {
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     let rivals = 0;
+    let sharedSeen = false;
     for (const weeks of [3, 4]) {
       const cut: Season = {
         ...full,
@@ -183,7 +184,30 @@ describe("help from elsewhere on a real season", () => {
           });
           expect(r.needs).toBe(r.games.filter((g) => g.result === "lose").length);
           expect(r.chance).toBeCloseTo(chance, 12);
+          // The count under its name adds up to every game it has left.
+          const won = r.games.filter((g) => g.result === "win").length;
+          const either = r.games.filter((g) => g.result === null).length;
+          expect(r.summary).toBe([`${r.needs} ${r.needs === 1 ? "loss" : "losses"}`, won ? `${won} ${won === 1 ? "win" : "wins"}` : "", either ? `${either} either way` : ""].filter(Boolean).join(", "));
+          // The minimized line names every rival.
+          expect(way.summary).toContain(r.team);
           rivals++;
+        }
+        // The team's own games, in kickoff order, each with the result the picks need from it.
+        const own = cut.games
+          .filter((g) => !g.completed && g.conferenceGame && (g.homeId === t.id || g.awayId === t.id))
+          .sort((a, b) => Date.parse(a.start) - Date.parse(b.start) || a.week - b.week || a.id - b.id);
+        expect(way.ownGames.map((g) => g.opponent)).toEqual(own.map((g) => nameOf(g.homeId === t.id ? g.awayId : g.homeId)));
+        own.forEach((g, k) => {
+          const w = picked.get(g.id);
+          expect(way.ownGames[k].result).toBe(w === undefined ? null : w === t.id ? "win" : "lose");
+        });
+        expect(way.summary[0]).toBe(way.summary[0].toUpperCase());
+        // Rivals that need the same number of losses share a phrase: "Duke and Miami each lose twice".
+        const say = (n: number) => (n === 1 ? "once" : n === 2 ? "twice" : `${n} times`);
+        for (const r of way.rivals) {
+          const shared = way.rivals.filter((x) => x.needs === r.needs).length > 1;
+          expect(way.summary).toContain(shared ? `each lose ${say(r.needs)}` : `${r.team} loses ${say(r.needs)}`);
+          sharedSeen ||= shared;
         }
         // No pick is a result the week by week shows knocks the team out.
         for (const g of tree.weeks.flatMap((w) => w.games)) {
@@ -197,6 +221,7 @@ describe("help from elsewhere on a real season", () => {
       }
     }
     expect(rivals).toBeGreaterThan(10);
+    expect(sharedSeen).toBe(true);
   }, 60_000);
 
   it("a game elsewhere marks the side that helps, and bigger impact means a bigger gap in the odds", () => {

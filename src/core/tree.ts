@@ -123,10 +123,15 @@ export type Likeliest = {
   overall: number;
   /** "Likeliest way in (4% chance): Virginia beats Duke; and Miami beats Pitt." The chance is `overall`. */
   line: string;
-  /** Card title: "Likeliest way in for Virginia". One sufficient way, not the only one, so not "what it needs". */
+  /**
+   * Card title: "What Virginia needs". The card lays out the likeliest way in, one sufficient way and not
+   * the only one, so its `scope` line says so.
+   */
   title: string;
-  /** The same, in parts for a card. "4% chance". */
-  heading: string;
+  /** "On its likeliest way in". */
+  scope: string;
+  /** One line for the card when it's minimized: "Win out, Duke and Miami each lose twice". */
+  summary: string;
   /** The team's own results: "Beat Duke", "Lose to Miami". */
   own: string[];
   /** Results elsewhere that aren't the favorite winning: "Miami over Pitt". */
@@ -137,6 +142,13 @@ export type Likeliest = {
   note: string | null;
   /** The team's part: "Win all 4 left", "Win 3 of 4 left". */
   ownJob: string;
+  /** The same, short, under the team's name on the card: "wins all 4", "wins 3 of 4". */
+  ownSummary: string;
+  /**
+   * The team's games left, in kickoff order: the opponent, the team's chance to win, and the result the way
+   * needs ("win", "lose", or null when either will do).
+   */
+  ownGames: { opponent: string; winChance: number; result: "win" | "lose" | null }[];
   /** Chance the team gets its own results in the picks. */
   ownChance: number;
   /** Teams the picks need to lose a game they're favored in, most losses first. */
@@ -160,6 +172,8 @@ export type Rival = {
   games: { opponent: string; chance: number; result: "lose" | "win" | null }[];
   /** Chance it gets every result the picks need from it. */
   chance: number;
+  /** The results it needs, counted: "2 losses, 2 wins", "2 losses, 2 either way", "1 loss". */
+  summary: string;
 };
 
 export type WayWeek = {
@@ -545,6 +559,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
       const parts = [own.length ? `${team} ${list(own)}` : "", elsewhere.length ? list(elsewhere) : ""].filter(Boolean);
       const what = parts.length ? parts.join("; and ") : `${team} needs nothing more`;
       const note = tiebreak === null ? null : `With these results ${team} gets in ${often}, depending on ${countsNonConference(conference) ? "total wins and the ranking tiebreak" : "the ranking tiebreak"}.`;
+      const card = wayParts(way, choices, teamId, name, sim, reachedAt, minSample, gameIndex);
       likeliest = {
         picks: way.picks,
         named,
@@ -554,13 +569,14 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
         tiebreak,
         overall,
         line: `Likeliest way in (${formatOdds(overall)} chance): ${what}.${note ? ` ${note}` : ""}`,
-        title: `Likeliest way in for ${team}`,
-        heading: `${formatOdds(overall)} chance`,
+        title: `What ${team} needs`,
+        scope: "On its likeliest way in",
         own: ownItems,
         needs,
         favorites: favorites > 0 ? `Favorites win the other ${favorites} game${favorites === 1 ? "" : "s"} it needs` : null,
         note,
-        ...wayParts(way, choices, teamId, name, sim, reachedAt, minSample, gameIndex),
+        ...card,
+        summary: waySummary(card, favorites),
       };
     }
   }
@@ -782,7 +798,7 @@ function wayParts(
   reachedAt: Uint8Array,
   minSample: number,
   gameIndex: Map<number, number>,
-): Pick<Likeliest, "ownJob" | "ownChance" | "rivals" | "weeks"> {
+): Pick<Likeliest, "ownJob" | "ownSummary" | "ownGames" | "ownChance" | "rivals" | "weeks"> {
   const byId = new Map(choices.map((c) => [c.g.id, c]));
   const chanceOf = (gameId: number, winner: number) => {
     const { g, pHome } = byId.get(gameId)!;
@@ -798,7 +814,16 @@ function wayParts(
   const ownJob = ownPicks.length === 0
     ? "Its own results don't matter on this way in"
     : ownWins === ownLeft ? (ownLeft === 1 ? "Win its last game" : `Win all ${ownLeft} left`) : `Win ${ownWins} of ${ownLeft} left`;
+  const ownSummary = ownPicks.length === 0
+    ? "either way"
+    : ownWins === ownLeft ? (ownLeft === 1 ? "wins its last game" : `wins all ${ownLeft}`) : `wins ${ownWins} of ${ownLeft}`;
   const ownChance = ownPicks.reduce((a, x) => a * x.p, 1);
+  const byKickoff = (a: Game, b: Game) => (Date.parse(a.start) || 0) - (Date.parse(b.start) || 0) || a.week - b.week || a.id - b.id;
+  const ownPicked = new Map(ownPicks.map((x) => [x.gameId, x.winner]));
+  const ownGames = choices.filter(({ g }) => isOwn(g)).sort((a, b) => byKickoff(a.g, b.g)).map(({ g }) => {
+    const w = ownPicked.get(g.id);
+    return { opponent: name(g.homeId === teamId ? g.awayId : g.homeId), winChance: chanceOf(g.id, teamId), result: w === undefined ? null : w === teamId ? ("win" as const) : ("lose" as const) };
+  });
 
   // Rivals: teams the picks need to lose at least one game they're favored in. Count every loss the picks give them.
   const losses = new Map<number, number>();
@@ -814,7 +839,7 @@ function wayParts(
   const rivals: Rival[] = [...losses].filter(([id]) => upset.has(id)).map(([id, needs]) => {
     const games = choices
       .filter(({ g }) => !isOwn(g) && (g.homeId === id || g.awayId === id))
-      .sort((a, b) => (Date.parse(a.g.start) || 0) - (Date.parse(b.g.start) || 0) || a.g.week - b.g.week || a.g.id - b.g.id)
+      .sort((a, b) => byKickoff(a.g, b.g))
       .map(({ g }) => {
         const opp = g.homeId === id ? g.awayId : g.homeId;
         const w = pickedWinner.get(g.id);
@@ -824,7 +849,9 @@ function wayParts(
     const lost = games.filter((g) => g.result === "lose").map((g) => g.opponent);
     const won = games.filter((g) => g.result === "win").map((g) => g.opponent);
     const line = [`Loses to ${list(lost)}`, won.length ? `beats ${list(won)}` : ""].filter(Boolean).join(", ");
-    return { teamId: id, team: name(id), needs, left: games.length, line, games, chance };
+    const either = games.length - lost.length - won.length;
+    const summary = [count(lost.length, "loss", "losses"), won.length ? count(won.length, "win", "wins") : "", either ? `${either} either way` : ""].filter(Boolean).join(", ");
+    return { teamId: id, team: name(id), needs, left: games.length, line, games, chance, summary };
   }).sort((a, b) => b.needs - a.needs || a.chance - b.chance || a.team.localeCompare(b.team));
 
   // Weeks in kickoff order; each holds the picks played that week.
@@ -861,7 +888,26 @@ function wayParts(
       afterLabel: after === null ? "—" : after === 1 ? "In" : after === 0 ? "<1%" : formatOdds(after),
     };
   });
-  return { ownJob, ownChance, rivals, weeks };
+  return { ownJob, ownSummary, ownGames, ownChance, rivals, weeks };
+}
+
+const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const times = (n: number) => (n === 1 ? "once" : n === 2 ? "twice" : `${n} times`);
+
+/** The way in one line: the team's part, then the rivals by how many losses each needs. "Win out, Duke and Miami each lose twice". */
+function waySummary(parts: Pick<Likeliest, "ownGames" | "rivals">, favorites: number): string {
+  const own = parts.ownGames.filter((g) => g.result !== null);
+  const wins = own.filter((g) => g.result === "win").length;
+  const out: string[] = [];
+  if (own.length > 0) out.push(wins === parts.ownGames.length ? "win out" : `win ${wins} of ${parts.ownGames.length}`);
+  const byLosses = new Map<number, string[]>();
+  for (const r of parts.rivals) byLosses.set(r.needs, [...(byLosses.get(r.needs) ?? []), r.team]);
+  for (const [n, teams] of [...byLosses].sort((a, b) => b[0] - a[0])) {
+    out.push(teams.length === 1 ? `${teams[0]} loses ${times(n)}` : `${list(teams)} each lose ${times(n)}`);
+  }
+  if (out.length === 0) out.push(favorites > 0 ? "the favorites win the games it needs" : "nothing more");
+  const line = out.join(", ");
+  return line[0].toUpperCase() + line.slice(1);
 }
 
 /** Which side of a game elsewhere helps the team, and how much, however little. Nothing when neither side does (or the sample can't tell). */

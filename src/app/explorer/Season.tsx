@@ -7,7 +7,7 @@ import { useConference } from "./conference";
 
 type PickState = "picked" | "likely" | "open";
 
-const label = "text-[11px] font-semibold uppercase tracking-wide text-ink-muted";
+const label = "text-xs font-semibold text-ink-muted";
 
 type PickFn = (gameId: number, winner: number | undefined) => void;
 
@@ -127,7 +127,7 @@ function FinalCard({ vs, won, score, nonConference }: { vs: string; won: boolean
       <span className="flex h-4 items-center justify-between gap-1 px-0.5 text-[11px] text-ink-muted">
         <span className="truncate">{vs}</span><span className="shrink-0">Final</span>
       </span>
-      <span className={`px-0.5 font-display text-xl font-bold ${won ? "text-turf" : "text-marker-text"}`}>
+      <span className={`px-0.5 font-display text-xl font-bold ${won ? "text-turf" : "text-red-700"}`}>
         {won ? "Won" : "Lost"} {score}
       </span>
       <span className="flex h-4 items-center px-0.5">
@@ -294,7 +294,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
             </p>
           </div>
           {has && (
-            <button type="button" onClick={onReset} className="press flex h-8 shrink-0 animate-rise items-center gap-1.5 rounded-full bg-marker-text px-3 text-xs font-bold text-white hover:bg-marker">
+            <button type="button" onClick={onReset} className="press flex h-8 shrink-0 animate-rise items-center gap-1.5 rounded-full border border-ink-muted/40 bg-white px-3 text-xs font-bold text-navy hover:bg-mist">
               <span aria-hidden>↺</span> Reset
             </button>
           )}
@@ -304,7 +304,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
           <div className="flex items-end justify-between">
             <div>
               <p className="text-xs text-ink-muted">{has ? `${labels.titleGame}, with your picks` : labels.titleGame}</p>
-              <p key={verdict} className={`animate-rise font-display text-5xl font-bold leading-none ${me.titleGame >= 0.5 || me.status === "clinched" ? "text-turf" : "text-marker-text"}`}>{verdict}</p>
+              <p key={verdict} className="animate-rise font-display text-5xl font-bold leading-none text-navy">{verdict}</p>
             </div>
             {has && <p className="text-xs text-ink-muted">Today {titleOdds(today)}</p>}
           </div>

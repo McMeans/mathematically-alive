@@ -348,10 +348,11 @@ describe("help from elsewhere", () => {
     expect(t.likeliest!.chance).toBeCloseTo(winProbability(14) * winProbability(0), 10);
     expect(t.likeliest!.upsets).toBe(1);
     expect(t.likeliest!.needsTiebreak).toBe(false);
-    // One sufficient way, so the card says so rather than calling it what the team needs.
-    expect(t.likeliest!.title).toBe("Likeliest way in for Team1");
+    // Framed as what the team needs, with a line saying it's the likeliest way, not the only one.
+    expect(t.likeliest!.title).toBe("What Team1 needs");
+    expect(t.likeliest!.scope).toBe("On its likeliest way in");
+    expect(t.likeliest!.summary).toBe("Win out, Team4 loses once");
     expect(t.likeliest!.line).toBe(`Likeliest way in (${formatOdds(t.likeliest!.chance)} chance): Team1 beats Team2; and Team3 beats Team4.`);
-    expect(t.likeliest!.heading).toBe(`${formatOdds(t.likeliest!.chance)} chance`);
     expect(t.likeliest!.own).toEqual(["Beat Team2"]);
     expect(t.likeliest!.named).toEqual(t.likeliest!.picks);
     expect(t.likeliest!.needs).toEqual(["Team3 over Team4"]);
@@ -359,9 +360,11 @@ describe("help from elsewhere", () => {
     expect(t.likeliest!.note).toBeNull();
     // The card's breakdown: the team's job, who has to lose, and the picks week by week.
     expect(t.likeliest!.ownJob).toBe("Win its last game");
+    expect(t.likeliest!.ownSummary).toBe("wins its last game");
+    expect(t.likeliest!.ownGames).toEqual([{ opponent: "Team2", winChance: winProbability(14), result: "win" }]);
     expect(t.likeliest!.ownChance).toBeCloseTo(winProbability(14), 10);
     expect(t.likeliest!.rivals).toEqual([
-      { teamId: 4, team: "Team4", needs: 1, left: 1, line: "Loses to Team3", games: [{ opponent: "Team3", chance: winProbability(0), result: "lose" }], chance: winProbability(0) },
+      { teamId: 4, team: "Team4", needs: 1, left: 1, line: "Loses to Team3", games: [{ opponent: "Team3", chance: winProbability(0), result: "lose" }], chance: winProbability(0), summary: "1 loss" },
     ]);
     expect(t.likeliest!.weeks.map((w) => [w.label, w.own, w.root.map((r) => r.what), w.favorites, w.afterLabel])).toEqual([
       ["Nov 7", "Beat Team2", [], null, t.likeliest!.weeks[0].afterLabel],
