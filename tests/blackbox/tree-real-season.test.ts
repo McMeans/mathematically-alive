@@ -152,6 +152,42 @@ describe("help from elsewhere on a real season", () => {
     expect(checked).toBeGreaterThan(20);
   }, 60_000);
 
+  it("the team's own part reads as a count of the results the way needs from it", () => {
+    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const full = seasonFromCfbd(snap);
+    const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
+    const seen = new Set<string>();
+    // These two cuts include a way that needs only some of a team's games, and one that needs none of them.
+    for (const weeks of [2, 5]) {
+      const cut: Season = {
+        ...full,
+        games: full.games.map((g) => (g.week > last - weeks ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
+      };
+      for (const t of cut.teams.filter((x) => x.conference === "ACC")) {
+        const way = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 500, seed: 1 }).likeliest;
+        if (!way) continue;
+        const left = way.ownGames.length;
+        const wins = way.ownGames.filter((g) => g.result === "win").length;
+        const losses = way.ownGames.filter((g) => g.result === "lose").length;
+        const [verb, n] = wins > 0 ? ["win", wins] : ["lose", losses];
+        if (n === 0) {
+          expect(way.ownSummary).toBe("either way");
+          expect(way.ownJob).toBe("Its own results don't matter on this way in");
+          seen.add("either way");
+        } else if (n === left) {
+          expect(way.ownSummary).toBe(left === 1 ? `${verb}s its last game` : `${verb}s all ${left}`);
+          expect(way.summary.startsWith(`${verb[0].toUpperCase()}${verb.slice(1)} out`)).toBe(true);
+        } else {
+          expect(way.ownSummary).toBe(`${verb}s ${n} of ${left}`);
+          expect(way.ownJob).toBe(`${verb[0].toUpperCase()}${verb.slice(1)} ${n} of ${left} left`);
+          expect(way.summary.startsWith(`${verb[0].toUpperCase()}${verb.slice(1)} ${n} of ${left}`)).toBe(true);
+          seen.add("some");
+        }
+      }
+    }
+    expect([...seen].sort()).toEqual(["either way", "some"]);
+  }, 60_000);
+
   it("the card's rivals and the week by week agree with the picks, for every team", () => {
     const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
     const full = seasonFromCfbd(snap);

@@ -378,6 +378,17 @@ describe("help from elsewhere", () => {
     expect(locked.likeliest).toBeNull();
   });
 
+  it("a way that needs only favorites winning says so in its one-line summary", () => {
+    const { s, upset, other } = needsHelp();
+    // Team 3 a clear favorite over Team 4, and Team 1's own game already picked: all it needs is the favorite.
+    const fav: Season = { ...s, games: s.games.map((g) => (g.id === other.id ? { ...g, spread: -10 } : g)) };
+    const way = pathTree(fav, { ...base, teamId: 1, locks: { [upset.id]: 1 } }).likeliest!;
+    expect(way.picks).toEqual([{ gameId: other.id, winner: 3 }]);
+    expect(way.ownGames).toEqual([]);
+    expect(way.rivals).toEqual([]);
+    expect(way.summary).toBe("The favorites win the game it needs");
+  });
+
   it("the likeliest way in is the most probable combination that gets the team in, keeping only what it needs", () => {
     nextId = 0;
     // Team 1 is 1-1. Five games left; every combination is checked by hand below.

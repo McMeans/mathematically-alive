@@ -811,12 +811,15 @@ function wayParts(
   const ownLeft = choices.filter(({ g }) => isOwn(g)).length;
   const ownPicks = picks.filter((x) => isOwn(x.g));
   const ownWins = ownPicks.filter((x) => x.winner === teamId).length;
+  // A way can need the team to lose (a tiebreak quirk); say so rather than "Win 0 of 3".
+  const ownLosses = ownPicks.length - ownWins;
+  const [verb, did] = ownWins > 0 ? ["Win", ownWins] : ["Lose", ownLosses];
   const ownJob = ownPicks.length === 0
     ? "Its own results don't matter on this way in"
-    : ownWins === ownLeft ? (ownLeft === 1 ? "Win its last game" : `Win all ${ownLeft} left`) : `Win ${ownWins} of ${ownLeft} left`;
+    : did === ownLeft ? (ownLeft === 1 ? `${verb} its last game` : `${verb} all ${ownLeft} left`) : `${verb} ${did} of ${ownLeft} left`;
   const ownSummary = ownPicks.length === 0
     ? "either way"
-    : ownWins === ownLeft ? (ownLeft === 1 ? "wins its last game" : `wins all ${ownLeft}`) : `wins ${ownWins} of ${ownLeft}`;
+    : `${verb.toLowerCase()}s ${did === ownLeft ? (ownLeft === 1 ? "its last game" : `all ${ownLeft}`) : `${did} of ${ownLeft}`}`;
   const ownChance = ownPicks.reduce((a, x) => a * x.p, 1);
   const byKickoff = (a: Game, b: Game) => (Date.parse(a.start) || 0) - (Date.parse(b.start) || 0) || a.week - b.week || a.id - b.id;
   const ownPicked = new Map(ownPicks.map((x) => [x.gameId, x.winner]));
@@ -896,16 +899,20 @@ const times = (n: number) => (n === 1 ? "once" : n === 2 ? "twice" : `${n} times
 
 /** The way in one line: the team's part, then the rivals by how many losses each needs. "Win out, Duke and Miami each lose twice". */
 function waySummary(parts: Pick<Likeliest, "ownGames" | "rivals">, favorites: number): string {
-  const own = parts.ownGames.filter((g) => g.result !== null);
-  const wins = own.filter((g) => g.result === "win").length;
+  const left = parts.ownGames.length;
+  const wins = parts.ownGames.filter((g) => g.result === "win").length;
+  const losses = parts.ownGames.filter((g) => g.result === "lose").length;
   const out: string[] = [];
-  if (own.length > 0) out.push(wins === parts.ownGames.length ? "win out" : `win ${wins} of ${parts.ownGames.length}`);
+  if (wins > 0) out.push(wins === left ? "win out" : `win ${wins} of ${left}`);
+  else if (losses > 0) out.push(losses === left ? "lose out" : `lose ${losses} of ${left}`);
   const byLosses = new Map<number, string[]>();
   for (const r of parts.rivals) byLosses.set(r.needs, [...(byLosses.get(r.needs) ?? []), r.team]);
   for (const [n, teams] of [...byLosses].sort((a, b) => b[0] - a[0])) {
     out.push(teams.length === 1 ? `${teams[0]} loses ${times(n)}` : `${list(teams)} each lose ${times(n)}`);
   }
-  if (out.length === 0) out.push(favorites > 0 ? "the favorites win the games it needs" : "nothing more");
+  // A way always picks something (a team with nothing left to need is in, with no way to show), so with no
+  // own result and no rival named, what's left is favorites winning.
+  if (out.length === 0) out.push(`the favorites win the ${favorites === 1 ? "game" : `${favorites} games`} it needs`);
   const line = out.join(", ");
   return line[0].toUpperCase() + line.slice(1);
 }
