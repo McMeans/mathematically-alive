@@ -16,11 +16,19 @@ function sources(): string[] {
   if (fixtures.length === 0) throw new Error("No data/season-<year>.json and no fixtures/<conference>-<year>.json to fall back to.");
   const year = (f: string) => Number(f.match(/(\d{4})\.json$/)![1]);
   const newest = Math.max(...fixtures.map(year));
+  // One season only: a conference whose newest fixture is older isn't in this build, so say so.
+  const older = fixtures.filter((f) => year(f) !== newest && !fixtures.some((g) => year(g) === newest && g.replace(/\d{4}\.json$/, "") === f.replace(/\d{4}\.json$/, "")));
+  for (const f of older) console.warn(`fixtures/${f}: no ${newest} fixture for this conference, so it is left out of the build.`);
   return fixtures.filter((f) => year(f) === newest).sort().map((f) => path.join("fixtures", f));
 }
 
-/** One snapshot from several conference fixtures of the same season; a team or game in two of them is kept once. */
-function merge(snaps: CfbdSnapshot[]): CfbdSnapshot {
+/**
+ * One snapshot from several conference fixtures of the same season; a team or game in two of them is kept once,
+ * from the most recently fetched fixture. `fetchedAt` is the oldest, so "as of" never overstates how fresh it is.
+ */
+function merge(all: CfbdSnapshot[]): CfbdSnapshot {
+  // Oldest fetch first, so a newer fixture's rows replace an older one's.
+  const snaps = [...all].sort((a, b) => a.fetchedAt.localeCompare(b.fetchedAt));
   const byKey = <T>(lists: T[][], key: (x: T) => string | number): T[] => [...new Map(lists.flat().map((x) => [key(x), x])).values()];
   return {
     year: snaps[0].year,

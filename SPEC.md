@@ -19,7 +19,7 @@ Users can lock results ("what if Miami loses to Wake Forest?") and every number 
 - **Source:** CollegeFootballData (CFBD) free tier. Teams, games, betting lines, SP+ ratings. `scripts/fetch-season.ts` makes 4 API calls and writes `data/season-<year>.json`. It needs `CFBD_API_KEY` in `.env.local`. The key is build-time only and must never reach the client or a log.
 - **Build:** `scripts/build-data.ts` turns the newest snapshot in `data/` (or, when there is none, every committed fixture for the newest year, merged) into `src/app/data/season.json`, which is gitignored. So `next build` and CI never need a key. It runs before `lint`, `typecheck` and `build`.
 - **Model:** `src/core/season.ts`, via `seasonFromCfbd`. A `Season` has teams (id, conference, FBS or not, colors, SP+ rating) and games (week, kickoff, neutral site, conference game, home/away, score once completed, spread).
-- **Fixtures:** `fixtures/acc-2025.json` (full season) and `fixtures/acc-2026.json` (mid-season, through week 9) are raw snapshots made by `scripts/make-fixture.ts`. Never hand-edit them.
+- **Fixtures:** `fixtures/acc-2025.json` and `fixtures/big-12-2025.json` (full season), and `fixtures/acc-2026.json` and `fixtures/big-12-2026.json` (mid-season, through week 9), are raw snapshots made by `scripts/make-fixture.ts` (`pnpm fixture [year] [conference]`). Never hand-edit them. Without `data/`, the build merges every fixture for the newest year.
 
 ## How the stats work
 
