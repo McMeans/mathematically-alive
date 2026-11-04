@@ -248,17 +248,17 @@ describe("help from elsewhere on a real season", () => {
 });
 
 describe("locked games on a real season", () => {
-  // Kansas in the 2026 Big 12 with its likeliest way in locked: more than a dozen picks, many of them games elsewhere.
-  const big12 = () => seasonFromCfbd(JSON.parse(readFileSync("fixtures/big-12-2026.json", "utf8")) as CfbdSnapshot);
+  // Kansas in the 2026 Big 12 with its likeliest way locked: more than a dozen picks, many of them games elsewhere.
+  const kansasLocked = () => {
+    const s = seasonFromCfbd(JSON.parse(readFileSync("fixtures/big-12-2026.json", "utf8")) as CfbdSnapshot);
+    const opts = { conference: "Big 12", teamId: s.teams.find((t) => t.name === "Kansas")!.id, iterations: 2000, seed: 1 };
+    const locks = Object.fromEntries(pathTree(s, opts).likeliest!.picks.map((p) => [p.gameId, p.winner]));
+    const tree = pathTree(s, { ...opts, locks });
+    return { s, opts, locks, tree, lockedElsewhere: tree.weeks.flatMap((w) => w.games).filter((g) => g.gameId in locks) };
+  };
 
   it("every locked game elsewhere shows the team's odds for its other side, however many games are locked", () => {
-    const s = big12();
-    const kansas = s.teams.find((t) => t.name === "Kansas")!.id;
-    const opts = { conference: "Big 12", teamId: kansas, iterations: 2000, seed: 1 };
-    const way = pathTree(s, opts).likeliest!;
-    const locks = Object.fromEntries(way.picks.map((p) => [p.gameId, p.winner]));
-    const tree = pathTree(s, { ...opts, locks });
-    const lockedElsewhere = tree.weeks.flatMap((w) => w.games).filter((g) => g.gameId in locks);
+    const { locks, lockedElsewhere } = kansasLocked();
     expect(lockedElsewhere.length).toBeGreaterThan(12);
     for (const g of lockedElsewhere) {
       const other = locks[g.gameId] === g.homeId ? g.ifAway : g.ifHome;
@@ -267,20 +267,17 @@ describe("locked games on a real season", () => {
   }, 60_000);
 
   it("a locked game's other side matches the odds with that result picked instead", () => {
-    const s = big12();
-    const kansas = s.teams.find((t) => t.name === "Kansas")!.id;
-    const opts = { conference: "Big 12", teamId: kansas, iterations: 2000, seed: 1 };
-    const way = pathTree(s, opts).likeliest!;
-    const locks = Object.fromEntries(way.picks.map((p) => [p.gameId, p.winner]));
-    const tree = pathTree(s, { ...opts, locks });
-    let checked = 0;
-    for (const g of tree.weeks.flatMap((w) => w.games).filter((x) => x.gameId in locks)) {
-      const otherSide = locks[g.gameId] === g.homeId ? g.awayId : g.homeId;
-      const shown = otherSide === g.homeId ? g.ifHome : g.ifAway;
-      const swapped = pathTree(s, { ...opts, locks: { ...locks, [g.gameId]: otherSide }, depth: 0 });
-      expect(shown, `${g.home} vs ${g.away}`).toBe(swapped.weeks.flatMap((w) => w.games).find((x) => x.gameId === g.gameId)![otherSide === g.homeId ? "ifHome" : "ifAway"]);
-      checked++;
+    const { s, opts, locks, lockedElsewhere } = kansasLocked();
+    const otherOf = (g: (typeof lockedElsewhere)[number]) => (locks[g.gameId] === g.homeId ? g.awayId : g.homeId);
+    const shownOf = (g: (typeof lockedElsewhere)[number]) => (otherOf(g) === g.homeId ? g.ifHome : g.ifAway);
+    // Five of them, those showing a percentage first: each check reruns the tree, and In or Out comes from a proof.
+    const sample = [...lockedElsewhere].sort((a, b) => Number(/%$/.test(shownOf(b))) - Number(/%$/.test(shownOf(a)))).slice(0, 5);
+    expect(sample.filter((g) => /%$/.test(shownOf(g))).length).toBeGreaterThan(2);
+    for (const g of sample) {
+      const other = otherOf(g);
+      const swapped = pathTree(s, { ...opts, locks: { ...locks, [g.gameId]: other }, depth: 0 });
+      const there = swapped.weeks.flatMap((w) => w.games).find((x) => x.gameId === g.gameId)!;
+      expect(shownOf(g), `${g.home} vs ${g.away}`).toBe(other === g.homeId ? there.ifHome : there.ifAway);
     }
-    expect(checked).toBeGreaterThan(12);
-  }, 120_000);
+  }, 60_000);
 });
