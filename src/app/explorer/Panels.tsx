@@ -29,16 +29,17 @@ export function TeamList({ conferences, names, selectedId, onSelect }: {
   // Rendered twice (desktop column and phone sheet), so the label needs a per-copy id.
   const searchId = useId();
   const query = q.trim().toLowerCase();
-  // A search looks through every conference; otherwise the chosen tab, best odds first.
+  // A search looks through every conference; otherwise the chosen tab. Either way one list, best odds first.
+  const order = byOdds(names);
   const rows = conferences
     .filter((c) => query !== "" || c.conference === shown)
     .flatMap((c) => {
       const byId = new Map(c.teams.map((t) => [t.id, t]));
-      return [...c.outlook]
-        .sort(byOdds(names))
+      return c.outlook
         .filter((o) => byId.get(o.teamId)!.name.toLowerCase().includes(query))
         .map((o) => ({ t: byId.get(o.teamId)!, o, conference: c.conference }));
-    });
+    })
+    .sort((a, b) => order(a.o, b.o));
   return (
     <div>
       {/* Search and column labels stay put while the list scrolls under them. */}

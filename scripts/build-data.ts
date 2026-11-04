@@ -4,6 +4,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { SUPPORTED_CONFERENCES } from "../src/app/config";
 import { seasonFromCfbd, type CfbdSnapshot } from "../src/core";
 
 /** The newest raw snapshot in data/, or else every committed fixture for the newest fixture year. */
@@ -17,8 +18,11 @@ function sources(): string[] {
   const year = (f: string) => Number(f.match(/(\d{4})\.json$/)![1]);
   const newest = Math.max(...fixtures.map(year));
   // One season only: a conference whose newest fixture is older isn't in this build, so say so.
-  const older = fixtures.filter((f) => year(f) !== newest && !fixtures.some((g) => year(g) === newest && g.replace(/\d{4}\.json$/, "") === f.replace(/\d{4}\.json$/, "")));
-  for (const f of older) console.warn(`fixtures/${f}: no ${newest} fixture for this conference, so it is left out of the build.`);
+  const conference = (f: string) => f.replace(/-\d{4}\.json$/, "");
+  const current = new Set(fixtures.filter((f) => year(f) === newest).map(conference));
+  for (const c of new Set(fixtures.map(conference))) {
+    if (!current.has(c)) console.warn(`fixtures/${c}-*.json: no ${newest} fixture for this conference, so it is left out of the build.`);
+  }
   return fixtures.filter((f) => year(f) === newest).sort().map((f) => path.join("fixtures", f));
 }
 
@@ -44,6 +48,18 @@ async function main() {
   const from = sources();
   const snaps = await Promise.all(from.map(async (f) => JSON.parse(await readFile(f, "utf8")) as CfbdSnapshot));
   const season = seasonFromCfbd(merge(snaps));
+  // The app shows a tab per supported conference, so each needs its own schedule in the data, not only the teams
+  // that turn up as another conference's opponents: every team in it plays a conference game against a member.
+  const conferenceOf = new Map(season.teams.map((t) => [t.id, t.conference]));
+  const missing = SUPPORTED_CONFERENCES.filter((c) => {
+    const members = season.teams.filter((t) => t.conference === c);
+    const played = (id: number) =>
+      season.games.some((g) => g.conferenceGame && (g.homeId === id || g.awayId === id) && conferenceOf.get(g.homeId) === c && conferenceOf.get(g.awayId) === c);
+    return members.length === 0 || !members.every((t) => played(t.id));
+  });
+  if (missing.length > 0) {
+    throw new Error(`No full schedule for ${missing.join(", ")} in ${from.join(", ")}. Add a fixture for it, or take it out of SUPPORTED_CONFERENCES.`);
+  }
   const out = path.join("src", "app", "data", "season.json");
   await mkdir(path.dirname(out), { recursive: true });
   await writeFile(out, JSON.stringify(season));
