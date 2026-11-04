@@ -527,6 +527,18 @@ describe("help from elsewhere", () => {
     expect(nc.ifWin).toBe(nc.ifLose);
   });
 
+  it("a picked non-conference game still shows the team's chance to win it", () => {
+    const { s, other } = needsHelp();
+    const next = game(1, 5, undefined, { conferenceGame: false, week: other.week, spread: -7 });
+    const s2 = { ...s, teams: [...s.teams, team(5, "X")], games: [...s.games, next] };
+    const nc = (locks: Record<number, number>) => pathTree(s2, { ...base, teamId: 1, locks }).weeks.find((w) => w.week === other.week)!.nonConference!;
+    const p = gameWinProbability(s2, next);
+    expect(nc({}).winChance).toBe(`${formatOdds(p)} to win`);
+    // Picked either way, the chance it had stays on the card.
+    expect(nc({ [next.id]: 1 }).winChance).toBe(`${formatOdds(p)} to win`);
+    expect(nc({ [next.id]: 5 }).winChance).toBe(`${formatOdds(p)} to win`);
+  });
+
   it("a team that has clinched the title game never shows a flat 100% playoff chance", () => {
     nextId = 0;
     // Team 1 is in; with fewer teams than playoff spots, it makes the playoff in every simulated season.
