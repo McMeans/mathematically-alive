@@ -221,7 +221,7 @@ export function Explorer({ teamId, conference, teams, conferences, names, asOf, 
           </nav>
 
           <main aria-busy={going !== null} className="scroll-thin relative min-w-0 p-4 md:overflow-y-auto md:p-6">
-            {going !== null && <Loading name={going === null ? undefined : names[going]} />}
+            {going !== null && <Loading name={names[going]} />}
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="font-display text-xl font-bold">
                 Play out the season
