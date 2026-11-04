@@ -445,7 +445,7 @@ describe("help from elsewhere", () => {
     expect(second.own).toBeNull();
     const h = t.help.find((x) => x.gameId === other.id)!;
     expect(second.games).toEqual([{ gameId: other.id, homeId: 3, awayId: 4, home: "Team3", away: "Team4",
-      ifHome: formatFine(h.oddsIfHomeWins!), ifAway: formatFine(h.oddsIfAwayWins!), swing: h.swing, likely: 3, matters: true, helps: 3, impact: "big" }]);
+      ifHome: formatFine(h.oddsIfHomeWins!), ifAway: formatFine(h.oddsIfAwayWins!), swing: h.swing, likely: 3, matters: true, helps: 3, impact: "big", homeWinChance: "50% to win", awayWinChance: "50% to win" }]);
     const locked = pathTree(s, { ...base, teamId: 1, locks: { [other.id]: 4 } });
     // Locked, the picked side shows the odds now; the other side is worked out with that pick swapped.
     const swappedIn = pathTree(s, { ...base, iterations: 2000, teamId: 1, locks: { [other.id]: 3 } }).titleGame;
@@ -547,6 +547,23 @@ describe("help from elsewhere", () => {
     expect(own.winChance).toBe(`${formatOdds(g.homeId === 1 ? p : 1 - p)} to win`);
     expect(own.cfpIfWin).toMatch(/%$/);
     expect(own.cfpIfLose).toMatch(/%$/);
+  });
+
+  it("each game elsewhere shows both sides' chance to win it, locked or not", () => {
+    const { s } = needsHelp();
+    const check = (locks: Record<number, number>) => {
+      const games = pathTree(s, { ...base, teamId: 1, locks }).weeks.flatMap((w) => w.games);
+      expect(games.length).toBeGreaterThan(0);
+      for (const x of games) {
+        const p = gameWinProbability(s, s.games.find((g) => g.id === x.gameId)!);
+        expect(x.homeWinChance).toBe(`${formatOdds(p)} to win`);
+        expect(x.awayWinChance).toBe(`${formatOdds(1 - p)} to win`);
+      }
+      return games;
+    };
+    const first = check({})[0];
+    const locked = check({ [first.gameId]: first.awayId }).find((x) => x.gameId === first.gameId)!;
+    expect(locked.homeWinChance).toBe(first.homeWinChance);
   });
 
   it("a team that only gets in as champion shows no playoff odds on its conference games", () => {

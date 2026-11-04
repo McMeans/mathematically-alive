@@ -88,8 +88,11 @@ function Week({ w, base, teamId, locks, likely, onPick }: { w: SeasonWeek; base:
         <span className="px-0.5 text-[11px] font-semibold text-ink-muted">Elsewhere</span>
         {games.map((g) => (
           <div key={g.gameId} role="group" aria-label={`${g.home} vs ${g.away}`} className="grid animate-rise grid-cols-2 gap-0.5 rounded-md bg-white p-0.5">
-            <SideButton team={g.home} odds={g.ifHome} effect={effectOf(g, g.homeId)} state={side(g.gameId, g.homeId, g.likely)} onClick={() => onPick(g.gameId, g.homeId)} />
-            <SideButton team={g.away} odds={g.ifAway} effect={effectOf(g, g.awayId)} state={side(g.gameId, g.awayId, g.likely)} onClick={() => onPick(g.gameId, g.awayId)} />
+            <SideButton team={g.home} chance={g.homeWinChance} odds={g.ifHome} effect={effectOf(g, g.homeId)} state={side(g.gameId, g.homeId, g.likely)} onClick={() => onPick(g.gameId, g.homeId)} />
+            <SideButton team={g.away} chance={g.awayWinChance} odds={g.ifAway} effect={effectOf(g, g.awayId)} state={side(g.gameId, g.awayId, g.likely)} onClick={() => onPick(g.gameId, g.awayId)} />
+            {/* Each side's chance to win the game itself, under its button, like the line under the team's own game. */}
+            <span aria-hidden className="px-1.5 text-[11px] leading-4 text-ink-muted">{g.homeWinChance}</span>
+            <span aria-hidden className="px-1.5 text-[11px] leading-4 text-ink-muted">{g.awayWinChance}</span>
           </div>
         ))}
         {listed.length === 0 && !all && <span className="px-0.5 text-[11px] text-ink-muted">Nothing elsewhere changes the odds</span>}
@@ -219,8 +222,10 @@ function effectOf(g: SeasonWeek["games"][number], winner: number): Effect | null
   return { kind: g.helps === winner ? "helps" : "hurts", impact: g.impact };
 }
 
-function SideButton({ team, odds, effect, state, onClick }: {
+function SideButton({ team, chance, odds, effect, state, onClick }: {
   team: string;
+  /** "62% to win", for screen readers; the caption under the button shows it. */
+  chance: string;
   odds: string;
   effect: Effect | null;
   state: "picked" | "likely" | "open";
@@ -233,7 +238,7 @@ function SideButton({ team, odds, effect, state, onClick }: {
     : effect && effect.impact !== "small" ? `font-bold ${ODDS_TEXT[effect.kind]}`
     : "text-ink-muted";
   return (
-    <button type="button" aria-label={`${team} wins: ${odds}${effect ? `, ${effect.kind} (${effect.impact})` : ""}`} aria-pressed={state === "picked"} onClick={onClick} className={`press flex min-h-9 min-w-0 flex-col items-start rounded px-1.5 py-0.5 text-left text-[11px] font-semibold ${look}`}>
+    <button type="button" aria-label={`${team} wins (${chance}): ${odds}${effect ? `, ${effect.kind} (${effect.impact})` : ""}`} aria-pressed={state === "picked"} onClick={onClick} className={`press flex min-h-9 min-w-0 flex-col items-start rounded px-1.5 py-0.5 text-left text-[11px] font-semibold ${look}`}>
       <span className="line-clamp-2 w-full break-words leading-tight">{team}</span>
       <span className={oddsLook}>{odds}</span>
     </button>

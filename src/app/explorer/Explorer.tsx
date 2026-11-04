@@ -231,18 +231,7 @@ export function Explorer({ teamId, conference, teams, conferences, names, asOf, 
               </div>
             </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                disabled={!likeliest && !wayOn}
-                aria-pressed={wayOn}
-                onClick={toggleWay}
-                className="min-h-11 rounded-full border border-marker px-3 text-sm font-bold text-marker-text disabled:opacity-40 aria-pressed:bg-marker aria-pressed:text-white md:min-h-8"
-              >
-                Fill in the likeliest way
-              </button>
-            </div>
-            {!wayOn && likeliest && <WayCard way={likeliest} />}
+            {(wayOn || likeliest) && <WayCard way={likeliest} filled={wayOn} picks={wayPicks?.length ?? 0} onToggle={toggleWay} />}
 
             <div className={`transition-opacity duration-200 ${busy ? "opacity-70" : ""}`}>
               <SeasonWeeks weeks={tree.weeks} base={initial.tree.weeks} teamId={teamId} locks={locks} likely={likely} onPick={pick} />

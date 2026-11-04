@@ -7,18 +7,57 @@ const RIVALS_SHOWN = 4;
 // A rival's game: a loss the way needs, a win it needs (another rival losing), or either result.
 const RESULT_LOOK = { lose: "bg-marker font-semibold text-white", win: "bg-white font-semibold text-navy ring-1 ring-inset ring-navy/30", either: "bg-mist text-ink-muted" };
 
-/** The likeliest way in, as counts: the team's own job, then how many games each rival has to lose. */
-export function WayCard({ way }: { way: Likeliest }) {
+const PILL = "press flex min-h-11 shrink-0 items-center rounded-full px-3 text-xs font-bold md:min-h-8";
+
+/**
+ * The likeliest way in, as counts: the team's own job, then how many games each rival has to lose.
+ * "Fill it in" picks every result on the board; then the card shrinks to a bar with Undo. It can also be minimized by hand.
+ * `way` is null only while filled in, when the tree with those picks may have no way left to show.
+ */
+export function WayCard({ way, filled, picks, onToggle }: { way: Likeliest | null; filled: boolean; picks: number; onToggle: () => void }) {
   const [all, setAll] = useState(false);
+  const [open, setOpen] = useState(true);
+  if (filled)
+    return (
+      <section aria-label="Likeliest way in" className="mt-2 flex max-w-3xl animate-rise items-center justify-between gap-3 rounded-xl bg-mist px-3 py-2">
+        <p className="text-sm text-navy">
+          <span className="font-display font-bold">Likeliest way filled in</span>
+          <span className="text-ink-muted"> · {picks} pick{picks === 1 ? "" : "s"}</span>
+        </p>
+        <button type="button" onClick={onToggle} className={`${PILL} bg-marker text-white hover:bg-marker-text`}>Undo</button>
+      </section>
+    );
+  if (!way) return null;
+  const fill = (
+    <button type="button" onClick={onToggle} className={`${PILL} border border-marker text-marker-text hover:bg-marker hover:text-white`}>Fill it in</button>
+  );
+  const toggle = (
+    <button type="button" aria-expanded={open} aria-label={open ? "Minimize" : "Expand"} onClick={() => setOpen(!open)}
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-ink-muted hover:bg-white md:h-8 md:w-8">
+      <svg aria-hidden viewBox="0 0 16 16" className={`h-4 w-4 transition-transform ${open ? "" : "rotate-180"}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10l4-4 4 4" /></svg>
+    </button>
+  );
+  const together = <>All of it together: <span className="font-bold text-navy">{way.heading}</span></>;
+  if (!open)
+    return (
+      <section aria-label="Likeliest way in" className="mt-2 flex max-w-3xl items-center justify-between gap-2 rounded-xl bg-mist py-1 pl-3 pr-1">
+        <p className="min-w-0 truncate text-sm">
+          <span className="font-display font-bold text-navy">{way.title}</span>
+          <span className="text-xs text-ink-muted"> · {together}</span>
+        </p>
+        <span className="flex items-center gap-1">{fill}{toggle}</span>
+      </section>
+    );
   const rivals = all ? way.rivals : way.rivals.slice(0, RIVALS_SHOWN);
   const footer = [way.favorites && `${way.favorites}.`, way.note].filter(Boolean).join(" ");
   return (
     <section aria-label="Likeliest way in" className="mt-2 flex max-w-3xl animate-rise flex-col gap-3 rounded-xl bg-mist p-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <h3 className="font-display text-base text-navy">{way.title}</h3>
-        <p className="text-xs text-ink-muted">
-          All of it together: <span className="font-bold text-navy">{way.heading}</span>
-        </p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="font-display text-base text-navy">{way.title}</h3>
+          <p className="text-xs text-ink-muted">{together}</p>
+        </div>
+        <span className="flex items-center gap-1">{fill}{toggle}</span>
       </div>
 
       {way.own.length > 0 && (

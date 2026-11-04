@@ -227,9 +227,11 @@ export type SeasonWeek = {
   /**
    * Every game elsewhere that week: locked ones first, then those that matter, then the rest, biggest swing first.
    * `ifHome`/`ifAway`: the team's odds if that side wins, for display.
+   * `homeWinChance`/`awayWinChance`: each side's chance to win the game itself ("62% to win"), locked or not.
    */
   games: {
     gameId: number; homeId: number; awayId: number; home: string; away: string; ifHome: string; ifAway: string; swing: number;
+    homeWinChance: string; awayWinChance: string;
     /** The winner the likeliest way in names here, when that side is also the one that helps the team more; else null. */
     likely: number | null;
     /** Locked, changes the team's odds (now or in a scenario), or needed by the likeliest way in. */
@@ -647,10 +649,12 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
     const w = weekOf(g);
     const locked = opts.locks?.[g.id];
     const h = helpById.get(g.id);
+    const pHome = gameWinProbability(season, g);
+    const chances = { homeWinChance: `${formatOdds(pHome)} to win`, awayWinChance: `${formatOdds(1 - pHome)} to win` };
     if (locked !== undefined) {
       const mine = formatTitleOdds(titleGame, statusOf(root.outcome));
       w.games.push({ gameId: g.id, homeId: g.homeId, awayId: g.awayId, home: name(g.homeId), away: name(g.awayId),
-        ifHome: locked === g.homeId ? mine : swapped(g.id), ifAway: locked === g.awayId ? mine : swapped(g.id), swing: Infinity, likely: null, matters: true, helps: null, impact: null });
+        ifHome: locked === g.homeId ? mine : swapped(g.id), ifAway: locked === g.awayId ? mine : swapped(g.id), swing: Infinity, likely: null, matters: true, helps: null, impact: null, ...chances });
     } else if (h) {
       const side = (odds: number | null, proof: "in" | "out" | null) =>
         odds === null && proof === null ? "—" : formatTitleOdds(odds ?? 0, statusOf(proof));
@@ -658,7 +662,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
       if (!matters) w.quiet++;
       w.games.push({ gameId: g.id, homeId: g.homeId, awayId: g.awayId, home: name(g.homeId), away: name(g.awayId),
         ifHome: side(h.oddsIfHomeWins, h.ifHomeWins), ifAway: side(h.oddsIfAwayWins, h.ifAwayWins), swing: h.swing,
-        likely: likelySide(namedWinner.get(g.id), g, h), matters, ...helpsSide(g, h, titleGame) });
+        likely: likelySide(namedWinner.get(g.id), g, h), matters, ...helpsSide(g, h, titleGame), ...chances });
     }
   }
   // A week still being played can hold the team's game already final: show the result, not a bye.
