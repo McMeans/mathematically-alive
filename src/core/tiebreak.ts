@@ -40,6 +40,9 @@ export type ConferenceData = {
   classes: Map<number, Classification>;
 };
 
+/** Conferences whose tiebreak counts non-conference results (the Big 12's total-wins step). Not part of the public API. */
+export const countsNonConference = (conference: string): boolean => conference === "Big 12";
+
 const pairKey = (a: number, b: number): number => (a < b ? a * 4294967296 + b : b * 4294967296 + a);
 
 export function conferenceData(season: Season, conference: string): ConferenceData {
@@ -176,7 +179,7 @@ export function championshipFromData(
     return { placed: pickByRankThenDraw(ids) };
   };
 
-  const big12 = conference === "Big 12";
+  const big12 = countsNonConference(conference);
   const rowOf = new Map(table.map((r) => [r.teamId, r]));
   const pctOf = new Map(table.map((r) => [r.teamId, r.pct]));
   /** Wins and losses of `id` in conference games against `opps`. */

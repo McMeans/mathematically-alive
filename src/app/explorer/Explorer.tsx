@@ -242,7 +242,7 @@ export function Explorer({ teamId, conference, teams, conferences, names, asOf, 
                 Fill in the likeliest way
               </button>
             </div>
-            {!wayOn && likeliest && <WayCard way={likeliest} teamName={team.name} />}
+            {!wayOn && likeliest && <WayCard way={likeliest} />}
 
             <div className={`transition-opacity duration-200 ${busy ? "opacity-70" : ""}`}>
               <SeasonWeeks weeks={tree.weeks} base={initial.tree.weeks} teamId={teamId} locks={locks} likely={likely} onPick={pick} />
