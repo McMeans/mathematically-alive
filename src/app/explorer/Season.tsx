@@ -134,7 +134,10 @@ function FinalCard({ vs, won, score, nonConference }: { vs: string; won: boolean
   );
 }
 
-/** The team's non-conference game that week: pickable with its playoff odds either way, or the result once it's final. */
+/**
+ * The team's non-conference game that week: pickable with its playoff odds either way (and its title odds where the
+ * conference's tiebreak counts non-conference results), or the result once it's final.
+ */
 function NonConference({ game, win, lose, onWin, onLose }: {
   game: NonNullable<SeasonWeek["nonConference"]>; win: PickState; lose: PickState; onWin: () => void; onLose: () => void;
 }) {
@@ -142,7 +145,7 @@ function NonConference({ game, win, lose, onWin, onLose }: {
   if (!game.score)
     return (
       <PickTable vs={vs} winChance={game.winChance} cfp nonConference
-        win={{ conf: null, cfp: game.ifWin, state: win, onClick: onWin }} lose={{ conf: null, cfp: game.ifLose, state: lose, onClick: onLose }} />
+        win={{ conf: game.titleIfWin, cfp: game.ifWin, state: win, onClick: onWin }} lose={{ conf: game.titleIfLose, cfp: game.ifLose, state: lose, onClick: onLose }} />
     );
   return <FinalCard vs={vs} won={game.won!} score={game.score} nonConference />;
 }
@@ -165,7 +168,8 @@ const darkTone = (odds: string) => (odds === "In" ? "font-bold text-[#8FE3B4]" :
 type PickRow = { conf: string | null; cfp: string | null; state: PickState; onClick: () => void };
 
 // Win and Lose rows under conference and CFP columns, the same shape for every game so the weeks line up.
-// `conf` null: a non-conference game, which can't move the title odds ("—"). `cfp` false: no CFP column.
+// `conf` null: a non-conference game in a conference whose tiebreak ignores non-conference results ("—").
+// `cfp` false: no CFP column.
 function PickTable({ vs, winChance, cfp, nonConference, win, lose }: {
   vs: string; winChance: string | null; cfp: boolean; nonConference?: boolean; win: PickRow; lose: PickRow;
 }) {

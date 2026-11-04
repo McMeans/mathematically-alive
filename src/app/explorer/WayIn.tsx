@@ -8,14 +8,14 @@ const RIVALS_SHOWN = 4;
 const RESULT_LOOK = { lose: "bg-marker font-semibold text-white", win: "bg-white font-semibold text-navy ring-1 ring-inset ring-navy/30", either: "bg-mist text-ink-muted" };
 
 /** The likeliest way in, as counts: the team's own job, then how many games each rival has to lose. */
-export function WayCard({ way, teamName }: { way: Likeliest; teamName: string }) {
+export function WayCard({ way }: { way: Likeliest }) {
   const [all, setAll] = useState(false);
   const rivals = all ? way.rivals : way.rivals.slice(0, RIVALS_SHOWN);
   const footer = [way.favorites && `${way.favorites}.`, way.note].filter(Boolean).join(" ");
   return (
     <section aria-label="Likeliest way in" className="mt-2 flex max-w-3xl animate-rise flex-col gap-3 rounded-xl bg-mist p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <h3 className="font-display text-base text-navy">What {teamName} needs</h3>
+        <h3 className="font-display text-base text-navy">{way.title}</h3>
         <p className="text-xs text-ink-muted">
           All of it together: <span className="font-bold text-navy">{way.heading}</span>
         </p>

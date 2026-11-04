@@ -348,6 +348,8 @@ describe("help from elsewhere", () => {
     expect(t.likeliest!.chance).toBeCloseTo(winProbability(14) * winProbability(0), 10);
     expect(t.likeliest!.upsets).toBe(1);
     expect(t.likeliest!.needsTiebreak).toBe(false);
+    // One sufficient way, so the card says so rather than calling it what the team needs.
+    expect(t.likeliest!.title).toBe("Likeliest way in for Team1");
     expect(t.likeliest!.line).toBe(`Likeliest way in (${formatOdds(t.likeliest!.chance)} chance): Team1 beats Team2; and Team3 beats Team4.`);
     expect(t.likeliest!.heading).toBe(`${formatOdds(t.likeliest!.chance)} chance`);
     expect(t.likeliest!.own).toEqual(["Beat Team2"]);

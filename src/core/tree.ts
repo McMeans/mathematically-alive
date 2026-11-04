@@ -21,7 +21,7 @@ import { FAINT, OVERALL, SCENARIO, isClear } from "./signal";
 import { gameWinProbability, mix, mulberry32, simulateSeason, type SimResult } from "./sim";
 import { likeliestWayIn, trimWay, type WayIn } from "./likeliest";
 import { provenStatus, type ProvenStatus } from "./proof";
-import { championshipFromData, conferenceData } from "./tiebreak";
+import { championshipFromData, conferenceData, countsNonConference } from "./tiebreak";
 
 export type TreeOptions = PathOptions & {
   /** How many of the team's next unplayed conference games to branch on. Default: all of them (at most 12). */
@@ -123,6 +123,8 @@ export type Likeliest = {
   overall: number;
   /** "Likeliest way in (4% chance): Virginia beats Duke; and Miami beats Pitt." The chance is `overall`. */
   line: string;
+  /** Card title: "Likeliest way in for Virginia". One sufficient way, not the only one, so not "what it needs". */
+  title: string;
   /** The same, in parts for a card. "4% chance". */
   heading: string;
   /** The team's own results: "Beat Duke", "Lose to Miami". */
@@ -211,14 +213,16 @@ export type SeasonWeek = {
   played: { gameId: number; opponent: string; site: "home" | "away" | "neutral"; won: boolean; score: string } | null;
   /**
    * The team's non-conference game that week: on the schedule, but not in the conference standings
-   * (it only feeds the ranking used to break a tie).
+   * (it feeds the ranking used to break a tie, and in the Big 12 the total-wins step too).
    * `won` and `score` once it's final, else null.
    * `ifWin`/`ifLose`: the team's playoff odds (EXPERIMENTAL) as if that result were picked, for display ("36%"); null once it's final.
+   * `titleIfWin`/`titleIfLose`: its title-game odds the same way, where the conference's tiebreak counts non-conference
+   * results (the Big 12's total wins); null elsewhere (the result reaches the title race only through the ranking) or once final.
    * `winChance`: "97% to win"; null once it's final or locked.
    */
   nonConference: {
     gameId: number; opponentId: number; opponent: string; site: "home" | "away" | "neutral"; date: string; won: boolean | null; score: string | null;
-    ifWin: string | null; ifLose: string | null; winChance: string | null;
+    ifWin: string | null; ifLose: string | null; titleIfWin: string | null; titleIfLose: string | null; winChance: string | null;
   } | null;
   /**
    * Every game elsewhere that week: locked ones first, then those that matter, then the rest, biggest swing first.
@@ -538,7 +542,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
       if (favorites > 0) elsewhere.push(elsewhere.length ? `the favorites win ${favorites} other game${favorites === 1 ? "" : "s"}` : `the favorites win ${favorites} game${favorites === 1 ? "" : "s"} elsewhere`);
       const parts = [own.length ? `${team} ${list(own)}` : "", elsewhere.length ? list(elsewhere) : ""].filter(Boolean);
       const what = parts.length ? parts.join("; and ") : `${team} needs nothing more`;
-      const note = tiebreak === null ? null : `With these results ${team} gets in ${often}, depending on ${conference === "Big 12" ? "total wins and the ranking tiebreak" : "the ranking tiebreak"}.`;
+      const note = tiebreak === null ? null : `With these results ${team} gets in ${often}, depending on ${countsNonConference(conference) ? "total wins and the ranking tiebreak" : "the ranking tiebreak"}.`;
       likeliest = {
         picks: way.picks,
         named,
@@ -548,6 +552,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
         tiebreak,
         overall,
         line: `Likeliest way in (${formatOdds(overall)} chance): ${what}.${note ? ` ${note}` : ""}`,
+        title: `Likeliest way in for ${team}`,
         heading: `${formatOdds(overall)} chance`,
         own: ownItems,
         needs,
@@ -681,10 +686,13 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
     const f = ifPicked.get(g.id);
     const ifWin = f ? playoffOdds(f.playoffIfWin) : null;
     const ifLose = f ? playoffOdds(f.playoffIfLose) : null;
+    const counts = f !== undefined && countsNonConference(conference);
     w.nonConference = {
       gameId: g.id, opponentId: opp, opponent: name(opp), site: g.neutralSite ? "neutral" : home ? "home" : "away", date: when(g),
       won: final ? mine > theirs : null, score: final ? `${mine}-${theirs}` : null,
       ifWin, ifLose,
+      titleIfWin: counts ? verdict(f.titleIfWin, g.id, teamId) : null,
+      titleIfLose: counts ? verdict(f.titleIfLose, g.id, opp) : null,
       winChance: final ? null : winChance(g),
     };
   }

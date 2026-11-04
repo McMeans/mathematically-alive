@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { championshipParticipants, explore, seasonFromCfbd, seasonOutlook, type CfbdSnapshot, type Game, type Season } from "@/core";
+import { championshipParticipants, explore, pathTree, seasonFromCfbd, seasonOutlook, type CfbdSnapshot, type Game, type Season } from "@/core";
 
 // Tiny made-up Big 12s. Teams are named by letter; `rating` stands in for the SportSource ranking, and
 // each test rates the team the earlier steps should lose higher, so a pass means those steps decided.
@@ -136,6 +136,37 @@ describe("Big 12 tiebreakers", () => {
     expect(odds({ [nonConf.id]: s.id("A") }).titleGame).toBe(1);
     const lost = odds({ [nonConf.id]: s.id("N") });
     expect(lost.titleGame).toBe(0);
+  });
+});
+
+describe("non-conference games in the Big 12", () => {
+  // L 2-0. A and B 1-1, level on every step before total wins; B has one more non-conference win, and A still
+  // plays N. The result decides the second spot, through total wins.
+  const scenario = (conference: string) => {
+    // P and Q (0-2) still meet: a conference game left that week, which the week list is built around.
+    const s = build(
+      [{ name: "L" }, { name: "A", rating: 40 }, { name: "B" }, { name: "X" }, { name: "Y" }, { name: "P" }, { name: "Q" },
+        { name: "N", conference: null, rating: 40 }, { name: "M", conference: null }],
+      [["L", "A"], ["L", "B"], ["A", "X"], ["B", "Y"], ["L", "P"], ["L", "Q"]],
+      [{ home: "B", away: "M", winner: "B" }, { home: "A", away: "N" }, { home: "P", away: "Q" }],
+    );
+    const games = s.games.map((g) => (g.homeId === s.id("P") && g.awayId === s.id("Q") ? { ...g, conferenceGame: true } : g));
+    const named = { ...s, games, teams: s.teams.map((t) => (t.conference === "Big 12" ? { ...t, conference } : t)) };
+    const card = pathTree(named, { conference, teamId: s.id("A"), iterations: 2000, seed: 1 }).weeks.find((w) => w.nonConference)!.nonConference!;
+    return card;
+  };
+
+  it("a Big 12 team's non-conference card shows its title odds either way, since total wins counts it", () => {
+    const card = scenario("Big 12");
+    expect(card.titleIfWin).toBe(">99%");
+    expect(card.titleIfLose).toBe("<0.1%");
+  });
+
+  it("where the tiebreak ignores non-conference results, the card shows no title odds", () => {
+    const card = scenario("Conference USA");
+    expect(card.titleIfWin).toBeNull();
+    expect(card.titleIfLose).toBeNull();
+    expect(card.ifWin).not.toBeNull();
   });
 });
 
