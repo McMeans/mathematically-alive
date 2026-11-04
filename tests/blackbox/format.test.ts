@@ -40,7 +40,7 @@ describe("formatRecord", () => {
 describe("oddsLabels", () => {
   it("names each odds tile after the conference", () => {
     expect(oddsLabels("ACC")).toEqual({ titleGame: "Title game", champion: "Win ACC", playoff: "Playoff", winOut: "Win out",
-      beta: "BETA", conferenceRecord: "ACC record, counting your picks", mustWin: "Must win ACC", nonConference: "Non-con", conference: "ACC", cfp: "CFP",
+      beta: "Beta", conferenceRecord: "ACC record, counting your picks", mustWin: "Must win ACC", nonConference: "Non-con", conference: "ACC", cfp: "CFP",
     });
     expect(oddsLabels("Big Ten").champion).toBe("Win Big Ten");
   });

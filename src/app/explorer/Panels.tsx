@@ -73,7 +73,7 @@ export function TeamList({ conferences, names, selectedId, onSelect }: {
             className="min-h-11 w-full rounded-lg border border-ink-muted/40 bg-white px-3 text-sm placeholder:text-ink-muted md:min-h-9"
           />
         </div>
-        <div aria-hidden className="flex items-center gap-2 px-3 pb-1 text-[11px] font-bold uppercase tracking-wide text-ink-muted">
+        <div aria-hidden className="flex items-center gap-2 px-3 pb-1 text-xs font-semibold text-ink-muted">
           <span className="w-2.5" />
           <span className="flex-1">Team</span>
           <span className="text-right">Odds</span>
@@ -119,7 +119,7 @@ export function TeamList({ conferences, names, selectedId, onSelect }: {
 
 export function Beta() {
   const { labels } = useConference();
-  return <span className="rounded border border-marker-text px-1 text-[10px] font-bold leading-4 text-marker-text">{labels.beta}</span>;
+  return <span className="rounded border border-ink-muted/50 px-1 text-[10px] font-semibold leading-4 text-ink-muted">{labels.beta}</span>;
 }
 
 /** The playoff odds, or "Must win <conference>" when the team only gets in as champion (then they'd just repeat the Win <conference> odds). */
@@ -143,7 +143,7 @@ export function StatTiles({ outlook, ifWinOut, compact, condensed }: { outlook: 
   if (condensed)
     return (
       <dl className="flex animate-rise items-baseline justify-between gap-3 text-xs text-ink-muted">
-        {([[labels.titleGame, formatChance(outlook.titleGame, outlook.status), "text-turf", false], [labels.champion, pct(outlook.champion), "text-navy", false], [labels.playoff, playoffText(outlook, pct(outlook.playoff), labels), "text-navy", true]] as const).map(([label, value, tone, badge]) => (
+        {([[labels.titleGame, formatChance(outlook.titleGame, outlook.status), "text-navy", false], [labels.champion, pct(outlook.champion), "text-navy", false], [labels.playoff, playoffText(outlook, pct(outlook.playoff), labels), "text-navy", true]] as const).map(([label, value, tone, badge]) => (
           <div key={label} className="flex items-baseline gap-1.5">
             <dt className="flex items-center gap-1">{label}{badge && <Beta />}</dt>
             <dd className={`font-display text-base font-bold ${tone}`}>{value}</dd>
@@ -153,7 +153,7 @@ export function StatTiles({ outlook, ifWinOut, compact, condensed }: { outlook: 
     );
   return (
     <dl className={`grid gap-2 ${compact ? "grid-cols-3" : "grid-cols-2"}`}>
-      <Tile label={labels.titleGame} value={formatChance(outlook.titleGame, outlook.status)} tone="text-turf" />
+      <Tile label={labels.titleGame} value={formatChance(outlook.titleGame, outlook.status)} tone="text-navy" />
       <Tile label={labels.champion} value={pct(outlook.champion)} tone="text-navy" />
       <Tile label={labels.playoff} value={playoffText(outlook, pct(outlook.playoff), labels)} tone="text-navy" badge small={mustWinConference(outlook)} />
       {!compact && <Tile label={labels.winOut} value={pct(ifWinOut)} tone="text-navy" />}
@@ -190,7 +190,7 @@ export function Stats({ team, outlook, me, path, teamId, own, names }: {
       </div>
       <StatTiles outlook={me} ifWinOut={path.ifWinOut} />
       <section aria-labelledby="proj">
-        <h3 id="proj" className="text-xs font-bold uppercase tracking-wide text-ink-muted">Projected</h3>
+        <h3 id="proj" className="text-xs font-semibold text-ink-muted">Projected</h3>
         <dl className="mt-2 divide-y divide-ink-muted/20 text-sm">
           <div className="flex justify-between py-2">
             <dt className="text-ink-soft">Record</dt>
@@ -203,7 +203,7 @@ export function Stats({ team, outlook, me, path, teamId, own, names }: {
         </dl>
       </section>
       <section aria-labelledby="race">
-        <h3 id="race" className="text-xs font-bold uppercase tracking-wide text-ink-muted">Race</h3>
+        <h3 id="race" className="text-xs font-semibold text-ink-muted">Race</h3>
         <ol className="mt-2 space-y-2 text-sm">
           {top.map((o) => (
             <li key={o.teamId} className="grid grid-cols-[88px_1fr_36px] items-center gap-2">

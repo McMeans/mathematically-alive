@@ -11,6 +11,10 @@
   --color-marker: #d9622b;
   --color-marker-text: #b4501f; /* marker orange darkened for text on white */
   --color-mist: #f3f5f8;
+  /* Results on the needs card: a win needed is turf, a loss needed teal. The -ink shades are their text on the light tints. */
+  --color-turf-ink: #17603c;
+  --color-teal: #0e7490;
+  --color-teal-ink: #0b5466;
   --color-ink-muted: #5b6478;
   --color-ink-soft: #3a4458;
 

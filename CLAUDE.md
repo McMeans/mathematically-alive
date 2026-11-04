@@ -34,5 +34,6 @@ Every change to `src/core` behavior ships with black-box tests in the same chang
 Identity direction D (canvas: https://claude.ai/artifact/KL6C75XoRFuUYPqYurETpt). Light-only, white page.
 
 - Type: Space Grotesk 700 for display (`font-display`), Inter for body and data (`font-sans`).
-- Colors (Tailwind tokens in `src/app/globals.css`): `navy` #14213D (text, the ball), `turf` #1F7A4D (accent, conference odds), `marker` #D9622B (fills only; use `marker-text` #B4501F for orange text on white), `mist` #F3F5F8 (cards), `ink-soft` #3A4458 (secondary text), `ink-muted` #5B6478 (labels, captions).
+- Colors (Tailwind tokens in `src/app/globals.css`): `navy` #14213D (text, the ball), `turf` #1F7A4D (good for your team: helps, a picked win, a win it needs), `marker` #D9622B (brand only: your team in the race, the one main action, the logo; fills only, `marker-text` #B4501F for orange text on white), `mist` #F3F5F8 (cards), `ink-soft` #3A4458 (secondary text), `ink-muted` #5B6478 (labels, captions).
+- One meaning per color: turf green is good for your team; red (`red-600`/`red-700`) bad (hurts, a picked loss); `teal` #0E7490 a loss your team needs from a rival; marker orange the brand; navy everything else, the big odds included. Beta tags, Reset and Undo stay neutral.
 - Mark: a football whose laces form a pulse line. `src/app/Logo.tsx`; below 48px it drops the lace ticks. Favicon is `src/app/icon.svg`; `public/logo.svg` is the standalone file for README, social and external use.

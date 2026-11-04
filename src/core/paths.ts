@@ -98,7 +98,7 @@ export function oddsLabels(conference: string): OddsLabels {
     champion: `Win ${conference}`,
     playoff: "Playoff",
     winOut: "Win out",
-    beta: "BETA",
+    beta: "Beta",
     conferenceRecord: `${conference} record, counting your picks`,
     mustWin: `Must win ${conference}`,
     nonConference: "Non-con",

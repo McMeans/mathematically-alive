@@ -22,14 +22,15 @@ type Props = {
   conferences: ConferenceList[];
   names: Record<number, string>;
   asOf: string;
+  /** "Through Oct 31", shown in the header; `asOf` is its tooltip. */
+  through: string;
   initial: Result;
 };
 
 export const NAVY = "#14213D";
 export const pct = (p: number | null) => (p === null ? "—" : formatOdds(p));
-export const oddsTone = (p: number | null) => (p === null ? "text-navy" : p >= 0.5 ? "text-turf" : p < 0.1 ? "text-marker-text" : "text-navy");
 
-export function Explorer({ teamId, conference, teams, conferences, names, asOf, initial }: Props) {
+export function Explorer({ teamId, conference, teams, conferences, names, asOf, through, initial }: Props) {
   const [locks, setLocks] = useState<Locks>({});
   const [result, setResult] = useState<Result>(initial);
   const [busy, setBusy] = useState(false);
@@ -163,8 +164,8 @@ export function Explorer({ teamId, conference, teams, conferences, names, asOf, 
             </div>
             <div className="flex items-center gap-3">
               <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">{conference}</span>
-              <span className="hidden text-sm text-ink-muted sm:inline">
-                {asOf}
+              <span title={asOf} className="hidden text-sm text-ink-muted sm:inline">
+                {through}
               </span>
             </div>
           </header>
@@ -190,7 +191,7 @@ export function Explorer({ teamId, conference, teams, conferences, names, asOf, 
                 </button>
                 {hasLocks && (
                   // On phones Reset rides in the pinned bar; wider screens have it in the summary column.
-                  <button type="button" onClick={() => update({})} className="press flex min-h-10 shrink-0 animate-rise items-center gap-1.5 rounded-full bg-marker-text px-3 text-sm font-bold text-white hover:bg-marker md:hidden">
+                  <button type="button" onClick={() => update({})} className="press flex min-h-10 shrink-0 animate-rise items-center gap-1.5 rounded-full border border-ink-muted/40 bg-white px-3 text-sm font-bold text-navy hover:bg-mist md:hidden">
                     <span aria-hidden>↺</span> Reset
                   </button>
                 )}
@@ -227,22 +228,11 @@ export function Explorer({ teamId, conference, teams, conferences, names, asOf, 
                 Play out the season
               </h2>
               <div className="flex items-center gap-3">
-                <span role="status" className={`text-xs ${failed ? "text-marker-text" : "text-ink-muted"}`}>{status}</span>
+                <span role="status" className={`text-xs ${failed ? "text-red-700" : "text-ink-muted"}`}>{status}</span>
               </div>
             </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                disabled={!likeliest && !wayOn}
-                aria-pressed={wayOn}
-                onClick={toggleWay}
-                className="min-h-11 rounded-full border border-marker px-3 text-sm font-bold text-marker-text disabled:opacity-40 aria-pressed:bg-marker aria-pressed:text-white md:min-h-8"
-              >
-                Fill in the likeliest way
-              </button>
-            </div>
-            {!wayOn && likeliest && <WayCard way={likeliest} />}
+            {(wayOn || likeliest) && <WayCard way={likeliest} team={team.name} filled={wayOn} picks={wayPicks?.length ?? 0} onToggle={toggleWay} />}
 
             <div className={`transition-opacity duration-200 ${busy ? "opacity-70" : ""}`}>
               <SeasonWeeks weeks={tree.weeks} base={initial.tree.weeks} teamId={teamId} locks={locks} likely={likely} onPick={pick} />

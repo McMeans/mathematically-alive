@@ -348,10 +348,11 @@ describe("help from elsewhere", () => {
     expect(t.likeliest!.chance).toBeCloseTo(winProbability(14) * winProbability(0), 10);
     expect(t.likeliest!.upsets).toBe(1);
     expect(t.likeliest!.needsTiebreak).toBe(false);
-    // One sufficient way, so the card says so rather than calling it what the team needs.
-    expect(t.likeliest!.title).toBe("Likeliest way in for Team1");
+    // Framed as what the team needs, with a line saying it's the likeliest way, not the only one.
+    expect(t.likeliest!.title).toBe("What Team1 needs");
+    expect(t.likeliest!.scope).toBe("On its likeliest way in");
+    expect(t.likeliest!.summary).toBe("Win out, Team4 loses once");
     expect(t.likeliest!.line).toBe(`Likeliest way in (${formatOdds(t.likeliest!.chance)} chance): Team1 beats Team2; and Team3 beats Team4.`);
-    expect(t.likeliest!.heading).toBe(`${formatOdds(t.likeliest!.chance)} chance`);
     expect(t.likeliest!.own).toEqual(["Beat Team2"]);
     expect(t.likeliest!.named).toEqual(t.likeliest!.picks);
     expect(t.likeliest!.needs).toEqual(["Team3 over Team4"]);
@@ -359,9 +360,11 @@ describe("help from elsewhere", () => {
     expect(t.likeliest!.note).toBeNull();
     // The card's breakdown: the team's job, who has to lose, and the picks week by week.
     expect(t.likeliest!.ownJob).toBe("Win its last game");
+    expect(t.likeliest!.ownSummary).toBe("wins its last game");
+    expect(t.likeliest!.ownGames).toEqual([{ opponent: "Team2", winChance: winProbability(14), result: "win" }]);
     expect(t.likeliest!.ownChance).toBeCloseTo(winProbability(14), 10);
     expect(t.likeliest!.rivals).toEqual([
-      { teamId: 4, team: "Team4", needs: 1, left: 1, line: "Loses to Team3", games: [{ opponent: "Team3", chance: winProbability(0), result: "lose" }], chance: winProbability(0) },
+      { teamId: 4, team: "Team4", needs: 1, left: 1, line: "Loses to Team3", games: [{ opponent: "Team3", chance: winProbability(0), result: "lose" }], chance: winProbability(0), summary: "1 loss" },
     ]);
     expect(t.likeliest!.weeks.map((w) => [w.label, w.own, w.root.map((r) => r.what), w.favorites, w.afterLabel])).toEqual([
       ["Nov 7", "Beat Team2", [], null, t.likeliest!.weeks[0].afterLabel],
@@ -373,6 +376,17 @@ describe("help from elsewhere", () => {
     const locked = pathTree(s, { ...base, teamId: 1, locks: { [upset.id]: 1, [other.id]: 3 } });
     expect(locked.root.verdict).toBe("In");
     expect(locked.likeliest).toBeNull();
+  });
+
+  it("a way that needs only favorites winning says so in its one-line summary", () => {
+    const { s, upset, other } = needsHelp();
+    // Team 3 a clear favorite over Team 4, and Team 1's own game already picked: all it needs is the favorite.
+    const fav: Season = { ...s, games: s.games.map((g) => (g.id === other.id ? { ...g, spread: -10 } : g)) };
+    const way = pathTree(fav, { ...base, teamId: 1, locks: { [upset.id]: 1 } }).likeliest!;
+    expect(way.picks).toEqual([{ gameId: other.id, winner: 3 }]);
+    expect(way.ownGames).toEqual([]);
+    expect(way.rivals).toEqual([]);
+    expect(way.summary).toBe("The favorites win the game it needs");
   });
 
   it("the likeliest way in is the most probable combination that gets the team in, keeping only what it needs", () => {
@@ -445,7 +459,7 @@ describe("help from elsewhere", () => {
     expect(second.own).toBeNull();
     const h = t.help.find((x) => x.gameId === other.id)!;
     expect(second.games).toEqual([{ gameId: other.id, homeId: 3, awayId: 4, home: "Team3", away: "Team4",
-      ifHome: formatFine(h.oddsIfHomeWins!), ifAway: formatFine(h.oddsIfAwayWins!), swing: h.swing, likely: 3, matters: true, helps: 3, impact: "big" }]);
+      ifHome: formatFine(h.oddsIfHomeWins!), ifAway: formatFine(h.oddsIfAwayWins!), swing: h.swing, likely: 3, matters: true, helps: 3, impact: "big", homeWinChance: "50% to win", awayWinChance: "50% to win" }]);
     const locked = pathTree(s, { ...base, teamId: 1, locks: { [other.id]: 4 } });
     // Locked, the picked side shows the odds now; the other side is worked out with that pick swapped.
     const swappedIn = pathTree(s, { ...base, iterations: 2000, teamId: 1, locks: { [other.id]: 3 } }).titleGame;
@@ -513,6 +527,18 @@ describe("help from elsewhere", () => {
     expect(nc.ifWin).toBe(nc.ifLose);
   });
 
+  it("a picked non-conference game still shows the team's chance to win it", () => {
+    const { s, other } = needsHelp();
+    const next = game(1, 5, undefined, { conferenceGame: false, week: other.week, spread: -7 });
+    const s2 = { ...s, teams: [...s.teams, team(5, "X")], games: [...s.games, next] };
+    const nc = (locks: Record<number, number>) => pathTree(s2, { ...base, teamId: 1, locks }).weeks.find((w) => w.week === other.week)!.nonConference!;
+    const p = gameWinProbability(s2, next);
+    expect(nc({}).winChance).toBe(`${formatOdds(p)} to win`);
+    // Picked either way, the chance it had stays on the card.
+    expect(nc({ [next.id]: 1 }).winChance).toBe(`${formatOdds(p)} to win`);
+    expect(nc({ [next.id]: 5 }).winChance).toBe(`${formatOdds(p)} to win`);
+  });
+
   it("a team that has clinched the title game never shows a flat 100% playoff chance", () => {
     nextId = 0;
     // Team 1 is in; with fewer teams than playoff spots, it makes the playoff in every simulated season.
@@ -549,6 +575,23 @@ describe("help from elsewhere", () => {
     expect(own.cfpIfLose).toMatch(/%$/);
   });
 
+  it("each game elsewhere shows both sides' chance to win it, locked or not", () => {
+    const { s } = needsHelp();
+    const check = (locks: Record<number, number>) => {
+      const games = pathTree(s, { ...base, teamId: 1, locks }).weeks.flatMap((w) => w.games);
+      expect(games.length).toBeGreaterThan(0);
+      for (const x of games) {
+        const p = gameWinProbability(s, s.games.find((g) => g.id === x.gameId)!);
+        expect(x.homeWinChance).toBe(`${formatOdds(p)} to win`);
+        expect(x.awayWinChance).toBe(`${formatOdds(1 - p)} to win`);
+      }
+      return games;
+    };
+    const first = check({})[0];
+    const locked = check({ [first.gameId]: first.awayId }).find((x) => x.gameId === first.gameId)!;
+    expect(locked.homeWinChance).toBe(first.homeWinChance);
+  });
+
   it("a team that only gets in as champion shows no playoff odds on its conference games", () => {
     const { s } = needsHelp();
     const strong = Array.from({ length: 11 }, (_, i) => team(100 + i, "Idle", 200));
@@ -558,11 +601,11 @@ describe("help from elsewhere", () => {
     expect(own.cfpIfLose).toBeNull();
   });
 
-  it("a locked game shows no chance to win", () => {
+  it("a locked game still shows the team's chance to win it", () => {
     const { s } = needsHelp();
     const first = pathTree(s, { ...base, teamId: 1 }).weeks.find((w) => w.own)!.own!;
     const locked = pathTree(s, { ...base, teamId: 1, locks: { [first.gameId]: 1 } }).weeks.find((w) => w.own?.gameId === first.gameId)!.own!;
-    expect(locked.winChance).toBeNull();
+    expect(locked.winChance).toBe(first.winChance);
   });
 
   it("records count locked results as played", () => {
