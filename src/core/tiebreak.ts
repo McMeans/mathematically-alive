@@ -307,16 +307,23 @@ export function championshipFromData(
     if (top.length === 0 || top.length === group.length) return [group];
     return [...h2hTiers(top), ...h2hTiers(group.filter((id) => !top.includes(id)))];
   };
-  /** SEC step D: the average conference win pct of the team's conference opponents. */
+  // Every member's game count divides this, so a sum of win pcts is a whole number of 1/lcm steps.
+  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+  const lcm = table.reduce((m, r) => (r.games === 0 ? m : (m * r.games) / gcd(m, r.games)), 1);
+  /**
+   * SEC step D: the average conference win pct of the team's conference opponents. Worked out in whole numbers and
+   * divided once, so averages equal as fractions come out equal (a float sum can round them apart).
+   */
   const opponentPct = (id: number): number => {
     let sum = 0;
     let n = 0;
     for (const o of data.ids) {
       const times = data.pairs.get(pairKey(id, o))?.length ?? 0;
-      sum += times * pctOf.get(o)!;
+      const r = rowOf.get(o)!;
+      if (r.games > 0) sum += (times * r.wins * lcm) / r.games;
       n += times;
     }
-    return n === 0 ? 0 : sum / n;
+    return n === 0 ? 0 : sum / (n * lcm);
   };
   /** Regular-season points scored and allowed per game, for SEC step E (the title game left out). */
   const averages = (id: number): { scored: number; allowed: number } => {
