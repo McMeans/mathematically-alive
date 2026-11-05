@@ -62,6 +62,7 @@ The biggest risk to scaling. Do it before the Big Ten.
    cross-check approach used for the SEC: random seasons against a second implementation written from the PDF.
 6. Fix on the way: the Big 12 total-wins step counts the conference title game (a week-15 non-conference game
    between two members) once it's in the data. The SEC code in #27 already leaves it out.
+   Write the black-box test that reproduces it first (a Big 12 season with the title game played), then fix it.
 
 Done when: three conferences run on configs, all current tests pass, adding a conference is a config plus tests.
 
@@ -91,7 +92,7 @@ One pass per simulated season, every stage a pure function in `src/core` and tes
 3. **Committee stand-in ranking:** rating, record, strength of schedule, conference champion flag. Fit its weights
    to past CFP rankings (store them as generated fixtures with the script that fetches them) and test that it
    reproduces past fields within a stated tolerance.
-4. **Field selection** by season format: automatic bids, the Group of Five rule `SPEC.md` describes, at-large spots,
+4. **Field selection** by season format: automatic bids, the Group of Six rule `SPEC.md` describes, at-large spots,
    seeding and byes. Format keyed by season, cited like the tiebreak rules.
 5. **Bracket:** games by simulated ratings, home field for the higher seeds where the format gives it.
 
@@ -109,8 +110,8 @@ covers it and what-ifs rerun only what a lock touches.
 
 ## Phase 6: the rest of FBS
 
-- Group of Five conferences, one config each from its official document, with "must win the conference and be the
-  top Group of Five champion" wording.
+- Group of Six conferences, one config each from its official document, with "must win the conference and be the
+  top Group of Six champion" wording.
 - Independents (Notre Dame and others): no title-game section; playoff only.
 - Picker that scales to every conference plus independents.
 
