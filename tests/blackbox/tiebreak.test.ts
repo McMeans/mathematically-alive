@@ -163,8 +163,8 @@ describe("conferences and seasons without rules", () => {
   });
 
   it("a conference with no tiebreak rules is an error, not another conference's rules", () => {
-    expect(() => championshipParticipants(named("Big Ten"), "Big Ten", l.winnerOf, { draw: noDraw })).toThrow(
-      "No tiebreak rules for Big Ten in 2026",
+    expect(() => championshipParticipants(named("Mountain West"), "Mountain West", l.winnerOf, { draw: noDraw })).toThrow(
+      "No tiebreak rules for Mountain West in 2026",
     );
   });
 
@@ -175,12 +175,12 @@ describe("conferences and seasons without rules", () => {
   });
 
   it("says which conferences and seasons have rules, so the build can refuse one that doesn't", () => {
-    expect(["ACC", "Big 12", "SEC"].map((c) => hasTiebreakRules(c, 2026))).toEqual([true, true, true]);
-    expect(hasTiebreakRules("Big Ten", 2026)).toBe(false);
+    expect(["ACC", "Big 12", "SEC", "Big Ten"].map((c) => hasTiebreakRules(c, 2026))).toEqual([true, true, true, true]);
+    expect(hasTiebreakRules("Mountain West", 2026)).toBe(false);
     expect(hasTiebreakRules("ACC", 2019)).toBe(false);
   });
 
   it("standings need no tiebreak rules", () => {
-    expect(conferenceStandings(named("Big Ten"), "Big Ten", l.winnerOf).map((s) => s.teamId)).toEqual([1, 2, 3]);
+    expect(conferenceStandings(named("Mountain West"), "Mountain West", l.winnerOf).map((s) => s.teamId)).toEqual([1, 2, 3]);
   });
 });

@@ -39,7 +39,7 @@ All logic lives in `src/core` (framework-free, public API in `src/core/index.ts`
 
 ### Tiebreakers (`tiebreak.ts`, `steps.ts`, `rules.ts`)
 
-One engine serves every conference. `rules.ts` holds a config per conference and season: the step list, the resolver settings, the game-count rule, the luck wording and the source document. A conference or season with no config is an error ("No tiebreak rules for <conference> in <season>"), never another conference's rules. `hasTiebreakRules` says whether one exists, and `scripts/build-data.ts` fails the build for a supported conference without one. Only 2026 configs exist (ACC, Big 12, SEC): the project covers the 2026 season only. Tests that check real 2025 title games load the 2025 fixtures as 2026, so they run under the 2026 rules.
+One engine serves every conference. `rules.ts` holds a config per conference and season: the step list, the resolver settings, the game-count rule, the luck wording and the source document. A conference or season with no config is an error ("No tiebreak rules for <conference> in <season>"), never another conference's rules. `hasTiebreakRules` says whether one exists, and `scripts/build-data.ts` fails the build for a supported conference without one. Only 2026 configs exist (ACC, Big 12, SEC, Big Ten): the project covers the 2026 season only. Tests that check real 2025 title games load the 2025 fixtures as 2026, so they run under the 2026 rules.
 
 - **Steps** (`steps.ts`): head-to-head (by games or by opponent, with or without dropping a team that lost to all), common opponents, highest placed common opponent (opponents level on record grouped, or ordered by head-to-head), strength of schedule, opponents' win pct, total wins (FCS cap; the title game left out), capped relative scoring margin, ranking, draw. One implementation each. Any score that can tie as a fraction is kept in whole numbers and compared exactly, so scores equal as fractions always tie (a float sum can round them apart).
 - **Resolver:** teams are ordered by conference win pct, and a tie is resolved for the open spots. Each step either can't tell the tied teams apart (next step), or names the teams at the top of its order. One alone at the top is placed and the rest start over for any spot left. Several at the top that fit the open spots are all in, seeded by starting over among them. Otherwise those at the top start over, from the first step or from the next one as the step says, and the rest are out of the tie. Settings: `spots` ("open": the tie fills every open spot at once; "one": one spot at a time, the rest re-tied from scratch after each) and `drop` (a dropped team leaves only this tie, or the whole race with a re-tie).
@@ -84,6 +84,17 @@ e. Capped relative total scoring margin against conference opponents (Appendix A
 f. Random draw: one name per open spot, the first name drawn seeded first.
 
 Step e. needs every regular-season score of every member. Until then, the simulation can't know it, so the ranking stand-in takes its place, and proofs count it as luck ("could go either way") like the ranking. Results of non-conference games feed only the averages in step e., never a win count, so `countsNonConference` is false for the SEC and its non-conference cards show no title odds. The likeliest-way note for an SEC team says "depending on the scoring margin tiebreak".
+
+**Big Ten** ("Big Ten Announces New Football Tiebreaking Procedures", Big Ten Communications, Aug. 26, 2024, the latest published: https://bigten.org/fb/article/blt6104802d94ebe1ab/). The full PDF that release links to is offline and no 2026 document is published, so the step order and wording come from the release, and the rest from secondary sources (cfb.app, CBS Sports, NBC, playoffstatus.com) and the Big Ten's 2025 title-game scenarios. Every team plays nine conference games, so there's no game-count rule. Non-conference games don't count. On the engine: `spots: "open"`, `drop: "restart"`, as for the SEC: two teams level at the top are both in, and a tie cut to two goes back to head-to-head (both shown in the 2025 scenarios). A tie is broken by the first step that tells the teams apart:
+
+a. Head-to-head. For teams who all played each other, the record among them. For teams who didn't, a team that beat every other tied team is in; otherwise go to the next step. No source has a team that lost to all the others dropped, so it isn't.
+b. Record against all common conference opponents.
+c. Record against the common opponent with the best conference record, then down the standings. Assumed, not confirmed by the document: common opponents level on record count as one group (the Big 12's stated rule).
+d. Cumulative conference win pct of all conference opponents. Every team plays nine conference games, so the average of their win pcts and the combined pct agree; the SEC's step (the average) is reused.
+e. Ranking: SportSource Analytics Team Rating Score after the regular season, modelled by the ranking stand-in.
+f. Random draw by the Commissioner or designee: one name per open spot, the first name drawn seeded first.
+
+Proofs count the ranking and the draw as luck. The likeliest-way note for a Big Ten team says "depending on the ranking tiebreak". The Big Ten isn't in `SUPPORTED_CONFERENCES` yet; that's the app change.
 
 ### Outlook (`outlook.ts`)
 
@@ -167,7 +178,7 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - The playoff model is a rough placeholder, not the committee.
 - Ranking is a stand-in for SportSource.
 - Proofs and the likeliest search have budgets. Near the edge they say "open" or return null rather than guess.
-- The app covers the ACC, the Big 12 and the SEC. The Big Ten still needs its own tiebreak rules.
+- The app covers the ACC, the Big 12 and the SEC. The Big Ten's tiebreak rules are in core; the app doesn't offer it yet. Two of its rules are assumed until the Big Ten's full document is available again (common opponents level on record count as one group; no team is dropped for losing to all the others).
 - **Expanding conferences.** Next: the Big Ten. Like the ACC and Big 12, each champion gets an automatic playoff bid, and as power-four teams they have the best at-large odds, so today's model and UI carry over.
 - **Group of Six, later.** The 2026 format guarantees a spot only to the highest-ranked Group of Six conference champion, not to every champion. Winning the conference isn't enough on its own, and at-large bids are rare but have happened. Before adding a G6 conference, the playoff model needs that rule (champion and ranked above every other G6 champion), and the UI needs wording for it ("Must win the conference and be the top G6 champion", or similar, rather than "Must win ACC").
 - A future MCP server is planned on top of `src/core`.
