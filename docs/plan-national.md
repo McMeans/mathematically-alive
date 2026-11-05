@@ -4,11 +4,14 @@ Status: proposed, November 2026. Each phase below is one PR (or a core PR plus a
 additions shipped), and each follows `CLAUDE.md`: black-box tests in the same change, the coverage gate, the
 `pr-review` skill. Read with `SPEC.md`.
 
+This plan assumes the SEC PRs #27 (core) and #28 (app) are merged. Everything below that names the SEC,
+`secPick` or `tiebreak-sec.test.ts` refers to code in those PRs, so phase 1 starts only after both land.
+
 ## Where things stand
 
-- **Conferences:** ACC, Big 12 and SEC (PRs #20–#28). Each has its own tiebreak function in
-  `src/core/tiebreak.ts`, chosen by conference name: `accBreak` (also the fallback for any other name),
-  `big12Break` and `secPick`. Rules are cited from each conference's official document.
+- **Conferences:** ACC and Big 12 on main (PRs #20–#23); the SEC in #27 and #28, pending merge. Each has its own
+  tiebreak function in `src/core/tiebreak.ts`, chosen by conference name: `accBreak` (also the fallback for any
+  other name), `big12Break` and, with #27, `secPick`. Rules are cited from each conference's official document.
 - **Simulation:** `simulateSeason` (`sim.ts`) already simulates every game in the season, nationally. The
   per-conference layer (`seasonOutlook`) replays those seasons to pick that one conference's title-game teams.
 - **Playoff:** experimental. Only the team's own conference champion is modelled; everyone else gets in by a top-11
@@ -58,7 +61,7 @@ The biggest risk to scaling. Do it before the Big Ten.
    `tiebreak-big12.test.ts`, `tiebreak-sec.test.ts`, real 2025 seasons) must pass unchanged. Keep the independent
    cross-check approach used for the SEC: random seasons against a second implementation written from the PDF.
 6. Fix on the way: the Big 12 total-wins step counts the conference title game (a week-15 non-conference game
-   between two members) once it's in the data. The SEC code already leaves it out.
+   between two members) once it's in the data. The SEC code in #27 already leaves it out.
 
 Done when: three conferences run on configs, all current tests pass, adding a conference is a config plus tests.
 
@@ -115,7 +118,7 @@ covers it and what-ifs rerun only what a lock touches.
 
 | Phase | Ships as | Depends on |
 | --- | --- | --- |
-| 1. Tiebreak engine | core PR | nothing |
+| 1. Tiebreak engine | core PR | #27 and #28 merged |
 | 2. Big Ten | core PR + app PR | 1 |
 | 3. National snapshot + refresh | build/scripts PR | nothing (can run alongside 1–2) |
 | 4. National simulation | core PRs (stages 2–3, then 4–5) | 1, 3 |
