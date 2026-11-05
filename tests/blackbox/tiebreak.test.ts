@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { championshipParticipants, conferenceStandings } from "@/core";
+import { championshipParticipants, conferenceStandings, hasTiebreakRules } from "@/core";
 import type { Game, Season } from "@/core";
 
 // Each result is [winner, loser]; ids are 1..n, all in conference "ACC".
@@ -172,6 +172,12 @@ describe("conferences and seasons without rules", () => {
     expect(() => championshipParticipants(named("ACC", 2019), "ACC", l.winnerOf, { draw: noDraw })).toThrow(
       "No tiebreak rules for ACC in 2019",
     );
+  });
+
+  it("says which conferences and seasons have rules, so the build can refuse one that doesn't", () => {
+    expect(["ACC", "Big 12", "SEC"].map((c) => hasTiebreakRules(c, 2026))).toEqual([true, true, true]);
+    expect(hasTiebreakRules("Big Ten", 2026)).toBe(false);
+    expect(hasTiebreakRules("ACC", 2019)).toBe(false);
   });
 
   it("standings need no tiebreak rules", () => {

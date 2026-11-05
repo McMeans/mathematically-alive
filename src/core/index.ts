@@ -15,6 +15,7 @@ export type {
   Team,
 } from "./season";
 export { championshipParticipants, conferenceStandings } from "./tiebreak";
+export { hasTiebreakRules } from "./rules";
 export type { ConferenceStanding, TiebreakOptions } from "./tiebreak";
 export { gameWinProbability, simulateSeason } from "./sim";
 export type { OddsOptions, SimOptions, SimResult, TeamSimStats } from "./sim";

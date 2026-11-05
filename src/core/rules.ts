@@ -92,6 +92,10 @@ const SEC: TiebreakRules = {
 
 const RULES: readonly TiebreakRules[] = [ACC, BIG_12, SEC];
 
+/** Is there a tiebreak config for the conference in that season? */
+export const hasTiebreakRules = (conference: string, season: number): boolean =>
+  RULES.some((r) => r.conference === conference && r.seasons.includes(season));
+
 /** The conference's rules for that season; throws when there are none. */
 export function tiebreakRules(conference: string, season: number): TiebreakRules {
   const rules = RULES.find((r) => r.conference === conference && r.seasons.includes(season));
