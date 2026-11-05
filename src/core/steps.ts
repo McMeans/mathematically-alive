@@ -238,7 +238,7 @@ export function opponentsWinPct(): Step {
 }
 
 /** The title game is a non-conference game between two members in the data; it comes after the tiebreak. */
-const isTitleGame = (data: Members, g: Game): boolean => !g.conferenceGame && data.ids.has(g.homeId) && data.ids.has(g.awayId);
+export const isTitleGame = (data: Pick<Members, "ids">, g: Game): boolean => !g.conferenceGame && data.ids.has(g.homeId) && data.ids.has(g.awayId);
 
 /** Regular-season wins, at most `belowFbs` of them over teams below FBS. The title game is left out. */
 export function totalWins(opts: { belowFbs: number }): Step {

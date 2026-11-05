@@ -13,7 +13,7 @@
 
 import { countsNonConference as needsNonConference, tiebreakRules, type TiebreakRules } from "./rules";
 import type { Game, Season } from "./season";
-import { comparePct, pairKey, winnerIn, type Context, type Members, type Row, type Step } from "./steps";
+import { comparePct, isTitleGame, pairKey, winnerIn, type Context, type Members, type Row, type Step } from "./steps";
 
 export type ConferenceStanding = {
   teamId: number;
@@ -54,9 +54,8 @@ function members(season: Season, conference: string): Members {
     schedule.get(g.homeId)?.push(g);
     schedule.get(g.awayId)?.push(g);
   }
-  // A non-conference game between two members is the title game, which comes after the tiebreak.
-  const titleGame = (g: Game) => !g.conferenceGame && ids.has(g.homeId) && ids.has(g.awayId);
-  const scored = [...schedule.values()].every((list) => list.every((g) => g.completed || titleGame(g)));
+  // The title game comes after the tiebreak, so it needn't be played yet.
+  const scored = [...schedule.values()].every((list) => list.every((g) => g.completed || isTitleGame({ ids }, g)));
   return {
     ids, games, pairs, schedule, scored,
     ratings: new Map(season.teams.map((t) => [t.id, t.rating])),
