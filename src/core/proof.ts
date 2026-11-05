@@ -1,8 +1,9 @@
 // Exact checks, not Monte Carlo: can a team still miss (or still make) the
 // conference title game under some combination of remaining results, its own
 // included? Rating and coin-flip tiebreak steps count as "could go either way", and so
-// does the Big 12's total-wins step, since the search covers conference games only. The SEC's scoring-margin
-// step plays the ranking until every score is in (see tiebreak.ts), so it counts the same way.
+// does the Big 12's total-wins step, since the search covers conference games only.
+// The SEC's scoring-margin step plays the ranking until every score is in (see
+// tiebreak.ts), so it counts the same way.
 // Searches remaining conference games depth-first, cutting a branch early once a
 // matching argument shows its answer; gives up after a node budget and then
 // reports "open" (never a false clinch or elimination).
