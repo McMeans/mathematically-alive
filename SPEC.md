@@ -4,7 +4,7 @@ What the app is, how its numbers are made, and the rules the code follows. Read 
 
 ## What it is
 
-A Next.js site. Pick a college football team and see what has to happen for it to reach its conference championship game. A team's page uses its own conference; the supported ones are listed in `SUPPORTED_CONFERENCES` (`src/app/config.ts`): the ACC and the Big 12. A playoff estimate exists but is experimental.
+A Next.js site. Pick a college football team and see what has to happen for it to reach its conference championship game. A team's page uses its own conference; the supported ones are listed in `SUPPORTED_CONFERENCES` (`src/app/config.ts`): the ACC, the Big 12 and the SEC. A playoff estimate exists but is experimental.
 
 It answers three questions for the picked team:
 
@@ -142,7 +142,7 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - Panels:
   - Team list with odds. One tab per supported conference (the team's own selected), and a search that looks through every conference.
   - Stat tiles: title game, title, playoff and if-win-out.
-  - The season by week. Own-game buttons and elsewhere chips can be clicked to lock a result. Each own game (conference or not) is a small table: Win and Lose rows under ACC and CFP columns, the chance to win (kept after the game is picked), and a "Non-con" tag on non-conference games. A picked win fills green, a picked loss red. Each elsewhere game shows both sides' chance to win under its buttons. Each number is what picking that result would show (see `games` above). Non-conference games show "—" in the conference column for the ACC, where they move the title race only slightly, through the ranking tiebreak. In the Big 12, whose total-wins step counts them, they show the title odds either way. For a team that must win the conference, conference cards drop the CFP column. Its non-conference cards keep it so they stay pickable and a pick on them stays visible. Final results, byes and the tables are all the same height, so the weeks line up.
+  - The season by week. Own-game buttons and elsewhere chips can be clicked to lock a result. Each own game (conference or not) is a small table: Win and Lose rows under ACC and CFP columns, the chance to win (kept after the game is picked), and a "Non-con" tag on non-conference games. A picked win fills green, a picked loss red. Each elsewhere game shows both sides' chance to win under its buttons. Each number is what picking that result would show (see `games` above). Non-conference games show "—" in the conference column for the ACC and the SEC, where they move the title race only slightly, through the ranking tiebreak. In the Big 12, whose total-wins step counts them, they show the title odds either way. For a team that must win the conference, conference cards drop the CFP column. Its non-conference cards keep it so they stay pickable and a pick on them stays visible. Final results, byes and the tables are all the same height, so the weeks line up.
   - The race table.
   - The "What <team> needs" card, from the likeliest way in (a line says so): the team's own part, then help from elsewhere, one row per team with its needed results counted ("2 losses, 2 wins") and grouped: loses to (teal), beats (green), either way (dashed). "Fill in the likeliest way" picks all its results; the card then shrinks to a bar with Undo. It can also be minimized to one line ("Win out, Utah and Kansas each lose twice").
   - The header shows "Through <day of the latest final game>", with the fetch time on hover.
@@ -160,7 +160,7 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - The playoff model is a rough placeholder, not the committee.
 - Ranking is a stand-in for SportSource.
 - Proofs and the likeliest search have budgets. Near the edge they say "open" or return null rather than guess.
-- The app covers the ACC and the Big 12. The SEC's tiebreak rules are in `src/core`; the app doesn't offer it yet. The Big Ten still needs its own.
-- **Expanding conferences.** Next: the SEC in the app, then the Big Ten. Like the ACC and Big 12, each champion gets an automatic playoff bid, and as power-four teams they have the best at-large odds, so today's model and UI carry over.
+- The app covers the ACC, the Big 12 and the SEC. The Big Ten still needs its own tiebreak rules.
+- **Expanding conferences.** Next: the Big Ten. Like the ACC and Big 12, each champion gets an automatic playoff bid, and as power-four teams they have the best at-large odds, so today's model and UI carry over.
 - **Group of Six, later.** The 2026 format guarantees a spot only to the highest-ranked Group of Six conference champion, not to every champion. Winning the conference isn't enough on its own, and at-large bids are rare but have happened. Before adding a G6 conference, the playoff model needs that rule (champion and ranked above every other G6 champion), and the UI needs wording for it ("Must win the conference and be the top G6 champion", or similar, rather than "Must win ACC").
 - A future MCP server is planned on top of `src/core`.
