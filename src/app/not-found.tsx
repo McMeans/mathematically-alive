@@ -4,7 +4,7 @@ import { SUPPORTED_CONFERENCES } from "./config";
 
 const list = (xs: readonly string[]) => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
 
-// Missing pages, including a team in a conference the app doesn't cover yet (/team/<id> for an SEC team).
+// Missing pages, including a team in a conference the app doesn't cover yet (/team/<id> for a Big Ten team).
 export default function NotFound() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-white px-4 text-center">
