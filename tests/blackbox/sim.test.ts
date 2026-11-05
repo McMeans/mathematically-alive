@@ -3,7 +3,7 @@ import { gameWinProbability, simulateSeason, winProbability } from "@/core";
 import type { Game, Season, Team } from "@/core";
 
 function team(id: number, rating: number | null = 0, classification: Team["classification"] = "fbs"): Team {
-  return { id, name: `T${id}`, abbreviation: null, conference: "C", classification, color: null, altColor: null, rating };
+  return { id, name: `T${id}`, abbreviation: null, conference: "ACC", classification, color: null, altColor: null, rating };
 }
 function game(id: number, homeId: number, awayId: number, o: Partial<Game> = {}): Game {
   return {

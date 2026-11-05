@@ -5,7 +5,7 @@
 //
 // The way is then trimmed to the results the team's spot depends on. Each result left is needed:
 // drop it and some combination of the rest keeps the team out.
-import { MAX_SPREAD, couldTieByCount, guaranteed, inEveryDraw, twoAhead, wayIn } from "./proof";
+import { couldTieByCount, spreadOk, guaranteed, inEveryDraw, twoAhead, wayIn } from "./proof";
 import type { Game } from "./season";
 import type { ConferenceData } from "./tiebreak";
 
@@ -43,14 +43,13 @@ export type Choice = { g: Game; pHome: number };
  */
 export function likeliestWayIn(
   data: ConferenceData,
-  conference: string,
   teamId: number,
   locks: Record<number, number>,
   games: Choice[],
   luck: boolean,
   starts: number[][] = [],
 ): WayIn | null {
-  const best = search(data, conference, teamId, locks, games, luck, starts);
+  const best = search(data, teamId, locks, games, luck, starts);
   return best && summary(games, best, () => true, luck);
 }
 
@@ -58,9 +57,9 @@ export function likeliestWayIn(
  * The way cut down to the results the team's spot depends on (each one left is needed). `quick`: a
  * tenth of the budget, for comparing ways; it may keep results that aren't needed.
  */
-export function trimWay(data: ConferenceData, conference: string, teamId: number, locks: Record<number, number>, games: Choice[], way: WayIn, quick = false): WayIn {
+export function trimWay(data: ConferenceData, teamId: number, locks: Record<number, number>, games: Choice[], way: WayIn, quick = false): WayIn {
   const winner = new Map(way.picks.map((p) => [p.gameId, p.winner]));
-  return trim(data, conference, teamId, locks, games, games.map(({ g }) => winner.get(g.id)!), way.needsTiebreak, quick ? TRIM_BUDGET / 10 : TRIM_BUDGET);
+  return trim(data, teamId, locks, games, games.map(({ g }) => winner.get(g.id)!), way.needsTiebreak, quick ? TRIM_BUDGET / 10 : TRIM_BUDGET);
 }
 
 /** The picks in `games` that `keep` keeps, with the chance they all happen. */
@@ -81,7 +80,7 @@ function summary(games: Choice[], winners: number[], keep: (gameId: number) => b
 /** Cost of a result: how much less likely it is than the likelier side (0 for the likelier side). */
 const cost = (p: number, other: number): number => Math.log(Math.max(p, other)) - Math.log(Math.max(p, 1e-12));
 
-function search(data: ConferenceData, conference: string, teamId: number, locks: Record<number, number>, games: Choice[], luck: boolean, starts: number[][]): number[] | null {
+function search(data: ConferenceData, teamId: number, locks: Record<number, number>, games: Choice[], luck: boolean, starts: number[][]): number[] | null {
   const ids = [...data.ids];
   const wins = new Map<number, number>(ids.map((id) => [id, 0]));
   const scheduled = new Map<number, number>(ids.map((id) => [id, 0]));
@@ -96,19 +95,18 @@ function search(data: ConferenceData, conference: string, teamId: number, locks:
   for (const { g } of games) { left.set(g.homeId, left.get(g.homeId)! + 1); left.set(g.awayId, left.get(g.awayId)! + 1); }
   const pct = (id: number, w: number) => (scheduled.get(id)! === 0 ? 0 : w / scheduled.get(id)!);
   const myGames = scheduled.get(teamId)!;
-  // The early stop below assumes schedules differ by at most MAX_SPREAD games, as the proof's does.
-  const counts = [...scheduled.values()];
-  const spreadOk = Math.max(...counts) - Math.min(...counts) <= MAX_SPREAD;
+  // The early stop below needs what the proof's does (see spreadOk).
+  const shortcutOk = spreadOk(data, [...scheduled.values()]);
   const likely = games.map(({ g, pHome }) => (pHome >= 0.5 ? g.homeId : g.awayId));
   const choice = new Array<number>(games.length);
-  const witness = wayIn(data, conference, teamId, locks, luck, WITNESS_BUDGET);
+  const witness = wayIn(data, teamId, locks, luck, WITNESS_BUDGET);
   if (!witness) return null;
   const costs = games.map(({ g, pHome }) => (w: number) => (w === g.homeId ? cost(pHome, 1 - pHome) : cost(1 - pHome, pHome)));
   const total = (ws: number[]) => ws.reduce((sum, w, k) => sum + costs[k](w), 0);
   const isIn = (ws: number[]): boolean => {
     const all = new Map(fixed);
     games.forEach(({ g }, k) => all.set(g.id, ws[k]));
-    return inEveryDraw(data, conference, teamId, (g) => all.get(g.id)!, luck);
+    return inEveryDraw(data, teamId, (g) => all.get(g.id)!, luck);
   };
   // Flip results to the likelier side, costliest first, as long as the team stays in.
   const climb = (start: number[]): number[] => {
@@ -149,13 +147,13 @@ function search(data: ConferenceData, conference: string, teamId: number, locks:
       if (id === teamId) continue;
       const w = wins.get(id)!;
       const most = w + left.get(id)!;
-      if (pct(id, most) >= pct(teamId, myMin) || couldTieByCount(myGames, myMin, myMax, scheduled.get(id)!, w, most)) maybeAhead++;
+      if (pct(id, most) >= pct(teamId, myMin) || couldTieByCount(data, myGames, myMin, myMax, scheduled.get(id)!, w, most)) maybeAhead++;
     }
-    if (twoAhead(ids, teamId, myGames, myMin, myMax, scheduled, wins, left)) return;
+    if (twoAhead(data, ids, teamId, myGames, myMin, myMax, scheduled, wins, left)) return;
     // In whatever happens from here: the rest go the likelier way, at no extra cost.
-    if ((spreadOk && maybeAhead < 2) || k === games.length) {
+    if ((shortcutOk && maybeAhead < 2) || k === games.length) {
       if (k === games.length) {
-        if (!inEveryDraw(data, conference, teamId, (g) => fixed.get(g.id)!, luck)) return;
+        if (!inEveryDraw(data, teamId, (g) => fixed.get(g.id)!, luck)) return;
       }
       best = [...choice.slice(0, k), ...likely.slice(k)];
       bestCost = spent;
@@ -184,7 +182,6 @@ function search(data: ConferenceData, conference: string, teamId: number, locks:
 /** Drop each picked result the spot doesn't depend on, trying the least likely ones first. */
 function trim(
   data: ConferenceData,
-  conference: string,
   teamId: number,
   locks: Record<number, number>,
   games: Choice[],
@@ -206,7 +203,7 @@ function trim(
     // The kept results already get the team in, so dropping this one is safe exactly when the other
     // result gets it in too. Proving that one result leaves one game fewer to search than leaving it open.
     const g = games[k].g;
-    const ok = guaranteed(data, conference, teamId, { ...locks, ...Object.fromEntries(kept), [id]: w === g.homeId ? g.awayId : g.homeId }, luck, check);
+    const ok = guaranteed(data, teamId, { ...locks, ...Object.fromEntries(kept), [id]: w === g.homeId ? g.awayId : g.homeId }, luck, check);
     pool.left += check.left;
     if (!ok) kept.set(id, w);
   }

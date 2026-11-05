@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { championshipParticipants, conferenceStandings } from "@/core";
 import type { Game, Season } from "@/core";
 
-// Each result is [winner, loser]; ids are 1..n, all in conference "C".
+// Each result is [winner, loser]; ids are 1..n, all in conference "ACC".
 function league(n: number, results: [number, number][], ratings: Record<number, number> = {}): {
   season: Season;
   winnerOf: (g: Game) => number;
@@ -11,7 +11,7 @@ function league(n: number, results: [number, number][], ratings: Record<number, 
     id: i + 1,
     name: `T${i + 1}`,
     abbreviation: null,
-    conference: "C",
+    conference: "ACC",
     classification: "fbs" as const,
     color: null,
     altColor: null,
@@ -41,12 +41,12 @@ const noDraw = () => {
   throw new Error("draw should not be needed");
 };
 const run = (l: ReturnType<typeof league>, draw: () => number = noDraw, rank?: (id: number) => number) =>
-  championshipParticipants(l.season, "C", l.winnerOf, { draw, rank });
+  championshipParticipants(l.season, "ACC", l.winnerOf, { draw, rank });
 
 describe("conference standings", () => {
   it("lists teams best record first with wins, losses and pct", () => {
     const l = league(3, [[1, 2], [1, 3], [2, 3]]);
-    const s = conferenceStandings(l.season, "C", l.winnerOf);
+    const s = conferenceStandings(l.season, "ACC", l.winnerOf);
     expect(s.map((x) => x.teamId)).toEqual([1, 2, 3]);
     expect(s[1]).toEqual({ teamId: 2, wins: 1, losses: 1, pct: 0.5 });
   });
@@ -119,7 +119,7 @@ describe("championship participants", () => {
       [2, 5], [2, 6], [2, 7], [5, 7], [6, 7], [5, 8], [6, 8],
     ];
     const l = league(8, results, { 1: 1, 3: 50 });
-    const s = conferenceStandings(l.season, "C", l.winnerOf);
+    const s = conferenceStandings(l.season, "ACC", l.winnerOf);
     expect(s[0].teamId).toBe(4);
     for (const id of [1, 2, 3]) expect(s.find((x) => x.teamId === id)).toMatchObject({ wins: 3, losses: 3 });
     expect(s.slice(1, 4).map((x) => x.teamId).sort()).toEqual([1, 2, 3]);
@@ -130,7 +130,7 @@ describe("championship participants", () => {
     // Team 1 is 7-1 in 8 games, team 2 is 8-1 in 9 games; they never met.
     const results: [number, number][] = [...chain(1, 3, 9), [10, 1], ...chain(2, 3, 10), [3, 2]];
     const l = league(10, results);
-    const s = conferenceStandings(l.season, "C", l.winnerOf);
+    const s = conferenceStandings(l.season, "ACC", l.winnerOf);
     expect(s.find((x) => x.teamId === 1)).toMatchObject({ wins: 7, losses: 1 });
     expect(s.find((x) => x.teamId === 2)).toMatchObject({ wins: 8, losses: 1 });
     expect(run(l)).toEqual([2, 1]);
@@ -153,5 +153,28 @@ describe("championship participants", () => {
     // Rank places 3; the restart finds 1 and 2 tied and head-to-head puts 1 second.
     const l = league(5, [[1, 2], [2, 3], [3, 1], ...chain(1, 4, 5), ...chain(2, 4, 5), ...chain(3, 4, 5)], { 3: 99 });
     expect(run(l)).toEqual([3, 1]);
+  });
+});
+
+describe("conferences and seasons without rules", () => {
+  const l = league(3, [[1, 2], [1, 3], [2, 3]]);
+  const named = (conference: string, year = 2026): Season => ({
+    ...l.season, year, teams: l.season.teams.map((t) => ({ ...t, conference })),
+  });
+
+  it("a conference with no tiebreak rules is an error, not another conference's rules", () => {
+    expect(() => championshipParticipants(named("Big Ten"), "Big Ten", l.winnerOf, { draw: noDraw })).toThrow(
+      "No tiebreak rules for Big Ten in 2026",
+    );
+  });
+
+  it("a season the rules don't cover is an error too", () => {
+    expect(() => championshipParticipants(named("ACC", 2019), "ACC", l.winnerOf, { draw: noDraw })).toThrow(
+      "No tiebreak rules for ACC in 2019",
+    );
+  });
+
+  it("standings need no tiebreak rules", () => {
+    expect(conferenceStandings(named("Big Ten"), "Big Ten", l.winnerOf).map((s) => s.teamId)).toEqual([1, 2, 3]);
   });
 });

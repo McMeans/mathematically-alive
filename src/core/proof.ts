@@ -1,9 +1,10 @@
 // Exact checks, not Monte Carlo: can a team still miss (or still make) the
 // conference title game under some combination of remaining results, its own
 // included? Rating and coin-flip tiebreak steps count as "could go either way", and so
-// does the Big 12's total-wins step, since the search covers conference games only.
-// The SEC's scoring-margin step plays the ranking until every score is in (see
-// tiebreak.ts), so it counts the same way.
+// do steps that count non-conference results (the Big 12's total wins), since the search
+// covers conference games only. A scoring-margin step plays the ranking until every score
+// is in (see steps.ts), so it counts the same way. Shortcuts that depend on the ACC's
+// game-count rule ask the conference's rules whether it applies.
 // Searches remaining conference games depth-first, cutting a branch early once a
 // matching argument shows its answer; gives up after a node budget and then
 // reports "open" (never a false clinch or elimination).
@@ -18,20 +19,20 @@ const BUDGET = 30_000;
 /** `budget`: search nodes per check; a smaller one answers faster but says "open" more often. */
 export function provenStatus(season: Season, conference: string, teamId: number, locks: Record<number, number> = {}, budget = BUDGET): ProvenStatus {
   const data = conferenceData(season, conference);
-  if (!canGetIn(data, conference, teamId, locks, true, budget)) return "eliminated";
+  if (!canGetIn(data, teamId, locks, true, budget)) return "eliminated";
   // A search for a way out that finds one settles it: the team isn't in for sure, and the one-rival check below
   // could only agree. Only an answer cut short by the budget or the draw limit goes on to that check.
   const out = { yes: false };
-  if (!canFinish(data, conference, teamId, locks, true, false, { left: budget }, undefined, true, out)) return "clinched";
+  if (!canFinish(data, teamId, locks, true, false, { left: budget }, undefined, true, out)) return "clinched";
   if (out.yes) return "open";
-  return oneRivalLeft(data, conference, teamId, locks, budget) ? "clinched" : "open";
+  return oneRivalLeft(data, teamId, locks, budget) ? "clinched" : "open";
 }
 
 /**
  * Two teams play for the title, so when at most one other team can still get in, the team is in. Catches
  * clinches the search above runs out of budget on: each other team's elimination is a smaller search.
  */
-function oneRivalLeft(data: ConferenceData, conference: string, teamId: number, locks: Record<number, number>, budget: number): boolean {
+function oneRivalLeft(data: ConferenceData, teamId: number, locks: Record<number, number>, budget: number): boolean {
   // Most wins so far first (played and locked): those teams can usually get in, found in a few probes, and two of
   // them end the check. Each team's answer doesn't depend on the order, so neither does the result.
   const wins = new Map<number, number>([...data.ids].map((id) => [id, 0]));
@@ -43,7 +44,7 @@ function oneRivalLeft(data: ConferenceData, conference: string, teamId: number, 
   for (const id of [...data.ids].sort((a, b) => wins.get(b)! - wins.get(a)!)) {
     if (id === teamId) continue;
     // Out of budget counts as "can get in", so the answer stays a proof.
-    if (canGetIn(data, conference, id, locks, true, budget) && ++rivals > 1) return false;
+    if (canGetIn(data, id, locks, true, budget) && ++rivals > 1) return false;
   }
   return true;
 }
@@ -54,37 +55,37 @@ function oneRivalLeft(data: ConferenceData, conference: string, teamId: number, 
  */
 export function guaranteed(
   data: ConferenceData,
-  conference: string,
   teamId: number,
   locks: Record<number, number>,
   luck: boolean,
   pool: { left: number } = { left: BUDGET },
 ): boolean {
-  return !canFinish(data, conference, teamId, locks, true, luck, pool);
+  return !canFinish(data, teamId, locks, true, luck, pool);
 }
 
 /**
  * One full set of conference results (game id -> winner) that puts the team in under the first draw order,
  * or null if none was found. A search for an example, not a proof: other draw orders aren't tried.
  */
-export function wayIn(data: ConferenceData, conference: string, teamId: number, locks: Record<number, number>, luck: boolean, budget = BUDGET): Map<number, number> | null {
+export function wayIn(data: ConferenceData, teamId: number, locks: Record<number, number>, luck: boolean, budget = BUDGET): Map<number, number> | null {
   const found = new Map<number, number>();
-  return canFinish(data, conference, teamId, locks, false, luck, { left: budget }, found, false) && found.size > 0 ? found : null;
+  return canFinish(data, teamId, locks, false, luck, { left: budget }, found, false) && found.size > 0 ? found : null;
 }
 
 /**
  * Could a and b end up "tied" through the alternate-game-count rule: different numbers of conference
  * games but the same wins or the same losses? Each side gives its scheduled games and final-win range.
+ * Never, where the rules have no such rule.
  */
-export function couldTieByCount(gA: number, minA: number, maxA: number, gB: number, minB: number, maxB: number): boolean {
-  if (gA === gB) return false;
+export function couldTieByCount(data: ConferenceData, gA: number, minA: number, maxA: number, gB: number, minB: number, maxB: number): boolean {
+  if (!data.rules.gameCountTies || gA === gB) return false;
   const winsOverlap = minA <= maxB && minB <= maxA;
   const lossesOverlap = gA - maxA <= gB - minB && gB - maxB <= gA - minA;
   return winsOverlap || lossesOverlap;
 }
 
-function canGetIn(data: ConferenceData, conference: string, teamId: number, locks: Record<number, number>, luck: boolean, budget = BUDGET): boolean {
-  return canFinish(data, conference, teamId, locks, false, luck, { left: budget });
+function canGetIn(data: ConferenceData, teamId: number, locks: Record<number, number>, luck: boolean, budget = BUDGET): boolean {
+  return canFinish(data, teamId, locks, false, luck, { left: budget });
 }
 
 // Before searching for a way in, try this many random result sets that mostly let the team with
@@ -99,7 +100,7 @@ const MAX_DRAWS = 2_000;
  * the team in, or with `out`, leaves it out? The team wins its ranking and draw steps with `luck`,
  * loses them without. Too many draw outcomes to try counts as yes.
  */
-function someDraw(data: ConferenceData, conference: string, teamId: number, winnerOf: (g: Game) => number, luck: boolean, out: boolean, guess?: { made: boolean }): boolean {
+function someDraw(data: ConferenceData, teamId: number, winnerOf: (g: Game) => number, luck: boolean, out: boolean, guess?: { made: boolean }): boolean {
   if (surelyOut(data, teamId, winnerOf)) return out;
   const rank = (id: number) => (id === teamId ? (luck ? Infinity : -Infinity) : 0);
   const choice: number[] = [];
@@ -111,7 +112,7 @@ function someDraw(data: ConferenceData, conference: string, teamId: number, winn
       choice[j] ??= 0;
       return (choice[j] + 0.5) / count;
     };
-    const [a, b] = championshipFromData(data, conference, winnerOf, { draw, rank, allGames: false });
+    const [a, b] = championshipFromData(data, winnerOf, { draw, rank, allGames: false });
     if ((a === teamId || b === teamId) !== out) return true;
     // Next draw outcome: like an odometer over this run's draws, later ones starting over.
     choice.length = counts.length;
@@ -153,6 +154,7 @@ function surelyOut(data: ConferenceData, teamId: number, winnerOf: (g: Game) => 
     else if (p === topP) topTied = true;
   }
   if (above < 2) return false;
+  if (!data.rules.gameCountTies) return true;
   if (topTied || games.get(top) === games.get(teamId)) return true;
   const sameWins = wins.get(top) === wins.get(teamId);
   const sameLosses = games.get(top)! - wins.get(top)! === games.get(teamId)! - wins.get(teamId)!;
@@ -160,14 +162,14 @@ function surelyOut(data: ConferenceData, teamId: number, winnerOf: (g: Game) => 
 }
 
 /** Is the team in under the first draw order (each pick among tied teams goes to the first of them)? */
-function firstDraw(data: ConferenceData, conference: string, teamId: number, winnerOf: (g: Game) => number, luck: boolean): boolean {
-  const [a, b] = championshipFromData(data, conference, winnerOf, { draw: () => 0, rank: (id) => (id === teamId ? (luck ? Infinity : -Infinity) : 0), allGames: false });
+function firstDraw(data: ConferenceData, teamId: number, winnerOf: (g: Game) => number, luck: boolean): boolean {
+  const [a, b] = championshipFromData(data, winnerOf, { draw: () => 0, rank: (id) => (id === teamId ? (luck ? Infinity : -Infinity) : 0), allGames: false });
   return a === teamId || b === teamId;
 }
 
 /** Is the team in whatever way the draws go, given every game's winner? `luck` as for someDraw. */
-export function inEveryDraw(data: ConferenceData, conference: string, teamId: number, winnerOf: (g: Game) => number, luck: boolean): boolean {
-  return !someDraw(data, conference, teamId, winnerOf, luck, true);
+export function inEveryDraw(data: ConferenceData, teamId: number, winnerOf: (g: Game) => number, luck: boolean): boolean {
+  return !someDraw(data, teamId, winnerOf, luck, true);
 }
 
 /**
@@ -179,6 +181,7 @@ export function inEveryDraw(data: ConferenceData, conference: string, teamId: nu
  * other team that's ahead.
  */
 export function twoAhead(
+  data: ConferenceData,
   ids: Iterable<number>,
   teamId: number,
   myGames: number,
@@ -207,15 +210,19 @@ export function twoAhead(
   for (const id of ids) {
     if (id === teamId) continue;
     const w = wins.get(id)!;
-    if (tieRouteOpen(myGames, myMin, myMax, games.get(id)!, w, w + left.get(id)!, id === first ? secondP : firstP)) return false;
+    if (tieRouteOpen(data, myGames, myMin, myMax, games.get(id)!, w, w + left.get(id)!, id === first ? secondP : firstP)) return false;
   }
   return true;
 }
 
-// The early stops below assume conference schedules differ by at most one game (the ACC: 8 or 9).
-// With a wider spread, a lower-ranked team could be placed through another team's "Tied Teams" group,
-// so the stop that proves a team in is switched off.
-export const MAX_SPREAD = 1;
+// Under the game-count rule, the early stops below assume conference schedules differ by at most one game
+// (the ACC: 8 or 9). With a wider spread, a lower-ranked team could be placed through another team's "Tied
+// Teams" group, so the stop that proves a team in is switched off. Without the rule, any spread is fine.
+const MAX_SPREAD = 1;
+
+/** Do the early stops that prove a team in hold for these conference game counts? */
+export const spreadOk = (data: ConferenceData, counts: number[]): boolean =>
+  !data.rules.gameCountTies || Math.max(...counts) - Math.min(...counts) <= MAX_SPREAD;
 
 /**
  * True when the team can't make the top two whatever happens in `open` (its own games there are
@@ -225,6 +232,7 @@ export const MAX_SPREAD = 1;
  * (false) when the alternate-game-count rule could still pull the team into the top group.
  */
 function cannotGetIn(
+  data: ConferenceData,
   ids: number[],
   teamId: number,
   myGames: number,
@@ -243,7 +251,7 @@ function cannotGetIn(
   for (const x of others) {
     let top = -Infinity;
     for (const y of others) if (y !== x) top = Math.max(top, pct(y, wins.get(y)!));
-    if (tieRouteOpen(myGames, myMin, myMax, games.get(x)!, wins.get(x)!, wins.get(x)! + left.get(x)!, top)) return false;
+    if (tieRouteOpen(data, myGames, myMin, myMax, games.get(x)!, wins.get(x)!, wins.get(x)! + left.get(x)!, top)) return false;
   }
   const index = new Map(others.map((id, i) => [id, i]));
   const cap = Int32Array.from(others, (id) => Math.floor(best * games.get(id)! + 1e-9) - wins.get(id)!);
@@ -262,8 +270,8 @@ function cannotGetIn(
  * Could X finish with one record that both puts it above `top` (every other team's lowest possible
  * percentage) and ties the team by game count (same wins or same losses, different number of games)?
  */
-function tieRouteOpen(myGames: number, myMin: number, myMax: number, xGames: number, xMin: number, xMax: number, top: number): boolean {
-  if (xGames === myGames || xGames === 0) return false;
+function tieRouteOpen(data: ConferenceData, myGames: number, myMin: number, myMax: number, xGames: number, xMin: number, xMax: number, top: number): boolean {
+  if (!data.rules.gameCountTies || xGames === myGames || xGames === 0) return false;
   for (let w = xMin; w <= xMax; w++) {
     if (w / xGames <= top) continue;
     const losses = xGames - w;
@@ -310,6 +318,7 @@ function placeAll(pairs: [number, number][], cap: Int32Array, free: number): boo
  * can only go to one.
  */
 function cannotMissOut(
+  data: ConferenceData,
   ids: number[],
   teamId: number,
   myGames: number,
@@ -326,7 +335,7 @@ function cannotMissOut(
     if (id === teamId) continue;
     const w = wins.get(id)!;
     const l = left.get(id)!;
-    const n = couldTieByCount(myGames, myMin, myMin, games.get(id)!, w, w + l) ? 0 : Math.max(0, Math.ceil(mine * games.get(id)! - 1e-9) - w);
+    const n = couldTieByCount(data, myGames, myMin, myMin, games.get(id)!, w, w + l) ? 0 : Math.max(0, Math.ceil(mine * games.get(id)! - 1e-9) - w);
     if (n <= l) need.set(id, n);
   }
   if (need.size < 2) return true;
@@ -358,7 +367,6 @@ function cannotMissOut(
  */
 function canFinish(
   data: ConferenceData,
-  conference: string,
   teamId: number,
   locks: Record<number, number>,
   wantOut: boolean,
@@ -384,8 +392,7 @@ function canFinish(
     if (w === undefined) open.push(g);
     else { fixed.set(g.id, w); wins.set(w, wins.get(w)! + 1); }
   }
-  const counts = [...games.values()];
-  const spreadOk = Math.max(...counts) - Math.min(...counts) <= MAX_SPREAD;
+  const shortcutOk = spreadOk(data, [...games.values()]);
   // The team's own games first, then games between the teams with the most wins: those decide soonest.
   const isOwn = (g: Game) => g.homeId === teamId || g.awayId === teamId;
   const top = (g: Game) => Math.max(wins.get(g.homeId)!, wins.get(g.awayId)!);
@@ -402,13 +409,13 @@ function canFinish(
     if (--budget < 0) { gaveUp = true; return true; }
     const myMin = wins.get(teamId)!;
     const myMax = myMin + left.get(teamId)!;
-    if (!wantOut && cannotGetIn(ids, teamId, myGames, myMin, myMax, games, wins, left, open, k)) return false;
-    if (wantOut && spreadOk && cannotMissOut(ids, teamId, myGames, myMin, games, wins, left, open, k)) return false;
+    if (!wantOut && cannotGetIn(data, ids, teamId, myGames, myMin, myMax, games, wins, left, open, k)) return false;
+    if (wantOut && shortcutOk && cannotMissOut(data, ids, teamId, myGames, myMin, games, wins, left, open, k)) return false;
     if (k === open.length) {
       const guess = { made: false };
       const ok = everyDraw
-        ? someDraw(data, conference, teamId, (g) => fixed.get(g.id)!, luck, wantOut, guess)
-        : firstDraw(data, conference, teamId, (g) => fixed.get(g.id)!, luck) !== wantOut;
+        ? someDraw(data, teamId, (g) => fixed.get(g.id)!, luck, wantOut, guess)
+        : firstDraw(data, teamId, (g) => fixed.get(g.id)!, luck) !== wantOut;
       if (ok && guess.made) guessed = true;
       if (ok && witness) for (const [id, w] of fixed) witness.set(id, w);
       return ok;
@@ -447,7 +454,7 @@ function canFinish(
         w2.set(w, w2.get(w)! + 1);
       }
       // One draw order is enough here: a probe only has to find some way in, never rule one out.
-      if (firstDraw(data, conference, teamId, (g) => f2.get(g.id)!, luck)) {
+      if (firstDraw(data, teamId, (g) => f2.get(g.id)!, luck)) {
         if (witness) for (const [id, w] of f2) witness.set(id, w);
         return true;
       }

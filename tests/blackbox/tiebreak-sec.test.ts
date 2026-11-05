@@ -170,6 +170,18 @@ describe("SEC tiebreakers", () => {
     expect(pair(s)).toEqual([s.id("B"), s.id("A")]);
   });
 
+  it("scoring margin stays defined against an opponent that never scored", () => {
+    // X scores no points all season, so A's shutout of X is 0 points over an average of 0. Both spots still go to
+    // real teams: A and B, the only teams with a win.
+    const s = build(
+      [{ name: "A" }, { name: "B" }, { name: "X" }, { name: "Y" }, { name: "N", conference: null }],
+      [["A", "X", 21, 0], ["B", "Y", 21, 14]],
+      [{ home: "N", away: "X", winner: "N", score: [7, 0] }, { home: "Y", away: "N", winner: "Y", score: [20, 10] }],
+      { scored: true },
+    );
+    expect(pair(s).sort()).toEqual([s.id("A"), s.id("B")].sort());
+  });
+
   it("while a score is still to come, the ranking stands in for scoring margin", () => {
     const s = margin(["A", "X", 35, 7], ["B", "Y", 21, 14], [[10, 20]], [[10, 20]], false);
     expect(pair(s)).toEqual([s.id("B"), s.id("A")]);

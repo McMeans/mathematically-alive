@@ -21,9 +21,9 @@ function game(home: number, away: number, winner?: number, extra: Partial<Game> 
 }
 const season = (games: Game[], n = 4): Season => ({
   year: 2026, fetchedAt: "", games,
-  teams: Array.from({ length: n }, (_, i) => team(i + 1, "C")),
+  teams: Array.from({ length: n }, (_, i) => team(i + 1, "ACC")),
 });
-const base = { conference: "C", iterations: 4000, seed: 5 };
+const base = { conference: "ACC", iterations: 4000, seed: 5 };
 
 // Team 1 beat team 4 already; it still plays 2, 3 (Nov 14) and, earlier, 4's rival game.
 function scenario() {
@@ -49,7 +49,7 @@ function needsHelp() {
   const s: Season = {
     year: 2026, fetchedAt: "",
     games: [game(1, 3, 1), game(4, 1, 4), game(2, 3, 2), game(2, 4, 2), upset, other],
-    teams: [team(1, "C", -10), team(2, "C", 5), team(3, "C", 0), team(4, "C", 1)],
+    teams: [team(1, "ACC", -10), team(2, "ACC", 5), team(3, "ACC", 0), team(4, "ACC", 1)],
   };
   return { s, upset, other };
 }
@@ -153,7 +153,7 @@ describe("path tree", () => {
     expect(t.footnote).toBeNull();
     expect(pathTree(scenario().s, { ...base, teamId: 1 }).footnote).toBeNull();
     expect(pathTree(scenario().s, { ...base, teamId: 1, depth: 1 }).footnote).toBe(
-      "The tree stops after 1 game; 2 later C games aren't shown.",
+      "The tree stops after 1 game; 2 later ACC games aren't shown.",
     );
   });
 
@@ -182,7 +182,7 @@ describe("path tree", () => {
     for (const p of paths(full)) {
       const leaf = p[p.length - 1];
       if (p.length < 3) expect(leaf.record).toBeNull();
-      else expect(leaf.record).toBe(`${1 + p.filter((n) => n.win).length}-${p.filter((n) => !n.win).length} C`);
+      else expect(leaf.record).toBe(`${1 + p.filter((n) => n.win).length}-${p.filter((n) => !n.win).length} ACC`);
     }
     const partial = pathTree(s, { ...base, teamId: 1, depth: 2 }).root;
     expect(leaves(partial).every((l) => l.record === null)).toBe(true);
@@ -251,7 +251,7 @@ describe("path tree", () => {
 
   it("rejects a team outside the conference, a tiny conference and a bad depth", () => {
     const { s } = scenario();
-    expect(() => pathTree(s, { ...base, teamId: 99 })).toThrow(/not in C/);
+    expect(() => pathTree(s, { ...base, teamId: 99 })).toThrow(/not in ACC/);
     expect(() => pathTree(s, { ...base, conference: "Nope", teamId: 1 })).toThrow(/fewer than two/);
     expect(() => pathTree(s, { ...base, teamId: 1, depth: -1 })).toThrow(RangeError);
   });
@@ -285,7 +285,7 @@ describe("help from elsewhere", () => {
     expect(h.oddsIfAwayWins!).toBeGreaterThan(0.2);
     expect(h.swing).toBeCloseTo(h.oddsIfAwayWins!, 10);
     expect(h.rooting).toBe(4);
-    expect(t.helpNote).toBe("Every other C game left can change Team2's odds.");
+    expect(t.helpNote).toBe("Every other ACC game left can change Team2's odds.");
   });
 
   it("a game that matters far more if the team wins out says so", () => {
@@ -402,7 +402,7 @@ describe("help from elsewhere", () => {
     const s: Season = {
       year: 2026, fetchedAt: "",
       games: [game(1, 3, 1), game(4, 1, 4), game(2, 3, 3), game(5, 1, 1), ...open],
-      teams: [1, 2, 3, 4, 5].map((id) => team(id, "C", 0)),
+      teams: [1, 2, 3, 4, 5].map((id) => team(id, "ACC", 0)),
     };
     const t = pathTree(s, { ...base, teamId: 1 });
     const way = t.likeliest!;
@@ -632,7 +632,7 @@ describe("help from elsewhere", () => {
     const { s, other } = needsHelp();
     const t = pathTree(s, { ...base, teamId: 1, locks: { [other.id]: 3 } });
     expect(t.help).toEqual([]);
-    expect(t.helpNote).toBe("No other C games are left to play.");
+    expect(t.helpNote).toBe("No other ACC games are left to play.");
   });
 
   it("a game whose result can't change the odds is never flagged, even when its upset side is small", () => {
