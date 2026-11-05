@@ -21,7 +21,7 @@ import { FAINT, OVERALL, SCENARIO, isClear } from "./signal";
 import { gameWinProbability, mix, mulberry32, simulateSeason, type SimResult } from "./sim";
 import { likeliestWayIn, trimWay, type WayIn } from "./likeliest";
 import { provenStatus, type ProvenStatus } from "./proof";
-import { championshipFromData, conferenceData, countsNonConference } from "./tiebreak";
+import { championshipFromData, conferenceData, countsNonConference, luckSteps } from "./tiebreak";
 
 export type TreeOptions = PathOptions & {
   /** How many of the team's next unplayed conference games to branch on. Default: all of them (at most 12). */
@@ -138,7 +138,7 @@ export type Likeliest = {
   needs: string[];
   /** "Favorites win the other 11 games it needs", or null. */
   favorites: string | null;
-  /** "With these results Virginia gets in about 40% of the time, depending on the ranking tiebreak.", or null. The Big 12 note names total wins too. */
+  /** "With these results Virginia gets in about 40% of the time, depending on the ranking tiebreak.", or null. The Big 12 note names total wins too; the SEC note, the scoring margin tiebreak. */
   note: string | null;
   /** The team's part: "Win all 4 left", "Win 3 of 4 left". */
   ownJob: string;
@@ -558,7 +558,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
       if (favorites > 0) elsewhere.push(elsewhere.length ? `the favorites win ${favorites} other game${favorites === 1 ? "" : "s"}` : `the favorites win ${favorites} game${favorites === 1 ? "" : "s"} elsewhere`);
       const parts = [own.length ? `${team} ${list(own)}` : "", elsewhere.length ? list(elsewhere) : ""].filter(Boolean);
       const what = parts.length ? parts.join("; and ") : `${team} needs nothing more`;
-      const note = tiebreak === null ? null : `With these results ${team} gets in ${often}, depending on ${countsNonConference(conference) ? "total wins and the ranking tiebreak" : "the ranking tiebreak"}.`;
+      const note = tiebreak === null ? null : `With these results ${team} gets in ${often}, depending on ${luckSteps(conference)}.`;
       const card = wayParts(way, choices, teamId, name, sim, reachedAt, minSample, gameIndex);
       likeliest = {
         picks: way.picks,
