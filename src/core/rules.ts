@@ -95,12 +95,13 @@ const SEC: TiebreakRules = {
 // follows secondary sources (cfb.app, CBS Sports, NBC, playoffstatus.com) and the Big Ten's 2025 title-game
 // scenarios, which show two teams level at the top both clinching ("open" spots) and a three-way tie reduced to
 // two going back to head-to-head. Not confirmed by the document: whether opponents level on record count as one
-// group (assumed, as the Big 12 states), and that a team that lost to all the others isn't dropped (no source
-// mentions it, unlike the SEC).
+// group (assumed, as the Big 12 states); that a team that lost to all the others isn't dropped (no source
+// mentions it, unlike the SEC); and that a tie of three or more cut down to a smaller group starts over at
+// head-to-head (shown for two teams left; cfb.app's paraphrase has three or more go on to the next step).
 const BIG_TEN: TiebreakRules = {
   conference: "Big Ten",
   seasons: [2026],
-  source: "Big Ten Announces New Football Tiebreaking Procedures, Aug. 26, 2024 (the latest published): https://bigten.org/fb/article/blt6104802d94ebe1ab/",
+  source: "Step order from Big Ten Announces New Football Tiebreaking Procedures, Aug. 26, 2024 (the latest published): https://bigten.org/fb/article/blt6104802d94ebe1ab/; details from secondary sources (see SPEC.md)",
   steps: [
     headToHead({ record: "games", lostToAll: false }),
     commonOpponents(),

@@ -94,6 +94,8 @@ d. Cumulative conference win pct of all conference opponents. Every team plays n
 e. Ranking: SportSource Analytics Team Rating Score after the regular season, modelled by the ranking stand-in.
 f. Random draw by the Commissioner or designee: one name per open spot, the first name drawn seeded first.
 
+Assumed, not confirmed by the document: when a step cuts a tie of three or more down to a smaller group, that group starts over at head-to-head (the engine's rule for every conference). The 2025 scenarios show it for two teams left; cfb.app's paraphrase has a group of three or more go on to the next step instead.
+
 Proofs count the ranking and the draw as luck. The likeliest-way note for a Big Ten team says "depending on the ranking tiebreak". The Big Ten isn't in `SUPPORTED_CONFERENCES` yet; that's the app change.
 
 ### Outlook (`outlook.ts`)
@@ -178,7 +180,7 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - The playoff model is a rough placeholder, not the committee.
 - Ranking is a stand-in for SportSource.
 - Proofs and the likeliest search have budgets. Near the edge they say "open" or return null rather than guess.
-- The app covers the ACC, the Big 12 and the SEC. The Big Ten's tiebreak rules are in core; the app doesn't offer it yet. Two of its rules are assumed until the Big Ten's full document is available again (common opponents level on record count as one group; no team is dropped for losing to all the others).
+- The app covers the ACC, the Big 12 and the SEC. The Big Ten's tiebreak rules are in core; the app doesn't offer it yet. Three of its rules are assumed until the Big Ten's full document is available again (common opponents level on record count as one group; no team is dropped for losing to all the others; a tie of three or more, once cut down, starts over at head-to-head).
 - **Expanding conferences.** Next: the Big Ten. Like the ACC and Big 12, each champion gets an automatic playoff bid, and as power-four teams they have the best at-large odds, so today's model and UI carry over.
 - **Group of Six, later.** The 2026 format guarantees a spot only to the highest-ranked Group of Six conference champion, not to every champion. Winning the conference isn't enough on its own, and at-large bids are rare but have happened. Before adding a G6 conference, the playoff model needs that rule (champion and ranked above every other G6 champion), and the UI needs wording for it ("Must win the conference and be the top G6 champion", or similar, rather than "Must win ACC").
 - A future MCP server is planned on top of `src/core`.
