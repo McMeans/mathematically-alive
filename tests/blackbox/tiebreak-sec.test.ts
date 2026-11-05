@@ -99,6 +99,17 @@ describe("SEC tiebreakers", () => {
     expect(pair(s)).toEqual([s.id("A"), s.id("B")]);
   });
 
+  it("opponents' win pct level as fractions is level, however the sum rounds", () => {
+    // A and B 3-0, never met, nothing in common. A's opponents are 1-1, 1-2 and 2-1, and so are B's: 1/2 on average
+    // for both, a tie that goes on to the ranking (B). Summed in a different order, the same three can round apart.
+    const s = build(
+      [{ name: "A" }, { name: "B", rating: 10 }, ...letters("H", "T1", "S1", "S2", "H2", "T2", "F1", "F3", "F4", "F6", "F7", "F8")],
+      [["A", "H"], ["A", "T1"], ["A", "S1"], ["B", "S2"], ["B", "H2"], ["B", "T2"], ["H", "F1"], ["S1", "T1"], ["T1", "F3"],
+        ["S1", "F4"], ["H2", "F6"], ["S2", "T2"], ["T2", "F7"], ["S2", "F8"]],
+    );
+    expect(pair(s)).toEqual([s.id("B"), s.id("A")]);
+  });
+
   it("three or more who all played each other: the two with the best record among them are both in", () => {
     // A, B, C and D 3-2. Among them A and B are 2-1, C and D 1-2. A beat B, so A is seeded first.
     const s = build(
