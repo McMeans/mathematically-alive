@@ -119,7 +119,7 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
   sim.forEachIteration((iteration, winnerAt, teams) => {
     const rand = mulberry32(mix(seed, iteration, 1));
     const winnerOf = (g: Game): number => winnerAt(gameIndex.get(g.id)!);
-    const [a, b] = championshipFromData(data, conference, winnerOf, { draw: rand, rank: teams.rank });
+    const [a, b] = championshipFromData(data, winnerOf, { draw: rand, rank: teams.rank });
     titleGame.set(a, titleGame.get(a)! + 1);
     titleGame.set(b, titleGame.get(b)! + 1);
     const champ = mulberry32(mix(seed, iteration, 2))() < titleOdds(a, b, teams.shift(a), teams.shift(b)) ? a : b;
@@ -147,7 +147,7 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
         if (wi >= 0) { w[wi]--; l[wi]++; }
         if (oi >= 0) { l[oi]--; w[oi]++; }
         const flipped = (x: Game): number => (x.id === g.id ? other : winnerOf(x));
-        const [a2, b2] = championshipFromData(data, conference, flipped, { draw: mulberry32(mix(seed, iteration, 1)), rank: (id) => teams.rankIf(id, o.i) });
+        const [a2, b2] = championshipFromData(data, flipped, { draw: mulberry32(mix(seed, iteration, 1)), rank: (id) => teams.rankIf(id, o.i) });
         const champ2 = mulberry32(mix(seed, iteration, 2))() < titleOdds(a2, b2, teams.shift(a2), teams.shift(b2)) ? a2 : b2;
         const side = won === focus ? 0 : 1;
         o.title[side] += inTitle;

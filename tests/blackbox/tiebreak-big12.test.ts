@@ -76,6 +76,20 @@ describe("Big 12 tiebreakers", () => {
     expect(pair(s)).toEqual([s.id("B"), s.id("A")]);
   });
 
+  it("total wins leaves out the title game, a non-conference game between two members", () => {
+    // A and B 1-0 over winless X and Y, level on every step before total wins. A beat N outside the conference;
+    // B beat X in the title game, which comes after the tiebreak, so A has more wins. B is ranked higher.
+    const s = build(
+      [{ name: "A" }, { name: "B", rating: 10 }, { name: "X" }, { name: "Y" }, { name: "N", conference: null }],
+      [["A", "X"], ["B", "Y"]],
+      [{ home: "A", away: "N", winner: "A" }, { home: "B", away: "X", winner: "B" }],
+    );
+    expect(pair(s)).toEqual([s.id("A"), s.id("B")]);
+    const title = s.games.find((g) => !g.conferenceGame && g.homeId === s.id("B"))!;
+    const unplayed = { ...s, games: s.games.map((g) => (g === title ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)) };
+    expect(pair(unplayed, (g) => (g.id === title.id ? s.id("B") : played(g)))).toEqual([s.id("A"), s.id("B")]);
+  });
+
   it("an unplayed non-conference game counts for total wins as the caller decides it", () => {
     const s = build(
       [{ name: "A" }, { name: "B", rating: 10 }, { name: "X" }, { name: "Y" }, { name: "N", conference: null }],
@@ -163,7 +177,7 @@ describe("non-conference games in the Big 12", () => {
   });
 
   it("where the tiebreak ignores non-conference results, the card shows no title odds", () => {
-    const card = scenario("Conference USA");
+    const card = scenario("ACC");
     expect(card.titleIfWin).toBeNull();
     expect(card.titleIfLose).toBeNull();
     expect(card.ifWin).not.toBeNull();
@@ -171,7 +185,8 @@ describe("non-conference games in the Big 12", () => {
 });
 
 describe("Big 12 seasons", () => {
-  const load = (year: number) => seasonFromCfbd(JSON.parse(readFileSync(`fixtures/big-12-${year}.json`, "utf8")) as CfbdSnapshot);
+  // Core has only the 2026 rules, so a 2025 fixture is loaded as 2026 to check the real 2025 title game under them.
+  const load = (year: number) => seasonFromCfbd({ ...(JSON.parse(readFileSync(`fixtures/big-12-${year}.json`, "utf8")) as CfbdSnapshot), year: 2026 });
 
   it("the 2025 results send Texas Tech and BYU, who played the real title game", () => {
     const s = load(2025);

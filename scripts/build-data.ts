@@ -5,7 +5,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { SUPPORTED_CONFERENCES } from "../src/app/config";
-import { seasonFromCfbd, type CfbdSnapshot } from "../src/core";
+import { hasTiebreakRules, seasonFromCfbd, type CfbdSnapshot } from "../src/core";
 
 /** The newest raw snapshot in data/, or else every committed fixture for the newest fixture year. */
 function sources(): string[] {
@@ -59,6 +59,11 @@ async function main() {
   });
   if (missing.length > 0) {
     throw new Error(`No full schedule for ${missing.join(", ")} in ${from.join(", ")}. Add a fixture for it, or take it out of SUPPORTED_CONFERENCES.`);
+  }
+  // Fail here, not at runtime: every supported conference needs tiebreak rules for this season (src/core/rules.ts).
+  const noRules = SUPPORTED_CONFERENCES.filter((c) => !hasTiebreakRules(c, season.year));
+  if (noRules.length > 0) {
+    throw new Error(`No tiebreak rules for ${noRules.join(", ")} in ${season.year}. Add a config to src/core/rules.ts from the conference's official document, or take it out of SUPPORTED_CONFERENCES.`);
   }
   const out = path.join("src", "app", "data", "season.json");
   await mkdir(path.dirname(out), { recursive: true });

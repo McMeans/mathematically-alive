@@ -22,7 +22,7 @@ function game(home: number, away: number, conf: boolean, winner?: number): Game 
   };
 }
 
-// Conference "C": team 1 beat everyone, team 5 lost to everyone, and 2, 3, 4
+// Conference "ACC": team 1 beat everyone, team 5 lost to everyone, and 2, 3, 4
 // still have to play each other. Teams 10 and 11 are outside the conference.
 function build(): { season: Season; upset: Game } {
   nextId = 0;
@@ -33,12 +33,12 @@ function build(): { season: Season; upset: Game } {
     upset, game(2, 4, true), game(3, 4, true),
     game(10, 2, false), game(3, 11, false), game(10, 11, false),
   ];
-  const teams = [1, 2, 3, 4, 5].map((id) => team(id, "C")).concat([team(10, "Other"), team(11, "Other")]);
+  const teams = [1, 2, 3, 4, 5].map((id) => team(id, "ACC")).concat([team(10, "Other"), team(11, "Other")]);
   return { season: { year: 2026, fetchedAt: "", teams, games }, upset };
 }
 
 const run = (season: Season, extra: { locks?: Record<number, number>; seed?: number; teamId?: number } = {}) =>
-  seasonOutlook(season, { conference: "C", iterations: 4000, seed: extra.seed ?? 7, locks: extra.locks, teamId: extra.teamId });
+  seasonOutlook(season, { conference: "ACC", iterations: 4000, seed: extra.seed ?? 7, locks: extra.locks, teamId: extra.teamId });
 const byTeam = (o: ReturnType<typeof run>, id: number) => o.teams.find((t) => t.teamId === id)!;
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
@@ -65,7 +65,7 @@ describe("season outlook", () => {
   });
 
   it("breaks a tie on ranking toward the team with the better simulated record", () => {
-    // Conference "R": 20 beat everyone; 21 and 22 are 1-1, never met, and have equal ratings. Only the
+    // An ACC: 20 beat everyone; 21 and 22 are 1-1, never met, and have equal ratings. Only the
     // ranking step separates them, and 21 wins its game outside the conference while 22 loses its.
     nextId = 100;
     const out = game(21, 24, false);
@@ -74,9 +74,9 @@ describe("season outlook", () => {
       game(20, 21, true, 20), game(20, 22, true, 20), game(20, 23, true, 20),
       game(21, 23, true, 21), game(22, 23, true, 22), out, other,
     ];
-    const teams = [20, 21, 22, 23].map((id) => team(id, "R")).concat([team(24, "Other"), team(25, "Other")]);
+    const teams = [20, 21, 22, 23].map((id) => team(id, "ACC")).concat([team(24, "Other"), team(25, "Other")]);
     const o = seasonOutlook({ year: 2026, fetchedAt: "", teams, games }, {
-      conference: "R", iterations: 4000, seed: 7, locks: { [out.id]: 21, [other.id]: 25 },
+      conference: "ACC", iterations: 4000, seed: 7, locks: { [out.id]: 21, [other.id]: 25 },
     });
     const a = o.teams.find((t) => t.teamId === 21)!.titleGame;
     const b = o.teams.find((t) => t.teamId === 22)!.titleGame;
@@ -232,6 +232,6 @@ describe("season outlook", () => {
 describe("championship participants input checks", () => {
   it("throws a descriptive error when winnerOf names a team that isn't in the game", () => {
     const { season } = build();
-    expect(() => championshipParticipants(season, "C", () => 99, { draw: () => 0.5 })).toThrow(/not in game/);
+    expect(() => championshipParticipants(season, "ACC", () => 99, { draw: () => 0.5 })).toThrow(/not in game/);
   });
 });

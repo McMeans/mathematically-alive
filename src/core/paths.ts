@@ -150,7 +150,7 @@ export function teamPath(season: Season, opts: PathOptions, shared?: SimResult):
 
   sim.forEachIteration((iteration, winnerAt, teams) => {
     const rand = mulberry32(mix(seed, iteration, 1));
-    const [a, b] = championshipFromData(data, conference, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: rand, rank: teams.rank });
+    const [a, b] = championshipFromData(data, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: rand, rank: teams.rank });
     const reached = a === teamId || b === teamId;
     if (reached) inTitle++;
     if (own.length > 0 && own.every(({ i }) => winnerAt(i) === teamId)) {

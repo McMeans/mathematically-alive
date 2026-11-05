@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { championshipParticipants, seasonFromCfbd, type CfbdSnapshot, type Game } from "@/core";
+// The 2025 results are checked under the 2026 rules, the only ones core has, so the fixture is loaded as 2026.
 
-const snapshot = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+const snapshot = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
 const season = seasonFromCfbd(snapshot);
 const acc = season.teams.filter((t) => t.conference === "ACC");
 const byName = (name: string) => season.teams.find((t) => t.name === name)!.id;

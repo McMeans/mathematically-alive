@@ -3,10 +3,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { explore, pathTree, seasonFromCfbd } from "@/core";
 import type { CfbdSnapshot, Season } from "@/core";
+// The 2025 results are checked under the 2026 rules, the only ones core has, so the fixture is loaded as 2026.
 
 describe("help from elsewhere on a real season", () => {
   it("the likeliest way in proves the spot once locked, for every team in a real season", () => {
-    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     let checked = 0;

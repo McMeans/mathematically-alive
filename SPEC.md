@@ -37,7 +37,14 @@ All logic lives in `src/core` (framework-free, public API in `src/core/index.ts`
 - **Ranking stand-in:** the SportSource Team Success Ranking (a tiebreak step) is modelled as the rating plus `RANK_PER_NET_WIN` = 2 per net simulated win, plus noise (`RANK_SD` = 3). It comes from one hashed draw per team and season, which the title game reuses.
 - Tiebreak draws and title-game rolls come from streams seeded per iteration, so what-if runs stay paired with the base run. That means differences come from the lock, not from noise.
 
-### Tiebreakers (`tiebreak.ts`)
+### Tiebreakers (`tiebreak.ts`, `steps.ts`, `rules.ts`)
+
+One engine serves every conference. `rules.ts` holds a config per conference and season: the step list, the resolver settings, the game-count rule, the luck wording and the source document. A conference or season with no config is an error ("No tiebreak rules for <conference> in <season>"), never another conference's rules. `hasTiebreakRules` says whether one exists, and `scripts/build-data.ts` fails the build for a supported conference without one. Only 2026 configs exist (ACC, Big 12, SEC): the project covers the 2026 season only. Tests that check real 2025 title games load the 2025 fixtures as 2026, so they run under the 2026 rules.
+
+- **Steps** (`steps.ts`): head-to-head (by games or by opponent, with or without dropping a team that lost to all), common opponents, highest placed common opponent (opponents level on record grouped, or ordered by head-to-head), strength of schedule, opponents' win pct, total wins (FCS cap; the title game left out), capped relative scoring margin, ranking, draw. One implementation each. Any score that can tie as a fraction is kept in whole numbers and compared exactly, so scores equal as fractions always tie (a float sum can round them apart).
+- **Resolver:** teams are ordered by conference win pct, and a tie is resolved for the open spots. Each step either can't tell the tied teams apart (next step), or names the teams at the top of its order. One alone at the top is placed and the rest start over for any spot left. Several at the top that fit the open spots are all in, seeded by starting over among them. Otherwise those at the top start over, from the first step or from the next one as the step says, and the rest are out of the tie. Settings: `spots` ("open": the tie fills every open spot at once; "one": one spot at a time, the rest re-tied from scratch after each) and `drop` (a dropped team leaves only this tie, or the whole race with a re-tie).
+- A step marked `nonConference` (total wins) counts non-conference results: `countsNonConference` follows from it, and proofs skip it as luck.
+- Proof shortcuts that rely on the ACC's game-count rule (`couldTieByCount`, the tie route, the schedule-spread check) apply only where the config has `gameCountTies`.
 
 The ACC tiebreaker policy (July 2026), no divisions, top two play for the title:
 
@@ -49,20 +56,20 @@ The ACC tiebreaker policy (July 2026), no divisions, top two play for the title:
 
 Steps based on record come before ranking and the draw. Proofs treat ranking and the draw as "could go either way".
 
-The rules depend on the conference name. Any conference other than the Big 12 and the SEC uses the ACC policy above.
+On the engine: steps head-to-head (by opponent, a team that lost to all dropped), ranking (teams level at the top go to the draw), draw; `spots: "one"`, `drop: "retie"`, `gameCountTies`.
 
-**Big 12** (Big 12 Football Tiebreaking Procedures, 2024 season document, the latest published). Every team plays nine conference games, so there's no game-count rule. Order teams by conference win pct. A tie is broken by the first of these steps that tells the teams apart. If that step leaves one team best, that team is placed. If several share the best mark, the tie starts over among them, so two left go back to the two-team steps. After a team is placed, the rest start over.
+**Big 12** (Big 12 Football Tiebreaking Procedures, 2024 season document, the latest published: https://s3.amazonaws.com/big12sports.com/documents/2025/11/4/Big_12_Football_2024_Tiebreaker_Policy.pdf). On the engine: `spots: "one"`, no game-count rule. Every team plays nine conference games, so there's no game-count rule. Order teams by conference win pct. A tie is broken by the first of these steps that tells the teams apart. If that step leaves one team best, that team is placed. If several share the best mark, the tie starts over among them, so two left go back to the two-team steps. After a team is placed, the rest start over.
 
 a. Head-to-head. For two teams, their game. For three or more who all played each other, the record among them. For three or more who didn't, a team that beat every other tied team is placed; otherwise go to the next step.
 b. Win pct against common conference opponents (those every tied team played).
 c. Win pct against the next highest placed common opponent, down the standings. Common opponents tied in the standings count as one group.
 d. Strength of conference schedule: the combined conference win pct of the team's conference opponents, counted per game.
-e. Total wins in the regular season, with at most one win over a team below FBS. Games exempt from the NCAA 12-game limit can't be told apart in the data, so they count too.
+e. Total wins in the regular season, with at most one win over a team below FBS. The title game (a non-conference game between two members in the data) is left out. Games exempt from the NCAA 12-game limit can't be told apart in the data, so they count too.
 f. Ranking (SP+ standing in for the SportSource Analytics rating), then g. a seeded draw (the coin toss).
 
 Proofs search conference games only, so they skip total wins and treat it like ranking: "could go either way". The likeliest-way note for a Big 12 team says "depending on total wins and the ranking tiebreak".
 
-**SEC** (Southeastern Conference Official Football Tiebreakers, "SEC Football Tiebreakers Final 10.29.24", the document the SEC's tiebreaker page https://www.secsports.com/fbtiebreaker publishes for the 16-team, no-division format: https://storage.googleapis.com/secsports-prod/upload/2024/10/29/f6fc7cd9-3031-4357-8754-80bfa4b9c4c0.pdf). Every team plays the same number of conference games (eight in 2025, nine in 2026), so there's no game-count rule. Order teams by conference win pct. Teams level at the top fill both spots; a team alone at the top is in and the teams level below it fill the second. A tie is broken by the first step that tells the teams apart:
+**SEC** (Southeastern Conference Official Football Tiebreakers, "SEC Football Tiebreakers Final 10.29.24", the document the SEC's tiebreaker page https://www.secsports.com/fbtiebreaker publishes for the 16-team, no-division format: https://storage.googleapis.com/secsports-prod/upload/2024/10/29/f6fc7cd9-3031-4357-8754-80bfa4b9c4c0.pdf). Every team plays the same number of conference games (eight in 2025, nine in 2026), so there's no game-count rule. On the engine: `spots: "open"`, `drop: "restart"`. Order teams by conference win pct. Teams level at the top fill both spots; a team alone at the top is in and the teams level below it fill the second. A tie is broken by the first step that tells the teams apart:
 
 - One team alone at the best mark is in. With two spots open, the rest start over for the second.
 - Two teams at the best mark with two spots open are both in.
@@ -73,7 +80,7 @@ a. Head-to-head. For teams who all played each other, the record among them. For
 b. Record against common conference opponents (those every tied team played).
 c. Record against the highest placed common opponent, down the standings. Opponents level on record are placed by head-to-head only (the step a. rules); those it can't separate count as one group, and only the common ones in a group count.
 d. Cumulative conference win pct of all conference opponents (the average of their win pcts).
-e. Capped relative total scoring margin against conference opponents (Appendix A). Per conference game: points scored over the opponent's regular-season average allowed, capped at 200%, minus points allowed over its average scored. Then the average over the team's conference games. The title game (a non-conference game between two members in the data) is left out of the averages.
+e. Capped relative total scoring margin against conference opponents (Appendix A). Per conference game: points scored over the opponent's regular-season average allowed, capped at 200%, minus points allowed over its average scored. Then the average over the team's conference games. The title game (a non-conference game between two members in the data) is left out of the averages. An opponent whose season total of points scored or allowed is 0 (not seen in FBS data) counts as 1 point, so the step stays defined.
 f. Random draw: one name per open spot, the first name drawn seeded first.
 
 Step e. needs every regular-season score of every member. Until then, the simulation can't know it, so the ranking stand-in takes its place, and proofs count it as luck ("could go either way") like the ranking. Results of non-conference games feed only the averages in step e., never a win count, so `countsNonConference` is false for the SEC and its non-conference cards show no title odds. The likeliest-way note for an SEC team says "depending on the scoring margin tiebreak".

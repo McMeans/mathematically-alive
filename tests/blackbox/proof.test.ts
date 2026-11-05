@@ -14,9 +14,9 @@ function game(home: number, away: number, winner?: number, spread: number | null
 }
 const season = (games: Game[]): Season => ({
   year: 2026, fetchedAt: "", games,
-  teams: [1, 2, 3, 4].map((id) => ({ id, name: `Team${id}`, abbreviation: null, conference: "C", classification: "fbs" as const, color: null, altColor: null, rating: null })),
+  teams: [1, 2, 3, 4].map((id) => ({ id, name: `Team${id}`, abbreviation: null, conference: "ACC", classification: "fbs" as const, color: null, altColor: null, rating: null })),
 });
-const o = { conference: "C", iterations: 2000, seed: 1 };
+const o = { conference: "ACC", iterations: 2000, seed: 1 };
 
 // Team 1 (1-1) gets in only through a 60-point upset: beating Team 3, or Team 4 beating Team 2 and a three-way tie.
 function longshot() {
@@ -53,7 +53,7 @@ describe("proven clinch and elimination", () => {
     ];
     const s: Season = {
       year: 2026, fetchedAt: "", games,
-      teams: [1, 2, 3, 4, 5, 6, 7].map((id) => ({ id, name: `Team${id}`, abbreviation: null, conference: "C", classification: "fbs" as const, color: null, altColor: null, rating: null })),
+      teams: [1, 2, 3, 4, 5, 6, 7].map((id) => ({ id, name: `Team${id}`, abbreviation: null, conference: "ACC", classification: "fbs" as const, color: null, altColor: null, rating: null })),
     };
     expect(pathTree(s, { ...o, teamId: 2 }).root.verdict).not.toBe("Out");
     expect(pathTree(s, { ...o, teamId: 2, locks: { [last.id]: 2 } }).root.verdict).toBe("In");
@@ -113,7 +113,7 @@ describe("proofs agree with checking every combination", () => {
       if (games.filter((g) => !g.completed).length > 9) continue;
       return {
         year: 2026, fetchedAt: "", games,
-        teams: Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `Team${i + 1}`, abbreviation: null, conference: "C", classification: "fbs" as const, color: null, altColor: null, rating: 0 })),
+        teams: Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `Team${i + 1}`, abbreviation: null, conference: "ACC", classification: "fbs" as const, color: null, altColor: null, rating: 0 })),
       };
     }
   }
@@ -125,7 +125,7 @@ describe("proofs agree with checking every combination", () => {
     while (queue.length) {
       const script = queue.pop()!;
       let j = 0;
-      const pair = championshipParticipants(s, "C", winnerOf, {
+      const pair = championshipParticipants(s, "ACC", winnerOf, {
         rank,
         draw: (count) => {
           if (j === script.length) for (let c = 1; c < count; c++) queue.push([...script, c]);
@@ -155,7 +155,7 @@ describe("proofs agree with checking every combination", () => {
     let settled = 0;
     for (let seed = 1; seed <= 300; seed++) {
       const s = randomConference(seed);
-      const outlook = seasonOutlook(s, { conference: "C", iterations: 200, seed: 1 });
+      const outlook = seasonOutlook(s, { conference: "ACC", iterations: 200, seed: 1 });
       for (const t of outlook.teams) {
         const { canIn, canOut } = bruteForce(s, t.teamId);
         const truth = !canIn ? "eliminated" : !canOut ? "clinched" : "alive";

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { formatOdds, seasonFromCfbd, teamPath } from "@/core";
 import type { CfbdSnapshot, Game, Season } from "@/core";
+// The 2025 results are checked under the 2026 rules, the only ones core has, so the fixture is loaded as 2026.
 
 function team(id: number, conference: string) {
   return {
@@ -22,9 +23,9 @@ function game(home: number, away: number, winner?: number, extra: Partial<Game> 
 }
 const season = (games: Game[], n = 4): Season => ({
   year: 2026, fetchedAt: "", games,
-  teams: Array.from({ length: n }, (_, i) => team(i + 1, "C")),
+  teams: Array.from({ length: n }, (_, i) => team(i + 1, "ACC")),
 });
-const path = (s: Season, teamId: number, seed = 3) => teamPath(s, { conference: "C", teamId, iterations: 3000, seed });
+const path = (s: Season, teamId: number, seed = 3) => teamPath(s, { conference: "ACC", teamId, iterations: 3000, seed });
 
 // Team 1 beat everyone. Team 2 only lost to 1 and has one decisive game left
 // (2 v 3); 3 and 4 still play each other.
@@ -39,7 +40,7 @@ describe("team path", () => {
     const p = path(scenario().s, 1);
     expect(p.status).toBe("clinched");
     expect(p.titleGame).toBe(1);
-    expect(p.summary).toBe("Team1 is in the C title game whatever happens.");
+    expect(p.summary).toBe("Team1 is in the ACC title game whatever happens.");
   });
 
   it("an eliminated team says eliminated", () => {
@@ -50,7 +51,7 @@ describe("team path", () => {
     ], 5);
     const p = path(s, 5);
     expect(p.status).toBe("eliminated");
-    expect(p.summary).toBe("Team5 can't make the C title game: no combination of remaining results gets it there.");
+    expect(p.summary).toBe("Team5 can't make the ACC title game: no combination of remaining results gets it there.");
     expect(p.keyGames).toEqual([]);
   });
 
@@ -117,7 +118,7 @@ describe("team path", () => {
   it("a locked game is absent from keyGames", () => {
     const { s, decider } = scenario();
     const third = s.games[5];
-    const p = teamPath(s, { conference: "C", teamId: 2, iterations: 3000, seed: 3, locks: { [third.id]: 3 } });
+    const p = teamPath(s, { conference: "ACC", teamId: 2, iterations: 3000, seed: 3, locks: { [third.id]: 3 } });
     expect(p.keyGames.some((k) => k.gameId === third.id)).toBe(false);
     expect(p.keyGames[0].gameId).toBe(decider.id);
   });
@@ -125,8 +126,8 @@ describe("team path", () => {
   it("a lock shifts titleGame and ifWinOut, and a lock on the team's own game counts toward win-out", () => {
     const { s, decider } = scenario();
     const base = path(s, 2);
-    const win = teamPath(s, { conference: "C", teamId: 2, iterations: 3000, seed: 3, locks: { [decider.id]: 2 } });
-    const lose = teamPath(s, { conference: "C", teamId: 2, iterations: 3000, seed: 3, locks: { [decider.id]: 3 } });
+    const win = teamPath(s, { conference: "ACC", teamId: 2, iterations: 3000, seed: 3, locks: { [decider.id]: 2 } });
+    const lose = teamPath(s, { conference: "ACC", teamId: 2, iterations: 3000, seed: 3, locks: { [decider.id]: 3 } });
     expect(win.titleGame).toBeGreaterThan(base.titleGame);
     expect(win.status).toBe("clinched");
     expect(win.ifWinOut).toBe(1);
@@ -161,7 +162,7 @@ describe("team path", () => {
       game(1, 2, 1), game(1, 3, 1), game(1, 4, 1), game(2, 4, 2), game(1, 5, 1), game(1, 6, 1),
       game(2, 5, 2), game(2, 6, 2), game(2, 3), game(3, 4), lopsided,
     ], 6);
-    const lock = (w: number) => teamPath(s, { conference: "C", teamId: 2, iterations: 3000, seed: 3, locks: { [lopsided.id]: w } });
+    const lock = (w: number) => teamPath(s, { conference: "ACC", teamId: 2, iterations: 3000, seed: 3, locks: { [lopsided.id]: w } });
     expect(lock(5).titleGame).toBe(lock(6).titleGame);
     expect(lock(5).titleGame).toBeGreaterThan(0.3);
     expect(lock(5).titleGame).toBeLessThan(0.95);
@@ -192,7 +193,7 @@ describe("formatOdds", () => {
 
 describe("2025 ACC fixture with the last two weeks unplayed", () => {
   it("runs for every ACC team with valid statuses", () => {
-    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     const cut: Season = {

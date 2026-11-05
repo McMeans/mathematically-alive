@@ -348,7 +348,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
     let b = 0;
     for (let k = 0; k < depth; k++) if (winnerAt(levels[k].i) !== teamId) b |= 1 << (depth - 1 - k);
     const rand = mulberry32(mix(seed, iteration, 1));
-    const [x, y] = championshipFromData(data, conference, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: rand, rank: teams.rank });
+    const [x, y] = championshipFromData(data, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: rand, rank: teams.rank });
     const reached = x === teamId || y === teamId;
     if (reached) reachedAt[iteration] = 1;
     count[b]++;
@@ -500,7 +500,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
   const simulatedOdds = (locks: Record<number, number>, n: number): number => {
     let hit = 0;
     simulateSeason(season, { iterations: n, seed, locks }).forEachIteration((it, winnerAt, teams) => {
-      const [x, y] = championshipFromData(data, conference, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: mulberry32(mix(seed, it, 1)), rank: teams.rank });
+      const [x, y] = championshipFromData(data, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: mulberry32(mix(seed, it, 1)), rank: teams.rank });
       if (x === teamId || y === teamId) hit++;
     });
     return hit / n;
@@ -520,18 +520,18 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
     // It's shown only when clearly likelier: the simulation also counts seasons the sure way covers.
     const locks = opts.locks ?? {};
     const starts = likelyStarts(sim, reachedAt, choices, gameIndex);
-    const sure = likeliestWayIn(data, conference, teamId, locks, choices, false, starts);
-    const lucky = likeliestWayIn(data, conference, teamId, locks, choices, true, starts);
+    const sure = likeliestWayIn(data, teamId, locks, choices, false, starts);
+    const lucky = likeliestWayIn(data, teamId, locks, choices, true, starts);
     const tiebreakOdds = (w: WayIn) =>
       simulatedOdds({ ...locks, ...Object.fromEntries(w.picks.map((p) => [p.gameId, p.winner])) }, Math.min(TIEBREAK_ITERATIONS, iterations));
     // Compare on a quick trim of each, then trim only the one shown in full.
-    const sureQuick = sure && trimWay(data, conference, teamId, locks, choices, sure, true);
-    const luckyQuick = lucky && trimWay(data, conference, teamId, locks, choices, lucky, true);
+    const sureQuick = sure && trimWay(data, teamId, locks, choices, sure, true);
+    const luckyQuick = lucky && trimWay(data, teamId, locks, choices, lucky, true);
     // A way that's no likelier even before its tiebreak can't beat the sure way.
     const q = luckyQuick && (!sureQuick || luckyQuick.chance > sureQuick.chance) ? tiebreakOdds(luckyQuick) : 0;
     const luckyWins = luckyQuick !== null && (!sureQuick || luckyQuick.chance * q > TIEBREAK_EDGE * sureQuick.chance);
     const found = luckyWins ? lucky : sure;
-    const way = found && trimWay(data, conference, teamId, locks, choices, found);
+    const way = found && trimWay(data, teamId, locks, choices, found);
     const tiebreak = way && luckyWins ? tiebreakOdds(way) : null;
     if (way) {
       const overall = way.chance * (tiebreak ?? 1);
@@ -558,7 +558,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
       if (favorites > 0) elsewhere.push(elsewhere.length ? `the favorites win ${favorites} other game${favorites === 1 ? "" : "s"}` : `the favorites win ${favorites} game${favorites === 1 ? "" : "s"} elsewhere`);
       const parts = [own.length ? `${team} ${list(own)}` : "", elsewhere.length ? list(elsewhere) : ""].filter(Boolean);
       const what = parts.length ? parts.join("; and ") : `${team} needs nothing more`;
-      const note = tiebreak === null ? null : `With these results ${team} gets in ${often}, depending on ${luckSteps(conference)}.`;
+      const note = tiebreak === null ? null : `With these results ${team} gets in ${often}, depending on ${luckSteps(data)}.`;
       const card = wayParts(way, choices, teamId, name, sim, reachedAt, minSample, gameIndex);
       likeliest = {
         picks: way.picks,
@@ -604,7 +604,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
       if (it >= n) return;
       toFlip.forEach(({ g, gi, other }, k) => {
         const flipped = (x: Game): number => (x.id === g.id ? other : winnerAt(gameIndex.get(x.id)!));
-        const [x, y] = championshipFromData(data, conference, flipped, { draw: mulberry32(mix(seed, it, 1)), rank: (id) => teams.rankIf(id, gi) });
+        const [x, y] = championshipFromData(data, flipped, { draw: mulberry32(mix(seed, it, 1)), rank: (id) => teams.rankIf(id, gi) });
         if (x === teamId || y === teamId) hits[k]++;
       });
     });
@@ -706,7 +706,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
     const f = ifPicked.get(g.id);
     const ifWin = f ? playoffOdds(f.playoffIfWin) : null;
     const ifLose = f ? playoffOdds(f.playoffIfLose) : null;
-    const counts = f !== undefined && countsNonConference(conference);
+    const counts = f !== undefined && countsNonConference(data);
     w.nonConference = {
       gameId: g.id, opponentId: opp, opponent: name(opp), site: g.neutralSite ? "neutral" : home ? "home" : "away", date: when(g),
       won: final ? mine > theirs : null, score: final ? `${mine}-${theirs}` : null,
