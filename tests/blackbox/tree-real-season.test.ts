@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { formatOdds, pathTree, seasonFromCfbd, teamPath } from "@/core";
 import type { CfbdSnapshot, Season, TreeNode } from "@/core";
+// The 2025 results are checked under the 2026 rules, the only ones core has, so the fixture is loaded as 2026.
 
 const leaves = (n: TreeNode): TreeNode[] => (n.children.length ? n.children.flatMap(leaves) : [n]);
 /** Every root-to-leaf path, as the list of nodes below the root. */
@@ -12,7 +13,7 @@ const paths = (n: TreeNode, above: TreeNode[] = []): TreeNode[][] =>
 
 describe("path tree on a real season", () => {
   it("builds a tree for every team in the 2025 ACC fixture with the last three weeks unplayed", () => {
-    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     const cut: Season = {
@@ -40,7 +41,7 @@ describe("path tree on a real season", () => {
 
 describe("help from elsewhere on a real season", () => {
   it("orders help: games that matter now, then games that matter in a scenario, then the rest by kickoff", () => {
-    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     const cut: Season = {
@@ -70,7 +71,7 @@ describe("help from elsewhere on a real season", () => {
   }, 30_000);
 
   it("the likeliest way, tiebreak included, is never likelier than the team's title odds, nor far below them for a contender", () => {
-    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     let viaTiebreak = 0;
@@ -103,7 +104,7 @@ describe("help from elsewhere on a real season", () => {
   }, 60_000);
 
   it("no result shows a flat 100% or 0% unless it's proven", () => {
-    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     const cut: Season = {
@@ -129,7 +130,7 @@ describe("help from elsewhere on a real season", () => {
   }, 60_000);
 
   it("a week marks the same side as helping that the team is told to root for", () => {
-    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     let checked = 0;
@@ -153,7 +154,7 @@ describe("help from elsewhere on a real season", () => {
   }, 60_000);
 
   it("California four weeks out: the card's wording, word for word", () => {
-    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     const cut: Season = {
@@ -177,7 +178,7 @@ describe("help from elsewhere on a real season", () => {
   }, 30_000);
 
   it("the team's own part reads as a count of the results the way needs from it", () => {
-    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     const seen = new Set<string>();
@@ -217,7 +218,7 @@ describe("help from elsewhere on a real season", () => {
   }, 60_000);
 
   it("the card's rivals and the week by week agree with the picks, for every team", () => {
-    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     let rivals = 0;
@@ -289,7 +290,7 @@ describe("help from elsewhere on a real season", () => {
   }, 60_000);
 
   it("a game elsewhere marks the side that helps, and bigger impact means a bigger gap in the odds", () => {
-    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     const cut: Season = {
@@ -314,7 +315,7 @@ describe("help from elsewhere on a real season", () => {
   }, 30_000);
 
   it("a side that helps even a little is marked, and one that can't is not", () => {
-    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     const cut: Season = {

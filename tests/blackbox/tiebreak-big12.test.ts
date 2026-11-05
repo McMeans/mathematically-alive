@@ -185,7 +185,8 @@ describe("non-conference games in the Big 12", () => {
 });
 
 describe("Big 12 seasons", () => {
-  const load = (year: number) => seasonFromCfbd(JSON.parse(readFileSync(`fixtures/big-12-${year}.json`, "utf8")) as CfbdSnapshot);
+  // Core has only the 2026 rules, so a 2025 fixture is loaded as 2026 to check the real 2025 title game under them.
+  const load = (year: number) => seasonFromCfbd({ ...(JSON.parse(readFileSync(`fixtures/big-12-${year}.json`, "utf8")) as CfbdSnapshot), year: 2026 });
 
   it("the 2025 results send Texas Tech and BYU, who played the real title game", () => {
     const s = load(2025);

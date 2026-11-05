@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { formatOdds, seasonFromCfbd, teamPath } from "@/core";
 import type { CfbdSnapshot, Game, Season } from "@/core";
+// The 2025 results are checked under the 2026 rules, the only ones core has, so the fixture is loaded as 2026.
 
 function team(id: number, conference: string) {
   return {
@@ -192,7 +193,7 @@ describe("formatOdds", () => {
 
 describe("2025 ACC fixture with the last two weeks unplayed", () => {
   it("runs for every ACC team with valid statuses", () => {
-    const snap = JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot;
+    const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     const cut: Season = {

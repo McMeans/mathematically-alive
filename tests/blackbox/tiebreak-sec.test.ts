@@ -227,7 +227,8 @@ describe("SEC tiebreakers", () => {
 });
 
 describe("SEC seasons", () => {
-  const load = (year: number) => seasonFromCfbd(JSON.parse(readFileSync(`fixtures/sec-${year}.json`, "utf8")) as CfbdSnapshot);
+  // Core has only the 2026 rules, so a 2025 fixture is loaded as 2026 to check the real 2025 title game under them.
+  const load = (year: number) => seasonFromCfbd({ ...(JSON.parse(readFileSync(`fixtures/sec-${year}.json`, "utf8")) as CfbdSnapshot), year: 2026 });
   const members = (s: Season) => s.teams.filter((t) => t.conference === "SEC");
 
   it("the 2025 results send Alabama and Georgia, who played the real title game", () => {

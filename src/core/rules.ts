@@ -44,7 +44,7 @@ export type TiebreakRules = {
 
 const ACC: TiebreakRules = {
   conference: "ACC",
-  seasons: [2025, 2026],
+  seasons: [2026],
   source: "ACC football championship game tiebreaker policy, July 2026 (theacc.com)",
   steps: [headToHead({ record: "opponents", lostToAll: true }), ranking({ restart: false }), draw()],
   spots: "one",
@@ -55,7 +55,7 @@ const ACC: TiebreakRules = {
 
 const BIG_12: TiebreakRules = {
   conference: "Big 12",
-  seasons: [2024, 2025, 2026],
+  seasons: [2026],
   source: "Big 12 Football Tiebreaking Procedures, 2024 season (the latest published): https://s3.amazonaws.com/big12sports.com/documents/2025/11/4/Big_12_Football_2024_Tiebreaker_Policy.pdf",
   steps: [
     headToHead({ record: "games", lostToAll: false }),
@@ -74,7 +74,7 @@ const BIG_12: TiebreakRules = {
 
 const SEC: TiebreakRules = {
   conference: "SEC",
-  seasons: [2024, 2025, 2026],
+  seasons: [2026],
   source: "SEC Football Tiebreakers Final 10.29.24: https://storage.googleapis.com/secsports-prod/upload/2024/10/29/f6fc7cd9-3031-4357-8754-80bfa4b9c4c0.pdf",
   steps: [
     headToHead({ record: "games", lostToAll: true }),
