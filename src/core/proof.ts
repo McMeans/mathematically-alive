@@ -16,23 +16,40 @@ export type ProvenStatus = "clinched" | "eliminated" | "open";
 
 const BUDGET = 30_000;
 
-/** `budget`: search nodes per check; a smaller one answers faster but says "open" more often. */
-export function provenStatus(season: Season, conference: string, teamId: number, locks: Record<number, number> = {}, budget = BUDGET): ProvenStatus {
+/**
+ * `budget`: search nodes per check; a smaller one answers faster but says "open" more often. `pool`: nodes shared
+ * with other proofs (a page's tree); each check takes at most what's left in it, and an empty pool answers "open"
+ * without searching.
+ */
+export function provenStatus(
+  season: Season, conference: string, teamId: number, locks: Record<number, number> = {}, budget = BUDGET, pool?: { left: number },
+): ProvenStatus {
+  if (pool && pool.left <= 0) return "open";
   const data = conferenceData(season, conference);
-  if (!canGetIn(data, teamId, locks, true, budget)) return "eliminated";
+  /** One check, with `budget` nodes or what's left in the pool if less; what it uses comes out of the pool. */
+  const run = (f: (check: { left: number }) => boolean): boolean => {
+    const check = { left: pool ? Math.min(budget, pool.left) : budget };
+    const from = check.left;
+    const r = f(check);
+    if (pool) pool.left -= from - check.left;
+    return r;
+  };
+  if (!run((c) => canFinish(data, teamId, locks, false, true, c))) return "eliminated";
   // A search for a way out that finds one settles it: the team isn't in for sure, and the one-rival check below
   // could only agree. Only an answer cut short by the budget or the draw limit goes on to that check.
   const out = { yes: false };
-  if (!canFinish(data, teamId, locks, true, false, { left: budget }, undefined, true, out)) return "clinched";
+  if (!run((c) => canFinish(data, teamId, locks, true, false, c, undefined, true, out))) return "clinched";
   if (out.yes) return "open";
-  return oneRivalLeft(data, teamId, locks, budget) ? "clinched" : "open";
+  return oneRivalLeft(data, teamId, locks, run) ? "clinched" : "open";
 }
 
 /**
  * Two teams play for the title, so when at most one other team can still get in, the team is in. Catches
  * clinches the search above runs out of budget on: each other team's elimination is a smaller search.
  */
-function oneRivalLeft(data: ConferenceData, teamId: number, locks: Record<number, number>, budget: number): boolean {
+function oneRivalLeft(
+  data: ConferenceData, teamId: number, locks: Record<number, number>, run: (f: (check: { left: number }) => boolean) => boolean,
+): boolean {
   // Most wins so far first (played and locked): those teams can usually get in, found in a few probes, and two of
   // them end the check. Each team's answer doesn't depend on the order, so neither does the result.
   const wins = new Map<number, number>([...data.ids].map((id) => [id, 0]));
@@ -44,7 +61,7 @@ function oneRivalLeft(data: ConferenceData, teamId: number, locks: Record<number
   for (const id of [...data.ids].sort((a, b) => wins.get(b)! - wins.get(a)!)) {
     if (id === teamId) continue;
     // Out of budget counts as "can get in", so the answer stays a proof.
-    if (canGetIn(data, id, locks, true, budget) && ++rivals > 1) return false;
+    if (run((c) => canFinish(data, id, locks, false, true, c)) && ++rivals > 1) return false;
   }
   return true;
 }
@@ -82,10 +99,6 @@ export function couldTieByCount(data: ConferenceData, gA: number, minA: number, 
   const winsOverlap = minA <= maxB && minB <= maxA;
   const lossesOverlap = gA - maxA <= gB - minB && gB - maxB <= gA - minA;
   return winsOverlap || lossesOverlap;
-}
-
-function canGetIn(data: ConferenceData, teamId: number, locks: Record<number, number>, luck: boolean, budget = BUDGET): boolean {
-  return canFinish(data, teamId, locks, false, luck, { left: budget });
 }
 
 // Before searching for a way in, try this many random result sets that mostly let the team with

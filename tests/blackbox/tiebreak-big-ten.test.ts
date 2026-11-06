@@ -204,6 +204,23 @@ describe("Big Ten seasons", () => {
     expect(checked).toBe(3);
   }, 60_000);
 
+  it("a page whose proofs keep running out of budget takes about as long as any other", () => {
+    // Penn State in 2026 never reaches the title game in the simulation but can't be proved out, so almost every
+    // branch of its tree asks for a proof that comes back open. Timed against Ohio State on the same data, so the
+    // machine's speed and coverage instrumentation cancel out.
+    const s = load(2026);
+    const time = (team: string) => {
+      const id = members(s).find((t) => t.name === team)!.id;
+      const t0 = performance.now();
+      const e = explore(s, { conference: "Big Ten", teamId: id, iterations: 20_000, seed: 2026 });
+      return { ms: performance.now() - t0, e, id };
+    };
+    const base = time("Ohio State");
+    const slow = time("Penn State");
+    expect(slow.e.outlook.find((o) => o.teamId === slow.id)!.titleGame).toBe(0);
+    expect(slow.ms).toBeLessThan(3 * base.ms);
+  }, 180_000);
+
   it("2026 title odds across the conference add up to two spots", () => {
     const s = load(2026);
     const o = seasonOutlook(s, { conference: "Big Ten", iterations: 2000, seed: 1 });

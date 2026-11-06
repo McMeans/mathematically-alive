@@ -196,6 +196,11 @@ export type Impact = "big" | "some" | "small";
 // long shot's noise doesn't read as big): at least half of it is big, a fifth some, anything else small.
 // Search nodes for proving the picks alone settle the team. More than one game side gets: when it works, every other proof is skipped.
 const ROOT_BUDGET = 150_000;
+// Search nodes the rest of a tree's proofs share (branches, game sides, locked games). A team its proofs can't
+// settle would otherwise spend a full budget on every one for nothing (Penn State, 2026: 2 million nodes, 40 s).
+// Once these run out, the rest show their odds (">99%", "<1%") instead of In or Out. Above every ACC, Big 12 and
+// SEC page on 2026 data (the most, Auburn: 212,000).
+const TREE_POOL = 250_000;
 const IMPACT_FLOOR = 0.02;
 const BIG = 0.5;
 const SOME = 0.2;
@@ -403,6 +408,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
   // Proofs are the slow part, and the same lock sets come up more than once (a branch of the tree and its game in the
   // week list, a game side and its verdict). Once the locks alone settle the team, adding more can't change that (swapping one can).
   const proofs = new Map<string, ProvenStatus>();
+  const pool = { left: TREE_POOL };
   const baseKey = Object.entries(opts.locks ?? {}).sort().join();
   const proven = (locks: Record<number, number>): ProvenStatus => {
     const base = proofs.get(baseKey);
@@ -410,7 +416,10 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
     if (more && base !== undefined && base !== "open") return base;
     const key = Object.entries(locks).sort().join();
     let s = proofs.get(key);
-    if (s === undefined) proofs.set(key, (s = provenStatus(season, conference, teamId, locks, key === baseKey ? ROOT_BUDGET : undefined)));
+    if (s === undefined) {
+      s = key === baseKey ? provenStatus(season, conference, teamId, locks, ROOT_BUDGET) : provenStatus(season, conference, teamId, locks, undefined, pool);
+      proofs.set(key, s);
+    }
     return s;
   };
 
