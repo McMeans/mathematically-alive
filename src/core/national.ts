@@ -70,6 +70,12 @@ export function titleRace(season: Season, conference: string): TitleRace {
   return { conference, data, game: i < 0 ? null : season.games[i], odds: neutralOdds(season) };
 }
 
+/** The data's title game, when it is between `a` and `b` (the teams the rules picked). */
+const gameBetween = (race: TitleRace, a: number, b: number): Game | null => {
+  const g = race.game;
+  return g && ((g.homeId === a && g.awayId === b) || (g.homeId === b && g.awayId === a)) ? g : null;
+};
+
 /**
  * Stage 2 for one conference in one simulated season: [seed 1, seed 2, champion]. The rules pick the teams. When
  * the data has the title game between those two, its result (final, locked or simulated) decides; otherwise a
@@ -84,8 +90,8 @@ export function playTitleGame(
   shift: (teamId: number) => number,
 ): [number, number, number] {
   const [a, b] = championshipFromData(race.data, winnerOf, { draw: tiebreakDraw(seed, iteration, race.conference), rank });
-  const g = race.game;
-  if (g && ((g.homeId === a && g.awayId === b) || (g.homeId === b && g.awayId === a))) return [a, b, winnerOf(g)];
+  const g = gameBetween(race, a, b);
+  if (g) return [a, b, winnerOf(g)];
   return [a, b, titleRoll(seed, iteration, race.conference) < race.odds(a, b, shift(a), shift(b)) ? a : b];
 }
 
@@ -176,7 +182,7 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       const li = idx(ch === a ? b : a);
       if (ci >= 0 && power.has(race.conference)) champ[ci] = 1;
       // A title game already in the data was counted with the season's games.
-      if (race.game && ((race.game.homeId === a && race.game.awayId === b) || (race.game.homeId === b && race.game.awayId === a))) continue;
+      if (gameBetween(race, a, b)) continue;
       if (ci >= 0) { w[ci]++; sos[ci] += teamRating(byId.get(ch === a ? b : a)); sosN[ci]++; }
       if (li >= 0) { l[li]++; sos[li] += teamRating(byId.get(ch)); sosN[li]++; }
     }
