@@ -96,7 +96,8 @@ f. Random draw by the Commissioner or designee: one name per open spot, the firs
 
 Assumed, not confirmed by the document: when a step cuts a tie of three or more down to a smaller group, that group starts over at head-to-head (the engine's rule for every conference). The 2025 scenarios show it for two teams left; cfb.app's paraphrase has a group of three or more go on to the next step instead.
 
-Proofs count the ranking and the draw as luck. The likeliest-way note for a Big Ten team says "depending on the ranking tiebreak". 
+Proofs count the ranking and the draw as luck. The likeliest-way note for a Big Ten team says "depending on the ranking tiebreak".
+
 ### Outlook (`outlook.ts`)
 
 For each conference team, `seasonOutlook` gives:
