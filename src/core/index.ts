@@ -16,7 +16,7 @@ export type {
 } from "./season";
 export { championshipParticipants, conferenceStandings } from "./tiebreak";
 export { hasTiebreakRules } from "./rules";
-export { checkSnapshot } from "./snapshot";
+export { checkFetch, checkSnapshot } from "./snapshot";
 export type { SnapshotCheck } from "./snapshot";
 export type { ConferenceStanding, TiebreakOptions } from "./tiebreak";
 export { gameWinProbability, simulateSeason } from "./sim";

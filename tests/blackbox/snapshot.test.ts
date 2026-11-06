@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkSnapshot, seasonFromCfbd, type CfbdGame, type CfbdSnapshot, type CfbdTeam } from "@/core";
+import { checkFetch, checkSnapshot, seasonFromCfbd, type CfbdGame, type CfbdSnapshot, type CfbdTeam } from "@/core";
 
 // A tiny made-up national snapshot: two ACC teams that play each other, a Sun Belt pair, an independent and an
 // FCS team.
@@ -71,5 +71,38 @@ describe("checkSnapshot", () => {
   it("fails a snapshot with no FBS teams", () => {
     const { errors } = checkSnapshot(seasonFromCfbd(snapshot({ teams: [team(6, "Big Sky", "fcs")], games: [] })), []);
     expect(errors).toEqual(["The 2026 snapshot has no FBS teams."]);
+  });
+});
+
+describe("checkFetch", () => {
+  const line = (id: number) => ({ id, lines: [] });
+  const rating = (n: number) => ({ team: `Team ${n}`, rating: n });
+  // A previous snapshot with 20 lines and 20 ratings, so a 5% shrink is one row.
+  const previous = snapshot({ lines: Array.from({ length: 20 }, (_, i) => line(i)), ratings: Array.from({ length: 20 }, (_, i) => rating(i)) });
+
+  it("accepts a first fetch, and a refresh that loses no more than 5% of any list", () => {
+    expect(checkFetch(previous, null)).toEqual([]);
+    expect(checkFetch({ ...previous, lines: previous.lines.slice(1) }, previous)).toEqual([]);
+  });
+
+  it("rejects a fetch with no teams or no games", () => {
+    expect(checkFetch(snapshot({ teams: [], games: [] }), null)).toEqual(["CFBD returned no teams for 2026.", "CFBD returned no games for 2026."]);
+  });
+
+  it("rejects a refresh whose lines or ratings shrink by more than 5%, an empty list included", () => {
+    expect(checkFetch({ ...previous, lines: previous.lines.slice(2), ratings: [] }, previous)).toEqual([
+      "CFBD returned 18 lines for 2026, down from 20 in the previous snapshot.",
+      "CFBD returned 0 ratings for 2026, down from 20 in the previous snapshot.",
+    ]);
+  });
+
+  it("rejects a refresh that drops games", () => {
+    expect(checkFetch({ ...previous, games: previous.games.slice(1) }, previous)).toEqual([
+      "CFBD returned 2 games for 2026, down from 3 in the previous snapshot.",
+    ]);
+  });
+
+  it("compares only against the same season's snapshot", () => {
+    expect(checkFetch(snapshot({ year: 2027 }), previous)).toEqual([]);
   });
 });
