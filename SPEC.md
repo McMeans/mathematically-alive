@@ -20,6 +20,7 @@ Users can lock results ("what if Miami loses to Wake Forest?") and every number 
 - **Snapshot:** committed. `.github/workflows/refresh-data.yml` refreshes it in season (August to January), Sunday 12:00 UTC once Saturday's games are final and Wednesday for the week's lines, 8 CFBD calls a week; it can also be run by hand with a year. It fetches, refuses a partial response (`checkFetch`: no teams or games, or any list down more than 5% from the committed snapshot of the same season, so a lost game or two still goes through), runs `pnpm build` (so the checks below and every team page must pass), and commits the snapshot to `main` when anything besides the fetch time changed. The host's git deploy ships it. A bad snapshot fails the job and is never committed.
 - **Build:** `scripts/build-data.ts` turns the newest `data/season-<year>.json` into `src/app/data/season.json`, which is gitignored. So `next build` and CI never need a key. It runs before `lint`, `typecheck` and `build`. It fails unless `checkSnapshot` (`snapshot.ts`) passes: every supported conference has a full schedule (each member plays a conference game against another member) and tiebreak rules for the season. It lists every other FBS conference in the snapshot, independents included, as not supported. With the whole 2026 season in the snapshot (888 games, through week 11), `pnpm build` takes about 110 s on a laptop, nearly all of it rendering the 71 team pages, and one team's `explore` has a median of 2.9 s (Penn State and Rutgers about 13 s). Simulating the other conferences' games costs about 0.3 s of that median; the merged week-9 fixtures took 85 s and 2.2 s.
 - **Model:** `src/core/season.ts`, via `seasonFromCfbd`. A `Season` has teams (id, conference, FBS or not, colors, SP+ rating) and games (week, kickoff, neutral site, conference game, home/away, score once completed, spread).
+- **Committee rankings:** `fixtures/cfp-<year>.json` (2014–2026), made by `pnpm cfp`: see the committee stand-in below.
 - **Fixtures:** `fixtures/acc-2025.json` and `fixtures/big-12-2025.json` (full season), and `fixtures/acc-2026.json` and `fixtures/big-12-2026.json` (mid-season, through week 9), are raw snapshots made by `scripts/make-fixture.ts` (`pnpm fixture [year] [conference]`). Never hand-edit them. They are for tests only; the app is built from the national snapshot.
 
 ## How the stats work
@@ -36,7 +37,25 @@ All logic lives in `src/core` (framework-free, public API in `src/core/index.ts`
 - Monte Carlo: every unplayed game is played out over many seasons. The core takes the count and seed as options; the app sets them in `src/app/config.ts` (`ITERATIONS` = 20,000, `SEED` = 2026). Completed games are never changed. Locked games always go to the locked winner.
 - **Rating shift:** in each simulated season, each team's rating moves by one normal draw (`SHOCK_SD` = 4) that is shared by all its games. A team that is better than its rating tends to win more of them. The per-game SD shrinks to match, so a single game's odds still equal what the spread says.
 - **Ranking stand-in:** the SportSource Team Success Ranking (a tiebreak step) is modelled as the rating plus `RANK_PER_NET_WIN` = 2 per net simulated win, plus noise (`RANK_SD` = 3). It comes from one hashed draw per team and season, which the title game reuses.
-- Tiebreak draws and title-game rolls come from streams seeded per iteration, so what-if runs stay paired with the base run. That means differences come from the lock, not from noise.
+- Tiebreak draws and title-game rolls come from streams seeded per iteration and per conference (a salt hashed from the conference's name), so what-if runs stay paired with the base run and two conferences never share a draw. That means differences come from the lock, not from noise.
+
+### National simulation (`national.ts`)
+
+`simulateNational(season, { iterations, seed, locks, conferences })` runs phase 4's stages 2 and 3 (`docs/plan-national.md`) on every simulated season of `simulateSeason`, which is stage 1:
+
+- **Stage 2, title games.** Each listed conference's rules pick its two teams, and the game is played at a neutral site with the season's simulated ratings. Once the data has the title game between those two teams, its result decides instead (final, locked, or simulated as a scheduled game). `seasonOutlook` plays its title game the same way, from the same streams, so a conference's title-game and title odds are the same in both. A conference with no tiebreak rules for the season is an error; Group of Six conferences have none yet, so their title games aren't simulated, their teams' `titleGame` and `champion` are null, and no Group of Six team gets the champion weight below.
+- **Stage 3, committee stand-in ranking** (`committee.ts`). Every FBS team is scored on the season's simulated record (title game included), its simulated rating (rating plus the season's shift), strength of schedule (its opponents' average rating) and a power-conference title, then ordered best first. Each team's score gets one standard Gumbel draw per season, hashed from (seed, iteration, team), which gives any two teams the pair odds the model was fitted on.
+- Per FBS team: `titleGame` and `champion` shares, `meanRank`, and the shares of seasons in the stand-in's top 4, 12 and 25. `forEachIteration` replays each season's title games and full ranking, for stage 4.
+- What-ifs stay paired: a lock changes only its own game's draw, so seasons where that game already went the locked way come out the same.
+- Cost on the 2026 snapshot at 20,000 iterations, on top of the regular season (0.4 s): about 0.25 s per conference's title games and 0.35 s for the ranking, so a national pass is about 1.8 s. No app page runs it yet (phase 5).
+
+### Committee stand-in (`committee.ts`)
+
+A modelled ranking, not the committee's. `committeeRanking(season, { throughWeek, champions })` ranks every FBS team from completed games by `score = 0.953·wins − 1.419·losses + 0.123·rating + 0.414·strength + 0.744·champion` (`committee-weights.ts`). Strength is the average rating of the opponents played (a missing rating is 0 for FBS teams and −10 below FBS). Champion means a power-conference champion (ACC, Big 12, Big Ten, SEC, and the Pac-12 through 2023); by default, the winner of each one's title game once played.
+
+- **Fitting:** `pnpm cfp` (`scripts/fetch-cfp.ts`, 4 CFBD calls a season) writes `fixtures/cfp-<year>.json`: every committee ranking of the season with a trimmed snapshot of its games and SP+ ratings. `pnpm fit-committee` (`scripts/fit-committee.ts`, no API calls) fits the weights by maximum likelihood on each season's latest ranking (the final one for 2014–2025, the first of 2026, released Nov. 3 after week 9): the committee puts a above b with probability `1 / (1 + e^−(score a − score b))`, over every pair the ranking orders (ranked over ranked, ranked over unranked), each ranking weighted equally, with a small ridge penalty. Features come from games before the ranking's week.
+- **Fit (in-sample):** its top 12 holds 10.8 of the committee's top 12 on average (at least 9 every season) and at least 3 of the top 4 every season. The old placeholder score (`wins − 1.5·losses + rating/10`) holds 8.9. `tests/blackbox/committee.test.ts` holds it to at least 9 every season, 10.5 on average and 3 of the top 4.
+- **Limits:** past seasons use final SP+, which includes bowl games played after the ranking. Title games are found in the data as the only game between members in the conference's last week (or the only one at a neutral site), since CFBD flags them as conference games before 2025 and non-conference games from 2025; the Big 12 had none in 2014–2016, and the 2020 Pac-12 game isn't found. Group of Six champions get no champion weight.
 
 ### Tiebreakers (`tiebreak.ts`, `steps.ts`, `rules.ts`)
 
@@ -107,7 +126,8 @@ For each conference team, `seasonOutlook` gives:
 - `titleGame`: the share of seasons it plays in the title game;
 - `title`: the share of seasons it wins the title game. That game is a neutral-site game using the simulated ratings;
 - `status`: clinched, eliminated or alive, from the proof;
-- `playoff`: **experimental**, not the committee. The conference champion always gets in. Any other FBS team gets in when it ranks in the top 11 by `wins − 1.5·losses + rating/10`.
+- `title`: when the data already has the title game between the two teams the rules pick, its result decides, as in the national simulation.
+- `playoff`: **experimental**, not the committee (the committee stand-in replaces it with stage 4). The conference champion always gets in. Any other FBS team gets in when it ranks in the top 11 by `wins − 1.5·losses + rating/10`.
 - `atLarge`: the share of seasons it gets in without winning the conference. 0 means it must win the conference (`mustWinConference`), and the app shows "Must win ACC" instead of a playoff percentage.
 - `games` (only for `OutlookOptions.teamId`): its title-game and playoff odds if it wins or loses each unplayed game. Each simulated season is replayed with only that game flipped (the title race rerun, ranking included), so the numbers equal what picking that result shows. A lock changes only its own game's draw, which is what makes this exact. Splitting the seasons by how the game went instead would be biased: seasons where a team loses lean toward seasons it drew a weak rating, so it also loses more of its other games.
 
@@ -179,7 +199,8 @@ A game's swing is the gap between the team's title-game odds when the home side 
 
 ## Known limits and open ideas
 
-- The playoff model is a rough placeholder, not the committee.
+- The team page's playoff number is still a rough placeholder (top-11 cut). The committee stand-in and the national title games exist (`simulateNational`); field selection, the bracket and the team page's playoff odds come next (phase 4, stages 4–5, then phase 5).
+- CFBD flagged title games as conference games before 2025. If a 2026 title game comes in flagged that way, the standings would count it as a conference game; the 2025 rows are flagged non-conference.
 - Ranking is a stand-in for SportSource.
 - Proofs and the likeliest search have budgets. Near the edge they say "open" or return null rather than guess.
 - The app covers the ACC, the Big 12, the SEC and the Big Ten. Three of the Big Ten's rules are assumed until the Big Ten's full document is available again (common opponents level on record count as one group; no team is dropped for losing to all the others; a tie of three or more, once cut down, starts over at head-to-head).

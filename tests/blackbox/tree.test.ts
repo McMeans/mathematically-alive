@@ -517,14 +517,18 @@ describe("help from elsewhere", () => {
     expect([nc.ifWin, nc.ifLose]).toEqual([formatFine(odds.playoffIfWin), formatFine(odds.playoffIfLose)]);
   });
 
-  it("a non-conference game stays pickable, with equal playoff odds either way, when the title is the only way in", () => {
+  it("a non-conference game stays pickable when the title is the only way in", () => {
     const { s, other } = needsHelp();
     const next = game(1, 5, undefined, { conferenceGame: false, week: other.week });
     const strong = Array.from({ length: 11 }, (_, i) => team(100 + i, "Idle", 200));
     const s2 = { ...s, teams: [...s.teams, team(5, "X"), ...strong], games: [...s.games, next] };
-    const nc = pathTree(s2, { ...base, teamId: 1 }).weeks.find((w) => w.week === other.week)!.nonConference!;
+    const r = explore(s2, { ...base, teamId: 1 });
+    expect(r.outlook.find((o) => o.teamId === 1)!.atLarge).toBe(0);
+    const nc = r.tree.weeks.find((w) => w.week === other.week)!.nonConference!;
+    // Both sides show odds, so the game can be picked. They can differ a little: the result moves the ranking
+    // tiebreak, and so the title race, which is the only way in.
     expect(nc.ifWin).toMatch(/%$/);
-    expect(nc.ifWin).toBe(nc.ifLose);
+    expect(nc.ifLose).toMatch(/%$/);
   });
 
   it("a picked non-conference game still shows the team's chance to win it", () => {

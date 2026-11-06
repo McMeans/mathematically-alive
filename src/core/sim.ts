@@ -83,9 +83,33 @@ function normalAt(seed: number, iteration: number, salt: number): number {
   const k = f | 0;
   return Q_TABLE[k] + (Q_TABLE[k + 1] - Q_TABLE[k]) * (f - k);
 }
-// Salts for each team's rating shift and ranking noise: SHIFT_SALT + team index, RANK_SALT + team index.
+// Salts for each team's rating shift and ranking noise: SHIFT_SALT + team index, RANK_SALT + team index; the
+// committee stand-in's noise (national.ts): COMMITTEE_SALT + FBS team index. Each conference's tiebreak draw and
+// title-game roll use salts hashed from its name (conferenceSalt), above all of these.
 const SHIFT_SALT = 1 << 20;
 const RANK_SALT = 1 << 21;
+export const COMMITTEE_SALT = 1 << 22;
+
+const salts = new Map<string, number>();
+/** An even salt in [2^30, 2^31) from the conference's name (FNV-1a), so each conference has its own streams. */
+function conferenceSalt(conference: string): number {
+  let s = salts.get(conference);
+  if (s === undefined) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < conference.length; i++) h = Math.imul(h ^ conference.charCodeAt(i), 0x01000193);
+    s = 0x40000000 | (h & 0x3ffffffe);
+    salts.set(conference, s);
+  }
+  return s;
+}
+
+/** The conference's tiebreak draw stream for one simulated season. Every caller uses this, so their draws agree. */
+export const tiebreakDraw = (seed: number, iteration: number, conference: string): (() => number) =>
+  mulberry32(mix(seed, iteration, conferenceSalt(conference)));
+
+/** The uniform draw that settles the conference's title game in one simulated season. */
+export const titleRoll = (seed: number, iteration: number, conference: string): number =>
+  mulberry32(mix(seed, iteration, conferenceSalt(conference) + 1))();
 
 export type SimOptions = {
   iterations: number;

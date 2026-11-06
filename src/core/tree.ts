@@ -18,7 +18,7 @@ import { formatFine, formatOdds, formatSideOdds, formatTitleOdds, mustWinConfere
 import { teamRecord } from "./season";
 import type { Game, Season } from "./season";
 import { FAINT, OVERALL, SCENARIO, isClear } from "./signal";
-import { gameWinProbability, mix, mulberry32, simulateSeason, type SimResult } from "./sim";
+import { gameWinProbability, simulateSeason, tiebreakDraw, type SimResult } from "./sim";
 import { likeliestWayIn, trimWay, type WayIn } from "./likeliest";
 import { provenStatus, type ProvenStatus } from "./proof";
 import { championshipFromData, conferenceData, countsNonConference, luckSteps } from "./tiebreak";
@@ -355,7 +355,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
   sim.forEachIteration((iteration, winnerAt, teams) => {
     let b = 0;
     for (let k = 0; k < depth; k++) if (winnerAt(levels[k].i) !== teamId) b |= 1 << (depth - 1 - k);
-    const rand = mulberry32(mix(seed, iteration, 1));
+    const rand = tiebreakDraw(seed, iteration, conference);
     const [x, y] = championshipFromData(data, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: rand, rank: teams.rank });
     const reached = x === teamId || y === teamId;
     if (reached) reachedAt[iteration] = 1;
@@ -512,7 +512,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
   const simulatedOdds = (locks: Record<number, number>, n: number): number => {
     let hit = 0;
     simulateSeason(season, { iterations: n, seed, locks }).forEachIteration((it, winnerAt, teams) => {
-      const [x, y] = championshipFromData(data, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: mulberry32(mix(seed, it, 1)), rank: teams.rank });
+      const [x, y] = championshipFromData(data, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: tiebreakDraw(seed, it, conference), rank: teams.rank });
       if (x === teamId || y === teamId) hit++;
     });
     return hit / n;
@@ -616,7 +616,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
       if (it >= n) return;
       toFlip.forEach(({ g, gi, other }, k) => {
         const flipped = (x: Game): number => (x.id === g.id ? other : winnerAt(gameIndex.get(x.id)!));
-        const [x, y] = championshipFromData(data, flipped, { draw: mulberry32(mix(seed, it, 1)), rank: (id) => teams.rankIf(id, gi) });
+        const [x, y] = championshipFromData(data, flipped, { draw: tiebreakDraw(seed, it, conference), rank: (id) => teams.rankIf(id, gi) });
         if (x === teamId || y === teamId) hits[k]++;
       });
     });

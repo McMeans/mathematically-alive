@@ -90,6 +90,13 @@ user's choice over a deploy hook). `checkSnapshot` in `src/core` is the build ch
 
 ## Phase 4: national simulation in stages
 
+Status: stages 2–3 done (core PR): `simulateNational` and `committeeRanking`. The user chose a stand-in fitted to past
+rankings, with the first 2026 ranking included. Fitted on each season's latest committee ranking 2014–2026
+(`fixtures/cfp-<year>.json`, `pnpm cfp`, `pnpm fit-committee`), its top 12 holds 10.8 of the committee's on average
+(the placeholder 8.9). Group of Six title games aren't simulated (no rules yet) and their champions get no champion
+weight. A national pass costs about 1.8 s at 20,000 iterations; no page runs it yet, so page times and the build
+are unchanged. Next: stages 4–5.
+
 One pass per simulated season, every stage a pure function in `src/core` and testable through the public API:
 
 1. **Regular season:** `simulateSeason` as today (rating shift, seeded streams, locks).
@@ -134,6 +141,6 @@ covers it and what-ifs rerun only what a lock touches.
 
 ## Open questions for the user
 
-- Committee stand-in: fit to past rankings (more work, testable) or keep a simple formula labelled as such?
+- Committee stand-in: answered in phase 4. Fitted to past rankings, the first 2026 ranking included.
 - Refresh: answered in phase 3. Scheduled, Sunday and Wednesday in season, committing the snapshot to `main`.
 - How far back should real-season tests go per conference (one season, or several where the rules were the same)?

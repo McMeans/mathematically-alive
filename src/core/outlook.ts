@@ -1,10 +1,10 @@
 // Season outlook for one conference: how likely each team is to reach the
 // conference championship game, win it, and (experimentally) make the playoff.
-import { mix, mulberry32, neutralOdds, simulateSeason, type SimResult } from "./sim";
+import { playTitleGame, titleRace } from "./national";
+import { simulateSeason, type SimResult } from "./sim";
 import { provenStatus } from "./proof";
 import { teamRecord } from "./season";
 import type { Game, Season, TeamRecord } from "./season";
-import { championshipFromData, conferenceData } from "./tiebreak";
 
 export type OutlookOptions = {
   conference: string;
@@ -53,8 +53,8 @@ const MISSING_RATING = 0;
 /** `shared`: a simulation of the same season, iterations, seed and locks to reuse. */
 export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: SimResult): SeasonOutlook {
   const { conference, iterations, seed } = opts;
-  const data = conferenceData(season, conference);
-  if (data.ids.size < 2) throw new Error(`${conference} has fewer than two teams`);
+  const race = titleRace(season, conference);
+  const { data } = race;
 
   const sim = shared ?? simulateSeason(season, { iterations, seed, locks: opts.locks });
   const gameIndex = new Map<number, number>(season.games.map((g, i) => [g.id, i]));
@@ -63,10 +63,9 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
   const outside = new Map<number, number>();
   const inConf = [...data.ids];
 
-  const titleOdds = neutralOdds(season);
-  // Tiebreak draws and the title-game roll come from fresh streams seeded per
-  // iteration (never a shared stream), so iteration k's draws don't depend on
-  // how many draws earlier iterations used and what-if runs stay paired.
+  // Tiebreak draws and the title-game roll come from fresh streams seeded per iteration and conference (never a
+  // shared stream), so iteration k's draws don't depend on how many draws earlier iterations used, what-if runs
+  // stay paired, and the title game is the one the national simulation plays (playTitleGame).
   const titleGame = new Map<number, number>(inConf.map((id) => [id, 0]));
   const champion = new Map<number, number>(inConf.map((id) => [id, 0]));
   // Playoff ordering, by FBS team index. Completed games are the same in every iteration, so their
@@ -117,12 +116,10 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
   };
 
   sim.forEachIteration((iteration, winnerAt, teams) => {
-    const rand = mulberry32(mix(seed, iteration, 1));
     const winnerOf = (g: Game): number => winnerAt(gameIndex.get(g.id)!);
-    const [a, b] = championshipFromData(data, winnerOf, { draw: rand, rank: teams.rank });
+    const [a, b, champ] = playTitleGame(race, seed, iteration, winnerOf, teams.rank, teams.shift);
     titleGame.set(a, titleGame.get(a)! + 1);
     titleGame.set(b, titleGame.get(b)! + 1);
-    const champ = mulberry32(mix(seed, iteration, 2))() < titleOdds(a, b, teams.shift(a), teams.shift(b)) ? a : b;
     champion.set(champ, champion.get(champ)! + 1);
 
     if (!based) {
@@ -147,8 +144,7 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
         if (wi >= 0) { w[wi]--; l[wi]++; }
         if (oi >= 0) { l[oi]--; w[oi]++; }
         const flipped = (x: Game): number => (x.id === g.id ? other : winnerOf(x));
-        const [a2, b2] = championshipFromData(data, flipped, { draw: mulberry32(mix(seed, iteration, 1)), rank: (id) => teams.rankIf(id, o.i) });
-        const champ2 = mulberry32(mix(seed, iteration, 2))() < titleOdds(a2, b2, teams.shift(a2), teams.shift(b2)) ? a2 : b2;
+        const [a2, b2, champ2] = playTitleGame(race, seed, iteration, flipped, (id) => teams.rankIf(id, o.i), teams.shift);
         const side = won === focus ? 0 : 1;
         o.title[side] += inTitle;
         o.playoff[side] += makes;
