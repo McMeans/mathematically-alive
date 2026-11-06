@@ -47,7 +47,7 @@ All logic lives in `src/core` (framework-free, public API in `src/core/index.ts`
 - **Stage 3, committee stand-in ranking** (`committee.ts`). Every FBS team is scored on the season's simulated record (title game included), its simulated rating (rating plus the season's shift), strength of schedule (its opponents' average rating) and a power-conference title, then ordered best first. Each team's score gets one standard Gumbel draw per season, hashed from (seed, iteration, team), which gives any two teams the pair odds the model was fitted on.
 - Per FBS team: `titleGame` and `champion` shares, `meanRank`, and the shares of seasons in the stand-in's top 4, 12 and 25. `forEachIteration` replays each season's title games and full ranking, for stage 4.
 - What-ifs stay paired: a lock changes only its own game's draw, so seasons where that game already went the locked way come out the same.
-- Cost on the 2026 snapshot at 20,000 iterations, on top of the regular season (0.4 s): about 0.25 s per conference's title games and 0.35 s for the ranking, so a national pass is about 1.8 s. No app page runs it yet (phase 5).
+- Cost on the 2026 snapshot at 20,000 iterations, on top of the regular season (0.4 s): about 1.25 s for the four power conferences' title games and the ranking (0.35 s of it the ranking), so a national pass is about 1.7 s, inside one team page's median. No app page runs it yet (phase 5). Measured when it landed: one team's `explore` median 2.83 s before, 2.93 s after (the draw streams changed, the work didn't; Penn State and Rutgers about 13.5 s both times), `pnpm build` 108 s before, 104 s after.
 
 ### Committee stand-in (`committee.ts`)
 
