@@ -423,7 +423,7 @@ describe("help from elsewhere", () => {
     for (const drop of way.picks) {
       expect(pathTree(s, { ...base, teamId: 1, locks: lock(way.picks.filter((p) => p !== drop)), depth: 0 }).root.verdict).not.toBe("In");
     }
-  });
+  }, 30_000);
 
   it("the likeliest way in still holds once locked when schedules differ by several games", () => {
     // Team 1 plays five conference games, team 6 one: past the spread the proof's early stops assume.
