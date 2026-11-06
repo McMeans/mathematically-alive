@@ -29,3 +29,7 @@ export type { Exploration } from "./explore";
 export type { KeyGame, OddsLabels, PathOptions, PathStatus, TeamPath } from "./paths";
 export { pathTree } from "./tree";
 export type { HelpGame, Impact, Likeliest, PathTree, Rival, SeasonWeek, TreeNode, TreeOptions, TreeOutcome, WayWeek } from "./tree";
+export { committeeRanking } from "./committee";
+export type { CommitteeFeatures, CommitteeOptions, CommitteeTeam, CommitteeWeights } from "./committee";
+export { simulateNational } from "./national";
+export type { NationalOptions, NationalResult, NationalSeason, NationalTeam } from "./national";

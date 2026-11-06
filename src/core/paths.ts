@@ -3,7 +3,7 @@
 // are mathematically proven (provenStatus checks every remaining combination);
 // odds of exactly 1 or 0 without a proof stay "open".
 import type { TeamOutlook } from "./outlook";
-import { mix, mulberry32, simulateSeason, type SimResult } from "./sim";
+import { simulateSeason, tiebreakDraw, type SimResult } from "./sim";
 import { provenStatus } from "./proof";
 import type { Game, Season, TeamRecord } from "./season";
 import { OVERALL, isClear } from "./signal";
@@ -149,7 +149,7 @@ export function teamPath(season: Season, opts: PathOptions, shared?: SimResult):
   let outIn = 0;
 
   sim.forEachIteration((iteration, winnerAt, teams) => {
-    const rand = mulberry32(mix(seed, iteration, 1));
+    const rand = tiebreakDraw(seed, iteration, conference);
     const [a, b] = championshipFromData(data, (g: Game) => winnerAt(gameIndex.get(g.id)!), { draw: rand, rank: teams.rank });
     const reached = a === teamId || b === teamId;
     if (reached) inTitle++;

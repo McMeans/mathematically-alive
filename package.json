@@ -12,6 +12,8 @@
     "gate": ".claude/skills/coverage-gate/gate.sh",
     "data": "tsx --env-file-if-exists=.env.local scripts/fetch-season.ts",
     "fixture": "tsx --env-file-if-exists=.env.local scripts/make-fixture.ts",
+    "cfp": "tsx --env-file-if-exists=.env.local scripts/fetch-cfp.ts",
+    "fit-committee": "tsx scripts/fit-committee.ts",
     "pretypecheck": "tsx scripts/build-data.ts",
     "prelint": "tsx scripts/build-data.ts",
     "prebuild": "tsx scripts/build-data.ts"
