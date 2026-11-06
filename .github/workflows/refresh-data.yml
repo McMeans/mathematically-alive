@@ -47,9 +47,10 @@ jobs:
       - name: Commit snapshot
         run: |
           git add data
-          # The first line holds only the year and fetch time; skip the commit (and the deploy) if nothing else changed.
-          changed=$(git diff --cached --numstat data | awk '{ n += $1 } END { print n + 0 }')
-          if [ "$changed" -le 1 ]; then
+          # The first line holds only the year and fetch time, so it is always one line out and one in. Skip the
+          # commit (and the deploy) if nothing else changed; a dropped game counts, since removed lines are summed too.
+          changed=$(git diff --cached --numstat data | awk '{ n += $1 + $2 } END { print n + 0 }')
+          if [ "$changed" -le 2 ]; then
             echo "Snapshot unchanged."
             exit 0
           fi
