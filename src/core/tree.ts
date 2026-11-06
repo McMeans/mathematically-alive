@@ -200,7 +200,9 @@ const ROOT_BUDGET = 150_000;
 // QUICK_BUDGET check comes first, outside the pool). A team its proofs can't settle would otherwise spend a full
 // budget on every one for nothing (Penn State, 2026: 2 million nodes, 40 s). Once these run out, the rest show their
 // odds (">99%", "<1%") instead of In or Out, so which ones do depends on the order the tree asks. Sized from 2026
-// data: above every ACC, Big 12 and SEC page then (the most, Auburn: 212,000).
+// data: above every ACC, Big 12 and SEC page then (the most, Auburn: 212,000), so those don't reach it. Big Ten pages
+// do by design: Penn State and Rutgers (about 2 million uncapped) stop here, and Nebraska and Wisconsin (about
+// 300,000) lose a few In/Out labels.
 const TREE_POOL = 250_000;
 const IMPACT_FLOOR = 0.02;
 const BIG = 0.5;
