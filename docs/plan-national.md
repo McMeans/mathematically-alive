@@ -74,6 +74,12 @@ First proof that phase 1 pays off.
 
 ## Phase 3: one national snapshot, refreshed on a schedule
 
+Status: done (build/scripts PR). The snapshot `data/season-2026.json` is committed; `.github/workflows/refresh-data.yml`
+refreshes it Sunday and Wednesday, August to January, and commits it to `main` for the host's git deploy (the
+user's choice over a deploy hook). `checkSnapshot` in `src/core` is the build check. The repository secret
+`CFBD_API_KEY` must be set for the job to run. Measured: build 85 s to 107 s, one team's `explore` median 2.2 s to
+2.9 s (about 0.3 s of it the other conferences' games, which phase 4 needs anyway).
+
 - Build from one full-season CFBD snapshot (all FBS games come back in the same 4 calls) instead of merging
   fixtures. Removes the risk of merged fixtures fetched on different dates.
 - Fixtures stay per conference, for tests only.
@@ -129,5 +135,5 @@ covers it and what-ifs rerun only what a lock touches.
 ## Open questions for the user
 
 - Committee stand-in: fit to past rankings (more work, testable) or keep a simple formula labelled as such?
-- Refresh: is a scheduled deploy acceptable, or should updates stay manual?
+- Refresh: answered in phase 3. Scheduled, Sunday and Wednesday in season, committing the snapshot to `main`.
 - How far back should real-season tests go per conference (one season, or several where the rules were the same)?

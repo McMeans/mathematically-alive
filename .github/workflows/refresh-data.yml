@@ -1,0 +1,60 @@
+name: Refresh data
+
+# Fetch the national CFBD snapshot, check that the app builds from it, and commit it to main.
+# The host's git deploy then ships it. In season (August to January): Sunday morning, once
+# Saturday's games are final, and Wednesday, for the week's lines. 8 CFBD calls a week.
+on:
+  schedule:
+    - cron: "0 12 * 1,8-12 0,3"
+  workflow_dispatch:
+    inputs:
+      year:
+        description: Season year (blank for the season being played)
+        required: false
+        type: string
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Fetch snapshot
+        env:
+          # Build-time only. fetch-season.ts sends it in a header and never prints it.
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+          YEAR: ${{ inputs.year }}
+        run: pnpm data "$YEAR"
+      # prebuild checks the snapshot (every supported conference has a full schedule and rules),
+      # then every team page is rendered from it. A bad snapshot fails here and is never committed.
+      - name: Build
+        run: pnpm build
+      - name: Commit snapshot
+        run: |
+          git add data
+          # The first line holds only the year and fetch time; skip the commit (and the deploy) if nothing else changed.
+          changed=$(git diff --cached --numstat data | awk '{ n += $1 } END { print n + 0 }')
+          if [ "$changed" -le 1 ]; then
+            echo "Snapshot unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "Refresh the national data snapshot"
+          git pull -q --rebase origin main
+          git push -q origin HEAD:main

@@ -14,4 +14,4 @@ See `CLAUDE.md` for layout, testing rules and the checks a change must pass.
 
 ## License
 
-Code is [MIT](LICENSE). Schedule, results, betting-line and rating data (including the snapshots in `fixtures/`) come from [CollegeFootballData](https://collegefootballdata.com) and stay under its terms, not this license.
+Code is [MIT](LICENSE). Schedule, results, betting-line and rating data (including the snapshots in `data/` and `fixtures/`) come from [CollegeFootballData](https://collegefootballdata.com) and stay under its terms, not this license.
