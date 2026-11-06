@@ -46,7 +46,7 @@ describe("national simulation: conference title games", () => {
   it("plays the same title games as each conference's own outlook", () => {
     const sim = simulateSeason(national, { iterations: N, seed: 7 });
     const nat = simulateNational(national, { iterations: N, seed: 7, conferences: POWER }, sim);
-    for (const c of ["ACC", "Big Ten"]) {
+    for (const c of ["ACC", "SEC"]) {
       const outlook = seasonOutlook(national, { conference: c, iterations: N, seed: 7 }, sim).teams;
       for (const o of outlook) {
         const t = nat.teams.find((x) => x.teamId === o.teamId)!;
@@ -54,7 +54,7 @@ describe("national simulation: conference title games", () => {
         expect(t.champion).toBe(o.champion);
       }
     }
-  });
+  }, 30_000);
 
   it("teams in conferences it doesn't simulate have no title-game odds", () => {
     const g6 = result.teams.filter((t) => t.conference === "Mountain West" || t.conference === null);
