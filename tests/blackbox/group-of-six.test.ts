@@ -4,13 +4,14 @@ import { mustWinConference, playoffRoute, seasonFromCfbd, seasonOutlook, simulat
 
 // Every FBS game of 2026 through week 9, from fixtures/cfp-2026.json.
 const season = seasonFromCfbd((JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot }).snapshot);
-const CONFERENCES = ["ACC", "Big 12", "SEC", "Big Ten", "Mid-American"];
+const CONFERENCES = ["ACC", "Big 12", "SEC", "Big Ten", "Mid-American", "Conference USA"];
 const N = 200;
 const SEED = 7;
 const mac = new Set(season.teams.filter((t) => t.conference === "Mid-American").map((t) => t.id));
 const sacState = season.teams.find((t) => t.name === "Sacramento State")!.id;
+const cusa = new Set(season.teams.filter((t) => t.conference === "Conference USA").map((t) => t.id));
 
-describe("a Group of Six conference in the national simulation (the MAC)", { timeout: 120_000 }, () => {
+describe("Group of Six conferences in the national simulation (the MAC and CUSA)", { timeout: 120_000 }, () => {
   const national = simulateNational(season, { iterations: N, seed: SEED, conferences: CONFERENCES });
   const outlook = seasonOutlook(season, { conference: "Mid-American", iterations: N, seed: SEED, reuse: national });
 
@@ -24,6 +25,30 @@ describe("a Group of Six conference in the national simulation (the MAC)", { tim
       expect(mac.has(a) && mac.has(b) && a !== b).toBe(true);
       expect([a, b]).toContain(s.champion("Mid-American"));
     });
+  });
+
+  it("plays the CUSA title game: two CUSA teams every season, one of them champion", () => {
+    expect(cusa.size).toBeGreaterThan(2);
+    const teams = national.teams.filter((t) => cusa.has(t.teamId));
+    expect(teams.reduce((s, t) => s + t.titleGame!, 0)).toBeCloseTo(2);
+    expect(teams.reduce((s, t) => s + t.champion!, 0)).toBeCloseTo(1);
+    national.forEachIteration((_, s) => {
+      const [a, b] = s.titleGame("Conference USA");
+      expect(cusa.has(a) && cusa.has(b) && a !== b).toBe(true);
+      expect([a, b]).toContain(s.champion("Conference USA"));
+    });
+  });
+
+  it("a CUSA team's odds come from the national run, and its route is the Group of Six bid", () => {
+    const outlook = seasonOutlook(season, { conference: "Conference USA", iterations: N, seed: SEED, reuse: national });
+    expect(outlook.national).not.toBeNull();
+    const byId = new Map(national.teams.map((t) => [t.teamId, t]));
+    for (const t of outlook.teams) {
+      expect(t.playoff).toBe(byId.get(t.teamId)!.playoff!.field);
+      expect(t.titleGame).toBe(byId.get(t.teamId)!.titleGame);
+      expect(mustWinConference(t)).toBe(false);
+      expect(playoffRoute(t)).toMatch(/highest-ranked Group of Six team, conference champion or not/);
+    }
   });
 
   it("a MAC team's playoff odds come from the national run", () => {
