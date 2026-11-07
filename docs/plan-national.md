@@ -142,7 +142,10 @@ Status: team-page odds done (field, bye, title, paired Win/Lose CFP columns, "Mu
   - Done: the Pac-12 (rules from its Sept. 2026 release: separate two-team and multi-team procedures, now an engine
     option). Its week-13 flex games are non-conference and come after the title-game teams are set; the projected
     pairings stand in until the data lists them.
-  - Next: the Sun Belt (divisions: needs engine support).
+  - Done: the Sun Belt (rules from its tie-breaking procedures page, updated for 2026). The engine now has divisions
+    (each division's champion plays; proofs and the likeliest-way search go by the division) and a "continue" cut
+    (a tie of three or more cut down goes on down the steps).
+  - Next: independents (pages without a title game) and the postseason-ban case below.
   - When a member is barred from the postseason: leave it out of its title game and the Group of Six bid.
 - Independents (Notre Dame and others): no title-game section; playoff only.
 - Picker that scales to every conference plus independents.

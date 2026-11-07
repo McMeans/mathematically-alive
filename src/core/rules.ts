@@ -3,6 +3,7 @@
 
 import {
   commonOpponents,
+  divisionWinPct,
   draw,
   headToHead,
   opponentsWinPct,
@@ -29,6 +30,18 @@ export type TiebreakRules = {
    * decides.
    */
   twoTeam?: { spot: readonly Step[]; seed: readonly Step[] };
+  /**
+   * Divisions, by school name as the data spells it (the Sun Belt's). Each division's champion plays: the best
+   * conference win pct in the division, ties broken by `steps` among that division's teams. The champion with the
+   * better conference win pct is seeded first, a tie broken by `twoTeam.seed` (or `steps`).
+   */
+  divisions?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * After a step cuts a tie down, the teams at the top start over from the first step as each step says
+   * ("restart", the default), or go on to the next step ("continue": the Sun Belt's "the remaining teams will
+   * continue down the tiebreaker").
+   */
+  cut?: "restart" | "continue";
   /**
    * "open": a tie is resolved for every open spot at once (a step's top teams fill the spots when they fit,
    * otherwise they start over and the rest are out). "one": one team is placed at a time and the rest are
@@ -270,7 +283,46 @@ const PAC_12: TiebreakRules = {
   luckSteps: "the ranking tiebreak",
 };
 
-const RULES: readonly TiebreakRules[] = [ACC, BIG_12, SEC, BIG_TEN, MAC, CUSA, MOUNTAIN_WEST, AMERICAN, PAC_12];
+// Two seven-team divisions; each team plays its division and two teams from the other. Each division champion (the
+// best win pct in all conference games) plays. Two-team and three-or-more ties use the same steps: head-to-head (two:
+// their game; more: win pct in games among them, and a division's teams all play each other), win pct in division
+// games, win pct against the next-highest team in the final division standings and on down (a level group counted
+// collectively), win pct against common non-divisional conference opponents, the CFP ranking for a ranked team that
+// wins on the final weekend, else a composite of computer rankings (both the ranking stand-in), overall win pct
+// against FBS teams, then a coin toss or lot. A tie of three or more cut down doesn't start over: "if one team falls
+// out of contention ... the remaining teams will continue down the tiebreaker" (cut "continue"). The host is the
+// champion with the better conference win pct; level, head-to-head, then the rankings (the seed order). Not modelled:
+// the ineligible-champion rule (no member is barred in 2026).
+const SUN_BELT_STEPS = [
+  headToHead({ record: "games", lostToAll: false }),
+  divisionWinPct(),
+  placedCommonOpponent({ level: "group", division: true }),
+  commonOpponents({ nonDivision: true }),
+  ranking({ restart: true }),
+  overallWinPct({ belowFbs: 0, fbsOnly: true }),
+  draw(),
+];
+const SUN_BELT: TiebreakRules = {
+  conference: "Sun Belt",
+  seasons: [2026],
+  source: "Sun Belt Football Tie-Breaking Procedures (sunbeltsports.org, with Louisiana Tech in the West, the 2026 alignment): https://sunbeltsports.org/sports/2018/8/30/FB_Tie-Breakers.aspx",
+  steps: SUN_BELT_STEPS,
+  twoTeam: {
+    spot: SUN_BELT_STEPS,
+    seed: [headToHead({ record: "games", lostToAll: false }), ranking({ restart: false }), draw()],
+  },
+  divisions: {
+    East: ["App State", "Coastal Carolina", "Georgia Southern", "Georgia State", "James Madison", "Marshall", "Old Dominion"],
+    West: ["Arkansas State", "Louisiana", "Louisiana Tech", "South Alabama", "Southern Miss", "Troy", "UL Monroe"],
+  },
+  cut: "continue",
+  spots: "one",
+  drop: "restart",
+  gameCountTies: false,
+  luckSteps: "the ranking tiebreak and overall win pct",
+};
+
+const RULES: readonly TiebreakRules[] = [ACC, BIG_12, SEC, BIG_TEN, MAC, CUSA, MOUNTAIN_WEST, AMERICAN, PAC_12, SUN_BELT];
 
 /** Is there a tiebreak config for the conference in that season? */
 export const hasTiebreakRules = (conference: string, season: number): boolean =>

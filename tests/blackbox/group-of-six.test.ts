@@ -7,13 +7,13 @@ import {
 
 // Every FBS game of 2026 through week 9, from fixtures/cfp-2026.json.
 const season = seasonFromCfbd((JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot }).snapshot);
-const CONFERENCES = ["ACC", "Big 12", "SEC", "Big Ten", "Mid-American", "Conference USA", "Mountain West", "American Athletic", "Pac-12"];
+const CONFERENCES = ["ACC", "Big 12", "SEC", "Big Ten", "Mid-American", "Conference USA", "Mountain West", "American Athletic", "Pac-12", "Sun Belt"];
 const N = 200;
 const SEED = 7;
 const mac = new Set(season.teams.filter((t) => t.conference === "Mid-American").map((t) => t.id));
 const members = (c: string) => new Set(season.teams.filter((t) => t.conference === c).map((t) => t.id));
 
-describe("Group of Six conferences in the national simulation (the MAC, CUSA, the Mountain West, the American and the Pac-12)", { timeout: 120_000 }, () => {
+describe("Group of Six conferences in the national simulation (all six: the MAC, CUSA, the Mountain West, the American, the Pac-12 and the Sun Belt)", { timeout: 120_000 }, () => {
   const national = simulateNational(season, { iterations: N, seed: SEED, conferences: CONFERENCES });
   const outlook = seasonOutlook(season, { conference: "Mid-American", iterations: N, seed: SEED, reuse: national });
 
@@ -28,7 +28,7 @@ describe("Group of Six conferences in the national simulation (the MAC, CUSA, th
     });
   });
 
-  for (const [conference, label] of [["Conference USA", "CUSA"], ["Mountain West", "Mountain West"], ["American Athletic", "American"], ["Pac-12", "Pac 12"]]) {
+  for (const [conference, label] of [["Conference USA", "CUSA"], ["Mountain West", "Mountain West"], ["American Athletic", "American"], ["Pac-12", "Pac 12"], ["Sun Belt", "Sun Belt"]]) {
     it(`plays the ${label} title game: two of its teams every season, one of them champion`, () => {
       const ids = members(conference);
       expect(ids.size).toBeGreaterThan(2);
@@ -107,6 +107,16 @@ describe("Group of Six conferences in the national simulation (the MAC, CUSA, th
     const pick = r.games.find((g) => g.gameId === game.id)!;
     expect([pick.fieldIfWin, pick.fieldIfLose]).toEqual([t.playoff!.field, t.playoff!.field]);
     expect([pick.titleIfWin, pick.titleIfLose]).toEqual([t.titleGame, t.titleGame]);
+  });
+
+  it("the Sun Belt's title game is its East champion against its West champion, every season", () => {
+    const east = new Set(["App State", "Coastal Carolina", "Georgia Southern", "Georgia State", "James Madison", "Marshall", "Old Dominion"]
+      .map((n) => season.teams.find((t) => t.name === n && t.conference === "Sun Belt")!.id));
+    expect(east.size).toBe(7);
+    national.forEachIteration((_, s) => {
+      const [a, b] = s.titleGame("Sun Belt");
+      expect(east.has(a)).not.toBe(east.has(b));
+    });
   });
 
   it("Boise State's projected flex game counts toward the playoff, not toward the Pac-12 title game", () => {

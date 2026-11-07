@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { checkFetch, checkSnapshot, seasonFromCfbd, type CfbdGame, type CfbdSnapshot, type CfbdTeam } from "@/core";
 
-// A tiny made-up national snapshot: two ACC teams that play each other, a Sun Belt pair, an independent and an
+// A tiny made-up national snapshot: two ACC teams that play each other, a pair in a made-up conference with no rules, an independent and an
 // FCS team.
 const team = (id: number, conference: string | null, classification = "fbs"): CfbdTeam => ({
   id,
@@ -29,7 +29,7 @@ function snapshot(overrides: Partial<CfbdSnapshot> = {}): CfbdSnapshot {
   return {
     year: 2026,
     fetchedAt: "2026-11-01T12:00:00.000Z",
-    teams: [team(1, "ACC"), team(2, "ACC"), team(3, "Sun Belt"), team(4, "Sun Belt"), team(5, null), team(6, "Big Sky", "fcs")],
+    teams: [team(1, "ACC"), team(2, "ACC"), team(3, "Gulf South"), team(4, "Gulf South"), team(5, null), team(6, "Big Sky", "fcs")],
     games: [game(10, 1, 2, true), game(11, 3, 4, true), game(12, 5, 1, false)],
     lines: [],
     ratings: [],
@@ -43,7 +43,7 @@ describe("checkSnapshot", () => {
   });
 
   it("reports every other FBS conference as not supported, independents included, and leaves out FCS", () => {
-    expect(checkSnapshot(seasonFromCfbd(snapshot()), ["ACC"]).notSupported).toEqual(["FBS Independents", "Sun Belt"]);
+    expect(checkSnapshot(seasonFromCfbd(snapshot()), ["ACC"]).notSupported).toEqual(["FBS Independents", "Gulf South"]);
   });
 
   it("fails a supported conference with a member that plays no conference game against another member", () => {
@@ -59,8 +59,8 @@ describe("checkSnapshot", () => {
   });
 
   it("fails a supported conference with no tiebreak rules for the season", () => {
-    const { errors, notSupported } = checkSnapshot(seasonFromCfbd(snapshot()), ["ACC", "Sun Belt"]);
-    expect(errors).toEqual(["No tiebreak rules for Sun Belt in 2026."]);
+    const { errors, notSupported } = checkSnapshot(seasonFromCfbd(snapshot()), ["ACC", "Gulf South"]);
+    expect(errors).toEqual(["No tiebreak rules for Gulf South in 2026."]);
     expect(notSupported).toEqual(["FBS Independents"]);
   });
 
