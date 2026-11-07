@@ -147,7 +147,33 @@ const MAC: TiebreakRules = {
   ineligible: ["Sacramento State"],
 };
 
-const RULES: readonly TiebreakRules[] = [ACC, BIG_12, SEC, BIG_TEN, MAC];
+// Two-team and multi-team ties use the same six steps: head-to-head (all tied teams played each other: their combined
+// record; otherwise one that beat all the others is in), common opponents, record against common opponents by
+// order of finish (a tied group "evaluated collectively"), the average computer ranking of SP+, SportSource, ESPN
+// SOR and KPI (the ranking stand-in), the combined conference win pct of all conference opponents, then a coin toss.
+// The top two by win pct play ("open" spots); "if at any point the tie is broken in a multiple team tie, the
+// remaining teams will begin the process again at step #1". Not modeled: section C, which ties a team short a
+// postponed game with the leaders when it is within one win and level on losses. Delaware and Missouri State, in
+// their second FBS season, are eligible in 2026.
+const CUSA: TiebreakRules = {
+  conference: "Conference USA",
+  seasons: [2026],
+  source: "CUSA Football Championship Game Tiebreaker Policy (conferenceusa.com, Sept. 2024, the latest published): https://s3.amazonaws.com/sidearm.sites/conferenceusa.com/documents/2024/9/19/CUSA_FB_Championship_Game_Tiebreaker_Policy.pdf",
+  steps: [
+    headToHead({ record: "games", lostToAll: false }),
+    commonOpponents(),
+    placedCommonOpponent({ level: "group" }),
+    ranking({ restart: true }),
+    scheduleStrength(),
+    draw(),
+  ],
+  spots: "open",
+  drop: "restart",
+  gameCountTies: false,
+  luckSteps: "the ranking tiebreak",
+};
+
+const RULES: readonly TiebreakRules[] = [ACC, BIG_12, SEC, BIG_TEN, MAC, CUSA];
 
 /** Is there a tiebreak config for the conference in that season? */
 export const hasTiebreakRules = (conference: string, season: number): boolean =>
