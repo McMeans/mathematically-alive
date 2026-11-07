@@ -1,15 +1,18 @@
-// National simulation, stages 2 and 3 (docs/plan-national.md, phase 4), one pass per simulated season on top of
+// National simulation, stages 2 to 5 (docs/plan-national.md, phase 4), one pass per simulated season on top of
 // the regular season that simulateSeason plays out (stage 1):
 // 2. Conference title games: each simulated conference's rules (rules.ts) pick its two teams, and the game is
 //    played at a neutral site with the season's simulated ratings, or taken from the data once it is scheduled.
 // 3. Committee stand-in ranking (committee.ts) of every FBS team, from the season's simulated record, rating and
 //    schedule, the title games included, with each team's score drawn once per season around the fitted model.
-// Every draw comes from a stream hashed from (seed, iteration, conference or team), so a lock changes only its own
+// 4. Playoff field (playoff.ts): the season's format picks and seeds the field from that ranking and the champions.
+// 5. Bracket: each game at the season's simulated ratings, home field for the higher seed where the format gives it.
+// Every draw comes from a stream hashed from (seed, iteration, conference, team or bracket game), so a lock changes only its own
 // game's draw and what-if runs stay paired with the base run.
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { powerConferences, teamRating, titleGameIndex } from "./committee";
+import { bracketGames, championsNeeded, fieldPicker, playoffFormat } from "./playoff";
 import type { Game, Season } from "./season";
-import { COMMITTEE_SALT, mix, neutralOdds, simulateSeason, tiebreakDraw, titleRoll, type SimResult } from "./sim";
+import { COMMITTEE_SALT, HOME_FIELD, PLAYOFF_SALT, mix, neutralOdds, simulateSeason, tiebreakDraw, titleRoll, type SimResult } from "./sim";
 import { championshipFromData, conferenceData, type ConferenceData } from "./tiebreak";
 
 export type NationalOptions = {
@@ -34,6 +37,24 @@ export type NationalTeam = {
   top4: number;
   top12: number;
   top25: number;
+  /** Its playoff odds; null when the playoff isn't simulated (see NationalResult.playoff). */
+  playoff: NationalPlayoff | null;
+};
+
+/** One team's playoff odds: shares of simulated seasons. */
+export type NationalPlayoff = {
+  /** In the field. */
+  field: number;
+  /** A first-round bye (seeds 1-4 of a 12-team field). */
+  bye: number;
+  /** seeds[s - 1]: the share of seasons it is seed s. */
+  seeds: number[];
+  /** Plays in a quarterfinal (a bye or a first-round win); null in a four-team format. */
+  quarterfinal: number | null;
+  semifinal: number;
+  final: number;
+  /** Wins the national title. */
+  champion: number;
 };
 
 /** One simulated season after stages 2 and 3. Valid only during the forEachIteration callback. */
@@ -43,11 +64,21 @@ export type NationalSeason = {
   champion(conference: string): number;
   /** Every FBS team, the stand-in's order, best first. */
   ranking: readonly number[];
+  /** The playoff field, seed 1 first; null when the playoff isn't simulated. */
+  field: readonly number[] | null;
+  /** The national champion; null when the playoff isn't simulated. */
+  playoffChampion: number | null;
 };
 
 export type NationalResult = {
   iterations: number;
   conferences: readonly string[];
+  /**
+   * Whether stages 4 and 5 ran. They need the champions the season's format uses: none in a four-team season, the
+   * power conferences' from 2026 (all of them must be in `conferences`). The 2024-2025 formats need every
+   * conference's champion, and Group of Six title games aren't simulated, so those seasons get no playoff.
+   */
+  playoff: boolean;
   /** Every FBS team, the stand-in's average order (best mean rank first). */
   teams: NationalTeam[];
   /** Replay every simulated season's title games and ranking. */
@@ -104,6 +135,13 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const n = sim.iterations;
   const C = races.length;
   const power = new Set(powerConferences(season.year));
+  const format = playoffFormat(season.year);
+  const needs = championsNeeded(format);
+  const playoff = needs === "none" || (needs === "power" && [...power].every((c) => conferences.includes(c)));
+  const pick = fieldPicker(season);
+  const bracket = bracketGames(format.teams);
+  const T = format.teams;
+  const odds = neutralOdds(season);
 
   const byId = new Map(season.teams.map((t) => [t.id, t]));
   const fbs = season.teams.filter((t) => t.classification === "fbs");
@@ -150,6 +188,13 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const rankSum = new Float64Array(F);
   const top = [new Uint32Array(F), new Uint32Array(F), new Uint32Array(F)];
   const cuts = [4, 12, 25];
+  const rankIds = new Int32Array(F);
+  const fields = new Int32Array(playoff ? n * T : 0);
+  const playoffChamps = new Int32Array(playoff ? n : 0);
+  const seedCount = new Uint32Array(F * T);
+  const reached = [new Uint32Array(F), new Uint32Array(F), new Uint32Array(F), new Uint32Array(F)]; // QF, SF, final, title
+  const roundOf = (g: number): number => (g === bracket.length - 1 ? 2 : T === 4 || g >= 8 ? 1 : g >= 4 ? 0 : -1);
+  const slot = new Int32Array(bracket.length);
   const inTitle = new Map<number, number>();
   const won = new Map<number, number>();
   for (const r of races) for (const id of r.data.ids) { inTitle.set(id, 0); won.set(id, 0); }
@@ -213,8 +258,48 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       rankSum[k] += p + 1;
       for (let q = 0; q < cuts.length; q++) if (p < cuts[q]) top[q][k]++;
     }
+    if (!playoff) return;
+
+    // Stage 4.
+    for (let p = 0; p < F; p++) rankIds[p] = fbsIds[order[p]];
+    const field = pick(rankIds, (id) => champ[idx(id)] === 1);
+    fields.set(field, it * T);
+    field.forEach((id, s) => {
+      const k = idx(id);
+      seedCount[k * T + s]++;
+      if (T === 12 && s < 4) reached[0][k]++;
+    });
+    // Stage 5.
+    for (let g = 0; g < bracket.length; g++) {
+      const [x, y, hosted] = bracket[g];
+      const a = x >= 0 ? field[x] : slot[~x];
+      const b = y >= 0 ? field[y] : slot[~y];
+      const u = (mix(seed, it, PLAYOFF_SALT + g) + 0.5) / 4294967296;
+      const win = u < odds(a, b, teams.shift(a), teams.shift(b), hosted ? HOME_FIELD : 0) ? a : b;
+      slot[g] = win;
+      // Rounds reached: a first-round win is a quarterfinal (byes were counted with the seeds); semifinals and the
+      // final count both teams.
+      const r = roundOf(g);
+      if (r < 0) reached[0][idx(win)]++;
+      else if (r > 0) { reached[r][idx(a)]++; reached[r][idx(b)]++; }
+    }
+    const champion = slot[bracket.length - 1];
+    playoffChamps[it] = champion;
+    reached[3][idx(champion)]++;
   });
 
+  const playoffOdds = (k: number): NationalPlayoff => {
+    const seeds = Array.from({ length: T }, (_, s) => seedCount[k * T + s] / n);
+    return {
+      field: seeds.reduce((sum, x) => sum + x, 0),
+      bye: T === 12 ? seeds.slice(0, 4).reduce((sum, x) => sum + x, 0) : 0,
+      seeds,
+      quarterfinal: T === 12 ? reached[0][k] / n : null,
+      semifinal: reached[1][k] / n,
+      final: reached[2][k] / n,
+      champion: reached[3][k] / n,
+    };
+  };
   const simulatedTeams = new Set(races.flatMap((r) => [...r.data.ids]));
   const teamsOut: NationalTeam[] = fbs.map((t, k) => {
     const simulated = simulatedTeams.has(t.id);
@@ -227,6 +312,7 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       top4: top[0][k] / n,
       top12: top[1][k] / n,
       top25: top[2][k] / n,
+      playoff: playoff ? playoffOdds(k) : null,
     };
   });
   teamsOut.sort((a, b) => a.meanRank - b.meanRank || a.teamId - b.teamId);
@@ -245,14 +331,23 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
     },
     champion: (conference) => titles[(current * C + raceIndex(conference)) * 3 + 2],
     ranking,
+    field: null,
+    playoffChampion: null,
   };
+  const fieldView: number[] = new Array<number>(playoff ? T : 0);
   return {
     iterations: n,
     conferences,
+    playoff,
     teams: teamsOut,
     forEachIteration(cb) {
       for (current = 0; current < n; current++) {
         for (let p = 0; p < F; p++) ranking[p] = fbs[rankings[current * F + p]].id;
+        if (playoff) {
+          for (let s = 0; s < T; s++) fieldView[s] = fields[current * T + s];
+          view.field = fieldView;
+          view.playoffChampion = playoffChamps[current];
+        }
         cb(current, view);
       }
     },

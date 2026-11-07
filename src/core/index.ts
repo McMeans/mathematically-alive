@@ -32,4 +32,6 @@ export type { HelpGame, Impact, Likeliest, PathTree, Rival, SeasonWeek, TreeNode
 export { committeeRanking } from "./committee";
 export type { CommitteeFeatures, CommitteeOptions, CommitteeTeam, CommitteeWeights } from "./committee";
 export { simulateNational } from "./national";
-export type { NationalOptions, NationalResult, NationalSeason, NationalTeam } from "./national";
+export type { NationalOptions, NationalPlayoff, NationalResult, NationalSeason, NationalTeam } from "./national";
+export { playoffField, playoffFormat } from "./playoff";
+export type { PlayoffFormat } from "./playoff";
