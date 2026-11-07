@@ -58,7 +58,7 @@ function oneRivalLeft(
     if (w !== undefined) wins.set(w, wins.get(w)! + 1);
   }
   let rivals = 0;
-  for (const id of [...data.ids].sort((a, b) => wins.get(b)! - wins.get(a)!)) {
+  for (const id of [...data.eligible].sort((a, b) => wins.get(b)! - wins.get(a)!)) {
     if (id === teamId) continue;
     // Out of budget counts as "can get in", so the answer stays a proof.
     if (run((c) => canFinish(data, id, locks, false, true, c)) && ++rivals > 1) return false;
@@ -159,7 +159,7 @@ function surelyOut(data: ConferenceData, teamId: number, winnerOf: (g: Game) => 
   let top = -1;
   let topP = -Infinity;
   let topTied = false;
-  for (const id of data.ids) {
+  for (const id of data.eligible) {
     if (id === teamId) continue;
     const p = pct(id);
     if (p > mine) above++;
@@ -212,7 +212,7 @@ export function twoAhead(
   let firstP = -Infinity;
   let secondP = -Infinity;
   for (const id of ids) {
-    if (id === teamId) continue;
+    if (id === teamId || !data.eligible.has(id)) continue;
     const p = pct(id, wins.get(id)!);
     if (p <= best) continue;
     count++;
@@ -221,7 +221,7 @@ export function twoAhead(
   }
   if (count < 2) return false;
   for (const id of ids) {
-    if (id === teamId) continue;
+    if (id === teamId || !data.eligible.has(id)) continue;
     const w = wins.get(id)!;
     if (tieRouteOpen(data, myGames, myMin, myMax, games.get(id)!, w, w + left.get(id)!, id === first ? secondP : firstP)) return false;
   }
@@ -262,12 +262,14 @@ function cannotGetIn(
   const others = ids.filter((id) => id !== teamId);
   // The {X, team} route: X alone at the top, the team tied with X by game count.
   for (const x of others) {
+    if (!data.eligible.has(x)) continue;
     let top = -Infinity;
-    for (const y of others) if (y !== x) top = Math.max(top, pct(y, wins.get(y)!));
+    for (const y of others) if (y !== x && data.eligible.has(y)) top = Math.max(top, pct(y, wins.get(y)!));
     if (tieRouteOpen(data, myGames, myMin, myMax, games.get(x)!, wins.get(x)!, wins.get(x)! + left.get(x)!, top)) return false;
   }
   const index = new Map(others.map((id, i) => [id, i]));
-  const cap = Int32Array.from(others, (id) => Math.floor(best * games.get(id)! + 1e-9) - wins.get(id)!);
+  // A team that can't play in the title game takes no spot, so it can win any number of games (no cap).
+  const cap = Int32Array.from(others, (id) => (data.eligible.has(id) ? Math.floor(best * games.get(id)! + 1e-9) - wins.get(id)! : 1 << 30));
   const over = others.flatMap((_, i) => (cap[i] < 0 ? [i] : []));
   if (over.length >= 2) return true;
   const pairs: [number, number][] = [];
@@ -345,7 +347,7 @@ function cannotMissOut(
   const mine = games.get(teamId)! === 0 ? 0 : myMin / games.get(teamId)!;
   const need = new Map<number, number>();
   for (const id of ids) {
-    if (id === teamId) continue;
+    if (id === teamId || !data.eligible.has(id)) continue;
     const w = wins.get(id)!;
     const l = left.get(id)!;
     const n = couldTieByCount(data, myGames, myMin, myMin, games.get(id)!, w, w + l) ? 0 : Math.max(0, Math.ceil(mine * games.get(id)! - 1e-9) - w);
@@ -390,6 +392,8 @@ function canFinish(
   /** Set to whether a true answer for a way out is certain: a result set was found, not a budget or draw limit hit. */
   certain?: { yes: boolean },
 ): boolean {
+  // A team that can't play in the title game is never in.
+  if (!data.eligible.has(teamId)) return wantOut;
   const ids = [...data.ids];
   const fixed = new Map<number, number>();
   const open: Game[] = [];

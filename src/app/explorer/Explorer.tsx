@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatOdds, formatRecord, type PathTree, type PlayoffSignal, type TeamOutlook, type TeamPath } from "@/core";
+import { conferenceName, formatOdds, formatRecord, type PathTree, type PlayoffSignal, type TeamOutlook, type TeamPath } from "@/core";
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
 import { Logo } from "@/app/Logo";
 import { WayCard } from "./WayIn";
@@ -165,7 +165,7 @@ export function Explorer({ teamId, conference, teams, conferences, names, asOf, 
             </div>
             <div className="flex items-center gap-3">
               <Link href="/national" className="text-sm font-bold text-navy underline-offset-2 hover:underline">Playoff field</Link>
-              <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">{conference}</span>
+              <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">{conferenceName(conference)}</span>
               <span title={asOf} className="hidden text-sm text-ink-muted sm:inline">
                 {through}
               </span>

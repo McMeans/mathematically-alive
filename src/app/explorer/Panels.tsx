@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useId, useState } from "react";
-import { formatChance, formatRecord, mustWinConference, playoffDetail, type OddsLabels, type PlayoffSignal, type TeamOutlook, type TeamPath } from "@/core";
+import { conferenceName, formatChance, formatRecord, mustWinConference, playoffDetail, playoffRoute, type OddsLabels, type PlayoffSignal, type TeamOutlook, type TeamPath } from "@/core";
 import { NAVY, pct, type ConferenceList, type GameInfo, type TeamInfo } from "./Explorer";
 import { byOdds } from "./Season";
 import { useConference } from "./conference";
@@ -54,7 +54,7 @@ export function TeamList({ conferences, names, selectedId, onSelect }: {
                 onClick={() => { setShown(c.conference); setQ(""); }}
                 className="min-h-11 flex-1 rounded-full border border-navy/20 px-3 text-sm font-bold text-navy hover:bg-mist aria-pressed:border-navy aria-pressed:bg-navy aria-pressed:text-white md:min-h-8"
               >
-                {c.conference}
+                {conferenceName(c.conference)}
               </button>
             ))}
           </div>
@@ -128,9 +128,11 @@ export const playoffText = (o: TeamOutlook, odds: string, labels: OddsLabels) =>
 /** Bye and national-title odds under the playoff number, when the national simulation has them. */
 export function PlayoffDetail({ outlook, className = "" }: { outlook: TeamOutlook; className?: string }) {
   const rows = playoffDetail(outlook);
-  if (rows.length === 0) return null;
+  const route = playoffRoute(outlook);
+  if (rows.length === 0 && !route) return null;
   return (
     <p className={`flex flex-wrap gap-x-3 text-xs text-ink-muted ${className}`}>
+      {route && <span className="basis-full">{route}</span>}
       {rows.map((r) => (
         <span key={r.label}>{r.label} <span className="font-semibold text-navy">{r.value}</span></span>
       ))}

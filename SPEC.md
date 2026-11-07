@@ -4,7 +4,7 @@ What the app is, how its numbers are made, and the rules the code follows. Read 
 
 ## What it is
 
-A Next.js site. Pick a college football team and see what has to happen for it to reach its conference championship game. A team's page uses its own conference; the supported ones are listed in `SUPPORTED_CONFERENCES` (`src/app/config.ts`): the ACC, the Big 12, the SEC and the Big Ten. A playoff estimate exists but is experimental.
+A Next.js site. Pick a college football team and see what has to happen for it to reach its conference championship game. A team's page uses its own conference; the supported ones are listed in `SUPPORTED_CONFERENCES` (`src/app/config.ts`): the ACC, the Big 12, the SEC, the Big Ten and the MAC (CFBD's "Mid-American", the first Group of Six conference; see conference names below). A playoff estimate exists but is experimental.
 
 It answers three questions for the picked team:
 
@@ -43,7 +43,7 @@ All logic lives in `src/core` (framework-free, public API in `src/core/index.ts`
 
 `simulateNational(season, { iterations, seed, locks, conferences })` runs phase 4's stages 2 to 5 (`docs/plan-national.md`) on every simulated season of `simulateSeason`, which is stage 1:
 
-- **Stage 2, title games.** Each listed conference's rules pick its two teams, and the game is played at a neutral site with the season's simulated ratings. Once the data has the title game between those two teams, its result decides instead (final, locked, or simulated as a scheduled game). `seasonOutlook` plays its title game the same way, from the same streams, so a conference's title-game and title odds are the same in both. A conference with no tiebreak rules for the season is an error; Group of Six conferences have none yet, so their title games aren't simulated, their teams' `titleGame` and `champion` are null, and no Group of Six team gets the champion weight below.
+- **Stage 2, title games.** Each listed conference's rules pick its two teams, and the game is played at a neutral site with the season's simulated ratings. Once the data has the title game between those two teams, its result decides instead (final, locked, or simulated as a scheduled game). `seasonOutlook` plays its title game the same way, from the same streams, so a conference's title-game and title odds are the same in both. A conference with no tiebreak rules for the season is an error. Of the Group of Six, only the MAC has rules so far: the other five's title games aren't simulated, and their teams' `titleGame` and `champion` are null. A MAC title game counts in its teams' records and strength of schedule, but no Group of Six champion gets the champion weight below; under the 2026 format the Group of Six bid goes by ranking, not by title.
 - **Stage 3, committee stand-in ranking** (`committee.ts`). Every FBS team is scored on the season's simulated record (title game included), its simulated rating (rating plus the season's shift), strength of schedule (its opponents' average rating) and a power-conference title, then ordered best first. Each team's score gets one standard Gumbel draw per season, hashed from (seed, iteration, team), which gives any two teams the pair odds the model was fitted on.
 - **Stage 4, playoff field** (`playoff.ts`). The season's format (`playoffFormat(year)`, each one cited) picks and seeds the field from the stand-in's ranking and the simulated champions; `playoffField(season, ranking, champions)` does the same for any ranking.
   - 2014–2023: the top four, 1 vs 4 and 2 vs 3.
@@ -66,11 +66,12 @@ A modelled ranking, not the committee's. `committeeRanking(season, { throughWeek
 
 ### Tiebreakers (`tiebreak.ts`, `steps.ts`, `rules.ts`)
 
-One engine serves every conference. `rules.ts` holds a config per conference and season: the step list, the resolver settings, the game-count rule, the luck wording and the source document. A conference or season with no config is an error ("No tiebreak rules for <conference> in <season>"), never another conference's rules. `hasTiebreakRules` says whether one exists, and `checkSnapshot` fails the build for a supported conference without one. Only 2026 configs exist (ACC, Big 12, SEC, Big Ten): the project covers the 2026 season only. Tests that check real 2025 title games load the 2025 fixtures as 2026, so they run under the 2026 rules.
+One engine serves every conference. `rules.ts` holds a config per conference and season: the step list, the resolver settings, the game-count rule, the luck wording and the source document. A conference or season with no config is an error ("No tiebreak rules for <conference> in <season>"), never another conference's rules. `hasTiebreakRules` says whether one exists, and `checkSnapshot` fails the build for a supported conference without one. Only 2026 configs exist (ACC, Big 12, SEC, Big Ten, MAC): the project covers the 2026 season only. Tests that check real 2025 title games load the 2025 fixtures as 2026, so they run under the 2026 rules.
 
 - **Steps** (`steps.ts`): head-to-head (by games or by opponent, with or without dropping a team that lost to all), common opponents, highest placed common opponent (opponents level on record grouped, or ordered by head-to-head), strength of schedule, opponents' win pct, total wins (FCS cap; the title game left out), capped relative scoring margin, ranking, draw. One implementation each. Any score that can tie as a fraction is kept in whole numbers and compared exactly, so scores equal as fractions always tie (a float sum can round them apart).
 - **Resolver:** teams are ordered by conference win pct, and a tie is resolved for the open spots. Each step either can't tell the tied teams apart (next step), or names the teams at the top of its order. One alone at the top is placed and the rest start over for any spot left. Several at the top that fit the open spots are all in, seeded by starting over among them. Otherwise those at the top start over, from the first step or from the next one as the step says, and the rest are out of the tie. Settings: `spots` ("open": the tie fills every open spot at once; "one": one spot at a time, the rest re-tied from scratch after each) and `drop` (a dropped team leaves only this tie, or the whole race with a re-tie).
 - A step marked `nonConference` (total wins) counts non-conference results: `countsNonConference` follows from it, and proofs skip it as luck.
+- `ineligible` (by team name): members who can't play in the title game. Their games count for everyone's record and every step, but the resolver never picks them, and proofs don't count them as rivals for a spot (they can win any number of games without taking one). An ineligible team is itself eliminated.
 - Proof shortcuts that rely on the ACC's game-count rule (`couldTieByCount`, the tie route, the schedule-spread check) apply only where the config has `gameCountTies`.
 
 The ACC tiebreaker policy (July 2026), no divisions, top two play for the title:
@@ -125,6 +126,17 @@ Assumed, not confirmed by the document: when a step cuts a tie of three or more 
 
 Proofs count the ranking and the draw as luck. The likeliest-way note for a Big Ten team says "depending on the ranking tiebreak".
 
+**MAC** ("MAC Football Championship Tiebreaker", Mid-American Conference: https://getsomemaction.com/sports/2025/11/12/FB_1112255434.aspx). No divisions; the two teams with the best conference win pct play for the title, and non-conference games don't count. The page lists a two-team and a more-than-two-team procedure that come to the same steps on the engine. `spots: "open"` ("two teams superior after any step" both go), `drop: "restart"`, no game-count rule. A tie is broken by the first step that tells the teams apart:
+
+a. Head-to-head. Two teams: their game. Three or more who all played each other: the combined record among them. Otherwise a team that beat every other tied team advances; otherwise go on.
+b. Win pct against all common opponents.
+c. Ranking: SportSource Analytics Team Rating Score after the regular season, modelled by the ranking stand-in. Unlike the Big Ten, this comes before order of finish.
+d. Win pct against common opponents by order of finish, down the standings. The page says order of finish is "with ties broken", so opponents level on record are placed by head-to-head (the SEC's reading), those it can't separate counting as one group.
+e. Combined conference win pct of conference opponents (strength of schedule, the Big 12's step).
+f. A draw by the Commissioner or designee.
+
+Assumed, not stated on the page: a step that cuts a tie down starts over among the teams left, as for every other conference. Sacramento State, a football-only member from 2026, can't play for the MAC title in its first two seasons (ESPN, February 2026), so it is `ineligible`. Proofs count the ranking and the draw as luck; the likeliest-way note says "depending on the ranking tiebreak".
+
 ### Outlook (`outlook.ts`)
 
 For each conference team, `seasonOutlook` gives:
@@ -135,7 +147,9 @@ For each conference team, `seasonOutlook` gives:
 - `status`: clinched, eliminated or alive, from the proof;
 - `title`: when the data already has the title game between the two teams the rules pick, its result decides, as in the national simulation.
 - `playoff`: **experimental**, not the committee (the committee stand-in replaces it with stage 4). The conference champion always gets in. Any other FBS team gets in when it ranks in the top 11 by `wins − 1.5·losses + rating/10`.
-- `atLarge`: the share of seasons it gets in without winning the conference. 0 means it must win the conference (`mustWinConference`), and the app shows "Must win ACC" instead of a playoff percentage.
+- `atLarge`: the share of seasons it gets in without winning the conference. 0 means it must win the conference (`mustWinConference`), and the app shows "Must win ACC" instead of a playoff percentage. Never for a Group of Six team.
+- `groupOfSix`: the season's format has the Group of Six bid (2026 on) and the team is in a Group of Six conference. Its conference title is no automatic bid, so `mustWinConference` is false, and `playoffRoute` gives the wording the app shows under its playoff odds: "Gets in as the highest-ranked Group of Six team, conference champion or not". Null for everyone else.
+- The national run behind a Group of Six conference's odds plays the power conferences' title games and its own; an earlier run passed as `reuse` that covers those (the app's, with every supported conference) is used as it is.
 - `games` (only for `OutlookOptions.teamId`): its title-game and playoff odds if it wins or loses each unplayed game. Each simulated season is replayed with only that game flipped (the title race rerun, ranking included), so the numbers equal what picking that result shows. A lock changes only its own game's draw, which is what makes this exact. Splitting the seasons by how the game went instead would be biased: seasons where a team loses lean toward seasons it drew a weak rating, so it also loses more of its other games.
 
 ### Proofs (`proof.ts`)
@@ -148,6 +162,8 @@ Exact checks, not Monte Carlo. Can the team still miss, or still make, the title
 - **One rival left:** if at most one other team can still get in, the team is in, because two teams play for the title. This catches clinches the main search runs out of budget on.
 
 ### Display rules (`paths.ts`)
+
+- Conference names: data and config keep CFBD's names; everything the user sees goes through `conferenceName` ("MAC", "Pac 12", "Sun Belt", "American", "CUSA", "Mountain West"; the rest as CFBD spells them) or, where space is tight (records, column labels), `conferenceShort` ("SBC", "MW").
 
 All wording users see is made in the core so tests can check it. `formatTitleOdds(p, status)` and `formatSideOdds(p, status)` follow these rules:
 
@@ -217,7 +233,7 @@ A game's swing is the gap between the team's title-game odds when the home side 
 - CFBD flagged title games as conference games before 2025. If a 2026 title game comes in flagged that way, the standings would count it as a conference game; the 2025 rows are flagged non-conference.
 - Ranking is a stand-in for SportSource.
 - Proofs and the likeliest search have budgets. Near the edge they say "open" or return null rather than guess.
-- The app covers the ACC, the Big 12, the SEC and the Big Ten. Three of the Big Ten's rules are assumed until the Big Ten's full document is available again (common opponents level on record count as one group; no team is dropped for losing to all the others; a tie of three or more, once cut down, starts over at head-to-head).
+- The app covers the ACC, the Big 12, the SEC, the Big Ten and the MAC. Three of the Big Ten's rules are assumed until the Big Ten's full document is available again (common opponents level on record count as one group; no team is dropped for losing to all the others; a tie of three or more, once cut down, starts over at head-to-head).
 - **Expanding conferences.** The power four are all in. Next: the rest of FBS (`docs/plan-national.md`).
-- **Group of Six, later.** The 2026 format guarantees a spot to the highest-ranked Group of Six team, whether or not it won its conference (the 2024–2025 formats took the highest-ranked champions). The national pass applies that rule; the G6 title games themselves aren't simulated yet, and the UI needs wording for it ("Must be the top-ranked Group of Six team", or similar, rather than "Must win ACC"). The champion weight in the stand-in still goes only to power-conference champions.
+- **Group of Six, in progress.** The 2026 format guarantees a spot to the highest-ranked Group of Six team, whether or not it won its conference (the 2024–2025 formats took the highest-ranked champions). The national pass applies that rule. The MAC's title game is simulated and its teams have pages with that wording; the American, Conference USA, Mountain West, Pac-12 and Sun Belt are next (the Sun Belt has divisions, the Mountain West a transitioning member, the American a computer-composite step). The champion weight in the stand-in still goes only to power-conference champions, and the field doesn't yet leave out teams barred from the postseason (Sacramento State in 2026–2027) from the Group of Six bid.
 - A future MCP server is planned on top of `src/core`.

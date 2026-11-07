@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { conferenceName } from "@/core";
 import { Logo } from "./Logo";
 import { SUPPORTED_CONFERENCES } from "./config";
 
@@ -11,7 +12,7 @@ export default function NotFound() {
       <Logo size={64} decorative />
       <h1 className="font-display text-2xl font-bold text-navy">No page here</h1>
       <p className="max-w-md text-sm text-ink-soft">
-        That team or page isn&rsquo;t on Mathematically Alive. It covers the {list(SUPPORTED_CONFERENCES)} so far, with more
+        That team or page isn&rsquo;t on Mathematically Alive. It covers the {list(SUPPORTED_CONFERENCES.map(conferenceName))} so far, with more
         conferences on the way.
       </p>
       <Link href="/" className="min-h-11 rounded-full bg-navy px-5 py-2.5 text-sm font-bold text-white hover:bg-navy/90">

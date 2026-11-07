@@ -128,8 +128,13 @@ Status: team-page odds done (field, bye, title, paired Win/Lose CFP columns, "Mu
 
 ## Phase 6: the rest of FBS
 
-- Group of Six conferences, one config each from its official document, with "must win the conference and be the
-  top Group of Six champion" wording.
+- Group of Six conferences, one config each from its official document. Under the 2026 format the route is being the
+  highest-ranked Group of Six team, champion or not, so the wording is never "Must win <conference>" (`playoffRoute`).
+  - Done: the MAC (rules from its published tiebreak page, Sacramento State ineligible for the title game in
+    2026-2027 via the config's `ineligible` list), its title game in the national pass, its pages.
+  - Next: Conference USA, the Mountain West (North Dakota State's eligibility to check), the American (computer
+    composite step; Army-Navy after its title game), the Pac-12, the Sun Belt (divisions: needs engine support).
+  - Leave postseason-barred teams out of the Group of Six bid in `fieldPicker`.
 - Independents (Notre Dame and others): no title-game section; playoff only.
 - Picker that scales to every conference plus independents.
 
