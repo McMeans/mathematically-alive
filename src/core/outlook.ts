@@ -48,6 +48,11 @@ export type TeamOutlook = {
   games: { gameId: number; titleIfWin: number; titleIfLose: number; playoffIfWin: number; playoffIfLose: number }[];
   /** Proven over every combination of remaining results: "clinched" / "eliminated" a title-game spot, else "alive". */
   status: "clinched" | "alive" | "eliminated";
+  /**
+   * The season's format has a Group of Six bid (2026 on: the highest-ranked Group of Six team, champion or not) and
+   * the team is in a Group of Six conference, so its conference title is no automatic bid.
+   */
+  groupOfSix: boolean;
 };
 
 export type SeasonOutlook = {
@@ -67,15 +72,24 @@ const MISSING_RATING = 0;
 
 /**
  * Whether the season can run the national simulation for `conference`: it has a playoff format whose field needs
- * at most the power conferences' champions, every power conference has tiebreak rules and teams in the data, and
- * `conference` is one of them.
+ * at most the power conferences' champions, and every power conference has tiebreak rules and teams in the data.
+ * `conference` itself has rules (titleRace has checked).
  */
-function nationalReady(season: Season, conference: string): boolean {
+function nationalReady(season: Season): boolean {
   const format = findFormat(season.year);
   if (!format || championsNeeded(format) === "all") return false;
   const power = powerConferences(season.year);
   const count = (c: string) => season.teams.filter((t) => t.conference === c).length;
-  return power.includes(conference) && power.every((c) => hasTiebreakRules(c, season.year) && count(c) >= 2);
+  return power.every((c) => hasTiebreakRules(c, season.year) && count(c) >= 2);
+}
+
+/**
+ * The conferences whose title games the national run plays: the earlier run's (`reuse`) when they cover the power
+ * conferences and this one, so it can be reused whole; otherwise the power conferences plus this one.
+ */
+function nationalConferences(season: Season, conference: string, reuse?: NationalResult): readonly string[] {
+  const need = [...new Set([...powerConferences(season.year), conference])];
+  return reuse && need.every((c) => reuse.conferences.includes(c)) ? reuse.conferences : need;
 }
 
 /** `shared`: a simulation of the same season, iterations, seed and locks to reuse. */
@@ -86,9 +100,11 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
 
   const sim = shared ?? simulateSeason(season, { iterations, seed, locks: opts.locks });
   // The playoff odds: the national simulation over the same simulated seasons when the season can run one.
-  const national: NationalResult | null = nationalReady(season, conference)
-    ? simulateNational(season, { iterations, seed, locks: opts.locks, conferences: powerConferences(season.year), teamId: opts.teamId, reuse: opts.reuse }, sim)
+  const national: NationalResult | null = nationalReady(season)
+    ? simulateNational(season, { iterations, seed, locks: opts.locks, conferences: nationalConferences(season, conference, opts.reuse), teamId: opts.teamId, reuse: opts.reuse }, sim)
     : null;
+  const format = findFormat(season.year);
+  const groupOfSix = format?.autoBids === "power4G6" && !powerConferences(season.year).includes(conference);
   const estimate = national === null;
   const gameIndex = new Map<number, number>(season.games.map((g, i) => [g.id, i]));
   const fbs = season.teams.filter((t) => t.classification === "fbs");
@@ -264,6 +280,7 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
         playoffIfLose: fieldIf.get(season.games[o.i].id)?.fieldIfLose ?? o.playoff[1] / n,
       })),
       status: statusOf(titleGame.get(id)! / n, id),
+      groupOfSix,
     })),
   };
 }

@@ -110,9 +110,20 @@ export function oddsLabels(conference: string): OddsLabels {
   };
 }
 
-/** The team makes the playoff only as conference champion (never at large), so its playoff odds are its title odds. */
+/**
+ * The team makes the playoff only as conference champion (never at large), so its playoff odds are its title odds.
+ * Never for a Group of Six team: its conference title is no automatic bid (see `playoffRoute`).
+ */
 export function mustWinConference(o: TeamOutlook): boolean {
-  return o.playoff > 0 && o.atLarge === 0;
+  return !o.groupOfSix && o.playoff > 0 && o.atLarge === 0;
+}
+
+/**
+ * How the team's playoff odds come about, when that needs saying: a Group of Six team's way in is ranking above
+ * every other Group of Six team, whether or not it wins its conference. Null otherwise.
+ */
+export function playoffRoute(o: TeamOutlook): string | null {
+  return o.groupOfSix ? "Gets in as the highest-ranked Group of Six team, conference champion or not" : null;
 }
 
 /**

@@ -144,7 +144,7 @@ function search(data: ConferenceData, teamId: number, locks: Record<number, numb
     const myMax = myMin + left.get(teamId)!;
     let maybeAhead = 0;
     for (const id of ids) {
-      if (id === teamId) continue;
+      if (id === teamId || !data.eligible.has(id)) continue;
       const w = wins.get(id)!;
       const most = w + left.get(id)!;
       if (pct(id, most) >= pct(teamId, myMin) || couldTieByCount(data, myGames, myMin, myMax, scheduled.get(id)!, w, most)) maybeAhead++;

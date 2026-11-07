@@ -40,6 +40,11 @@ export type TiebreakRules = {
   gameCountTies: boolean;
   /** The steps a way in can still hinge on once its results are set, as the likeliest-way note names them. */
   luckSteps: string;
+  /**
+   * Members (by team name) who can't play in the title game, such as a team moving up to FBS. Their games still
+   * count for everyone else's record and every tiebreak step; they are just never picked.
+   */
+  ineligible?: readonly string[];
 };
 
 const ACC: TiebreakRules = {
@@ -116,7 +121,33 @@ const BIG_TEN: TiebreakRules = {
   luckSteps: "the ranking tiebreak",
 };
 
-const RULES: readonly TiebreakRules[] = [ACC, BIG_12, SEC, BIG_TEN];
+// Two-team and more-than-two-team procedures are the same steps here: head-to-head (all tied teams played each
+// other: their combined record; otherwise one that beat all the others is in), common opponents, the SportSource
+// Analytics Team Rating Score (the ranking stand-in), common opponents by order of finish ("with ties broken": level
+// opponents placed by head-to-head), then the combined conference win pct of conference opponents, then a draw.
+// "Two teams superior after any step" both go ("open" spots). The page doesn't say what a step that cuts a tie down
+// does next; like the other conferences, the teams left start over. Sacramento State, a football-only member from
+// 2026, can't play for the title in its first two seasons (ESPN, Feb. 2026).
+const MAC: TiebreakRules = {
+  conference: "Mid-American",
+  seasons: [2026],
+  source: "MAC Football Championship Tiebreaker (getsomemaction.com, 2025-26): https://getsomemaction.com/sports/2025/11/12/FB_1112255434.aspx",
+  steps: [
+    headToHead({ record: "games", lostToAll: false }),
+    commonOpponents(),
+    ranking({ restart: true }),
+    placedCommonOpponent({ level: "head-to-head" }),
+    scheduleStrength(),
+    draw(),
+  ],
+  spots: "open",
+  drop: "restart",
+  gameCountTies: false,
+  luckSteps: "the ranking tiebreak",
+  ineligible: ["Sacramento State"],
+};
+
+const RULES: readonly TiebreakRules[] = [ACC, BIG_12, SEC, BIG_TEN, MAC];
 
 /** Is there a tiebreak config for the conference in that season? */
 export const hasTiebreakRules = (conference: string, season: number): boolean =>

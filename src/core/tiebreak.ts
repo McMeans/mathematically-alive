@@ -31,7 +31,11 @@ export type TiebreakOptions = {
 };
 
 /** Per-conference data that doesn't change between simulated seasons, with the conference's rules. */
-export type ConferenceData = Members & { rules: TiebreakRules };
+export type ConferenceData = Members & {
+  rules: TiebreakRules;
+  /** Members who can play in the title game (all but the rules' `ineligible`). */
+  eligible: ReadonlySet<number>;
+};
 
 /** Conferences whose tiebreak counts non-conference results (the Big 12's total-wins step). Not part of the public API. */
 export const countsNonConference = (data: ConferenceData): boolean => needsNonConference(data.rules);
@@ -67,7 +71,11 @@ function members(season: Season, conference: string): Members {
 export function conferenceData(season: Season, conference: string): ConferenceData {
   const data = members(season, conference);
   if (data.ids.size < 2) throw new Error(`${conference} has fewer than two teams`);
-  return { ...data, rules: tiebreakRules(conference, season.year) };
+  const rules = tiebreakRules(conference, season.year);
+  const out = new Set(season.teams.filter((t) => t.conference === conference && rules.ineligible?.includes(t.name)).map((t) => t.id));
+  const eligible = new Set([...data.ids].filter((id) => !out.has(id)));
+  if (eligible.size < 2) throw new Error(`${conference} has fewer than two eligible teams`);
+  return { ...data, rules, eligible };
 }
 
 function rows(data: Members, winnerOf: (game: Game) => number): Row[] {
@@ -192,7 +200,8 @@ export function championshipFromData(
 
   const result: number[] = [];
   let slots = 2;
-  let cands = table;
+  // Ineligible members' games count for everyone's record and the tiebreak steps, but they are never picked.
+  let cands = table.filter((r) => data.eligible.has(r.teamId));
   while (slots > 0 && cands.length > 0) {
     const tied = tiedTeams(cands);
     if (tied.length <= slots) {
