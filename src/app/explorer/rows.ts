@@ -18,4 +18,3 @@ export const independentRows = (outlook: IndependentOutlook[]): ListRow[] =>
     teamId: o.teamId, record: formatRecord(o.record, INDEPENDENTS), odds: formatSideOdds(o.playoff, o.postseasonBan ? "eliminated" : "alive"),
     key: o.postseasonBan ? -1 : o.playoff, out: o.postseasonBan,
   }));
-

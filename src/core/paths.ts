@@ -150,8 +150,9 @@ export function mustWinConference(o: TeamOutlook): boolean {
 export const BARRED = "Barred from the postseason this season: no title game, no playoff";
 
 /**
- * How the team's playoff odds come about, when that needs saying: a team barred from the postseason can't get in; a Group of Six team's way in is ranking above
- * every other Group of Six team, whether or not it wins its conference. Null otherwise.
+ * How the team's playoff odds come about, when that needs saying: a team barred from the postseason can't get in;
+ * a Group of Six team's way in is ranking above every other Group of Six team, whether or not it wins its
+ * conference. Null otherwise.
  */
 export function playoffRoute(o: TeamOutlook): string | null {
   if (o.postseasonBan) return BARRED;

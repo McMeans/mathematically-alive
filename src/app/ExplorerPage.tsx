@@ -14,7 +14,8 @@ export function ExplorerPage({ teamId }: { teamId: number }) {
 
   if (conference === INDEPENDENTS) {
     const base = baseExploreIndependent(teamId);
-    // Every supported conference, then the independents, for the team picker; the team's own list uses this page's numbers.
+    // Every supported conference, then the independents, for the team picker; the team's own list uses this
+    // page's numbers.
     const conferences: ConferenceList[] = [
       ...baseOutlooks.map((b) => ({ conference: b.conference, teams: info(b.conference), rows: conferenceRows(b.conference, b.outlook.teams) })),
       { conference: INDEPENDENTS, teams, rows: independentRows(base.outlook) },
