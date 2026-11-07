@@ -196,7 +196,35 @@ const MOUNTAIN_WEST: TiebreakRules = {
   luckSteps: "the ranking tiebreak and overall win pct",
 };
 
-const RULES: readonly TiebreakRules[] = [ACC, BIG_12, SEC, BIG_TEN, MAC, CUSA, MOUNTAIN_WEST];
+// Two-team (10.5) and multi-team (10.6) ties use the same five steps: head-to-head (two teams: their game; three or
+// more: the mini round-robin when all played each other, otherwise one that beat all the others is in), the CFP
+// ranking going into the final weekend for a ranked team that doesn't lose that weekend, else a composite of
+// selected computer metrics (SP+, SportSource TR116 SOR, ESPN SOR, KPI), both modelled by the ranking stand-in, then
+// win pct against all common conference opponents, overall win pct (conference and non-conference, no cap on FCS
+// wins), then a coin toss or drawing. "The highest-ranked team or teams" go when the ranking decides, so spots are
+// "open"; "if only two teams remain tied after any step", the two-team procedure starts over. Army-Navy isn't one of
+// the eight conference games and is played after the title game, so it counts in neither the standings nor the
+// overall record (see seasonFromCfbd). Not modelled: 10.4, the unbalanced-schedule rule (seven conference games to
+// be eligible, head-to-head over win pct for a team short a game that beat every team it tied with in the loss
+// column); "exempt games", left out of overall win pct, are counted.
+const AMERICAN: TiebreakRules = {
+  conference: "American Athletic",
+  seasons: [2026],
+  source: "American Conference Football Tiebreakers, 2025 (25_FB_Tiebreakers.pdf, Section 10: Conference Champion Determination; the latest published), linked from https://theamerican.org/news/2025/11/23/FOOTBALL_Tiebreaker.aspx",
+  steps: [
+    headToHead({ record: "games", lostToAll: false }),
+    ranking({ restart: true }),
+    commonOpponents(),
+    overallWinPct({ belowFbs: Infinity }),
+    draw(),
+  ],
+  spots: "open",
+  drop: "restart",
+  gameCountTies: false,
+  luckSteps: "the ranking tiebreak and overall win pct",
+};
+
+const RULES: readonly TiebreakRules[] = [ACC, BIG_12, SEC, BIG_TEN, MAC, CUSA, MOUNTAIN_WEST, AMERICAN];
 
 /** Is there a tiebreak config for the conference in that season? */
 export const hasTiebreakRules = (conference: string, season: number): boolean =>

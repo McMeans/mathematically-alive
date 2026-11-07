@@ -141,7 +141,7 @@ export function seasonFromCfbd(raw: CfbdSnapshot): Season {
       week: g.week,
       start: g.startDate,
       neutralSite: g.neutralSite,
-      conferenceGame: g.conferenceGame,
+      conferenceGame: g.conferenceGame && !isArmyNavy(g.homeTeam, g.awayTeam),
       homeId: g.homeId,
       awayId: g.awayId,
       homePoints: g.completed ? homePoints : null,
@@ -155,6 +155,14 @@ export function seasonFromCfbd(raw: CfbdSnapshot): Season {
   const teamList = [...teams.values()].sort((a, b) => a.name.localeCompare(b.name));
   return { year: raw.year, fetchedAt: raw.fetchedAt, teams: teamList, games };
 }
+
+/**
+ * Army-Navy, by the two schools' names. Both are American members (Army for football only, since 2024), so CFBD flags
+ * their game a conference game, but it isn't one of the American's eight conference games and is played the week
+ * after its title game. seasonFromCfbd makes it a non-conference game; titleGameIndex never takes it for the title game.
+ */
+export const isArmyNavy = (home: string | undefined, away: string | undefined): boolean =>
+  (home === "Army" && away === "Navy") || (home === "Navy" && away === "Army");
 
 export type TeamRecord = {
   wins: number;

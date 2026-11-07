@@ -11,7 +11,7 @@
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { powerConferences, teamRating, titleGameIndex } from "./committee";
 import { bracketGames, championsNeeded, fieldPicker, findFormat } from "./playoff";
-import type { Game, Season } from "./season";
+import { isArmyNavy, type Game, type Season } from "./season";
 import { COMMITTEE_SALT, HOME_FIELD, PLAYOFF_SALT, mix, neutralOdds, simulateSeason, tiebreakDraw, titleRoll, type SimResult } from "./sim";
 import { championshipFromData, conferenceData, type ConferenceData } from "./tiebreak";
 
@@ -205,19 +205,22 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const idx = (id: number): number => fbsIndex.get(id) ?? -1;
   const games = season.games;
   const gameIndex = new Map<number, number>(games.map((g, i) => [g.id, i]));
-  const home = Int32Array.from(games, (g) => idx(g.homeId));
-  const away = Int32Array.from(games, (g) => idx(g.awayId));
+  // Army-Navy is played the week after the field is picked, so it counts in none of the records the stand-in ranks on.
+  const name = new Map(season.teams.map((t) => [t.id, t.name]));
+  const late = games.map((g) => isArmyNavy(name.get(g.homeId), name.get(g.awayId)));
+  const home = Int32Array.from(games, (g, i) => (late[i] ? -1 : idx(g.homeId)));
+  const away = Int32Array.from(games, (g, i) => (late[i] ? -1 : idx(g.awayId)));
   const unplayed = Int32Array.from(games.flatMap((g, i) => (g.completed ? [] : [i])));
   const rating = Float64Array.from(fbs, (t) => teamRating(t));
   // Strength of schedule: opponents' ratings summed over the season's games, and how many.
   const oppSum = new Float64Array(F);
   const oppCount = new Int32Array(F);
-  for (const g of games) {
-    const h = idx(g.homeId);
-    const a = idx(g.awayId);
+  games.forEach((g, i) => {
+    const h = home[i];
+    const a = away[i];
     if (h >= 0) { oppSum[h] += teamRating(byId.get(g.awayId)); oppCount[h]++; }
     if (a >= 0) { oppSum[a] += teamRating(byId.get(g.homeId)); oppCount[a]++; }
-  }
+  });
   const baseW = new Int32Array(F);
   const baseL = new Int32Array(F);
   games.forEach((g, i) => {
@@ -368,7 +371,8 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       // Only the flipped game's two teams and the touched races' title-game teams can score differently.
       fscore.set(score);
       const changed: number[] = [was, other];
-      const swap = (k: number, dw: number, dl: number) => { if (k >= 0) { w[k] += dw; l[k] += dl; } };
+      // Army-Navy counts in no record, so flipping it changes none: its odds come out the same either way.
+      const swap = (k: number, dw: number, dl: number) => { if (k >= 0 && !late[o.i]) { w[k] += dw; l[k] += dl; } };
       const wi = idx(was);
       const oi = idx(other);
       // Take the touched races' title games back out of the season's records, flip the game, play them again.

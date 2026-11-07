@@ -3,7 +3,7 @@
 // and a power-conference title, with weights fitted to past committee rankings (scripts/fit-committee.ts, on the
 // fixtures scripts/fetch-cfp.ts makes). Higher scores rank higher.
 import { COMMITTEE_WEIGHTS } from "./committee-weights";
-import type { Game, Season, Team } from "./season";
+import { isArmyNavy, type Game, type Season, type Team } from "./season";
 
 /** What the score weighs. `champion` is 1 for a power-conference champion, else 0. */
 export type CommitteeFeatures = {
@@ -55,11 +55,13 @@ export const committeeScore = (f: CommitteeFeatures, w: CommitteeWeights = COMMI
  * in the latest week that has any (once earlier weeks have some): the only one, or else the only one at a neutral
  * site (a regular-season game postponed into title week, like Cal-Stanford in 2018, is at home). CFBD's conference
  * flag can't tell: title games are conference games before 2025, non-conference games from 2025. Meant for power
- * conferences, whose last regular week has several home games between members; a game like Army-Navy (two American
- * Athletic members, after the title game) would be taken for that conference's title game.
+ * conferences, whose last regular week has several home games between members, and the American, whose Army-Navy
+ * (two members, the week after the title game) is left out.
  */
 export function titleGameIndex(season: Season, ids: ReadonlySet<number>): number {
-  const between = season.games.flatMap((g, i) => (ids.has(g.homeId) && ids.has(g.awayId) ? [i] : []));
+  const name = new Map(season.teams.map((t) => [t.id, t.name]));
+  const between = season.games.flatMap((g, i) =>
+    ids.has(g.homeId) && ids.has(g.awayId) && !isArmyNavy(name.get(g.homeId), name.get(g.awayId)) ? [i] : []);
   const last = Math.max(...between.map((i) => season.games[i].week));
   const inLast = between.filter((i) => season.games[i].week === last);
   if (inLast.length === between.length) return -1;
