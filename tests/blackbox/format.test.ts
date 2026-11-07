@@ -41,6 +41,7 @@ describe("oddsLabels", () => {
   it("names each odds tile after the conference", () => {
     expect(oddsLabels("ACC")).toEqual({ titleGame: "Title game", champion: "Win ACC", playoff: "Playoff", winOut: "Win out",
       beta: "Beta", conferenceRecord: "ACC record, counting your picks", mustWin: "Must win ACC", nonConference: "Non-con", conference: "ACC", cfp: "CFP",
+      projected: "Projected", projectedNote: "A projected matchup, not yet confirmed.",
     });
     expect(oddsLabels("Big Ten").champion).toBe("Win Big Ten");
   });

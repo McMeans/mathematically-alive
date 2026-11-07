@@ -108,7 +108,15 @@ export const conferenceName = (conference: string): string => CONFERENCE_NAMES[c
 export const conferenceShort = (conference: string): string => CONFERENCE_NAMES[conference]?.short ?? conference;
 
 /** What each odds tile is called. */
-export type OddsLabels = { titleGame: string; champion: string; playoff: string; winOut: string; beta: string; conferenceRecord: string; mustWin: string; nonConference: string; conference: string; cfp: string };
+export type OddsLabels = {
+  titleGame: string; champion: string; playoff: string; winOut: string; beta: string; conferenceRecord: string; mustWin: string; nonConference: string;
+  conference: string; cfp: string;
+  /** The tag on a projected matchup, and what it means. */
+  projected: string; projectedNote: string;
+};
+
+/** What a projected matchup (`Game.projected`) is, in a sentence without its period. */
+export const PROJECTED_NOTE = "A projected matchup, not yet confirmed";
 
 /** Labels for the odds tiles, so every view names each number the same way. */
 export function oddsLabels(key: string): OddsLabels {
@@ -122,6 +130,8 @@ export function oddsLabels(key: string): OddsLabels {
     conferenceRecord: `${conference} record, counting your picks`,
     mustWin: `Must win ${conference}`,
     nonConference: "Non-con",
+    projected: "Projected",
+    projectedNote: `${PROJECTED_NOTE}.`,
     conference: conferenceShort(key),
     cfp: "CFP",
   };

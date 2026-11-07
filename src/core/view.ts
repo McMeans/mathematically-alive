@@ -1,7 +1,7 @@
 // What the national view shows (phase 5): the projected playoff field and bracket, each spot's odds, the bubble, and
 // which results elsewhere move one team's playoff odds. All wording lives here so black-box tests can check it.
 import type { NationalResult } from "./national";
-import { formatFine, formatOdds } from "./paths";
+import { PROJECTED_NOTE, formatFine, formatOdds } from "./paths";
 import { bracketGames } from "./playoff";
 import type { Season } from "./season";
 import type { SimResult } from "./sim";
@@ -89,8 +89,10 @@ export type PlayoffSignal = {
   swing: number;
   /** The side whose win helps. */
   rooting: number;
-  /** "Root for Utah over BYU: 34% if Utah wins, 22% if BYU does." */
+  /** "Root for Utah over BYU: 34% if Utah wins, 22% if BYU does.", plus " A projected matchup, not yet confirmed." for one. */
   text: string;
+  /** A matchup the conference projected but hasn't confirmed (the Pac-12's flex week). */
+  projected: boolean;
 };
 
 /**
@@ -129,7 +131,8 @@ export function playoffSignals(season: Season, sim: SimResult, national: Nationa
     out.push({
       gameId: g.id, homeId: g.homeId, awayId: g.awayId, oddsIfHomeWins, oddsIfAwayWins,
       swing: Math.abs(oddsIfHomeWins - oddsIfAwayWins), rooting: good,
-      text: `Root for ${name(good)} over ${name(bad)}: ${formatFine(pGood)} if ${name(good)} wins, ${formatFine(pBad)} if ${name(bad)} does.`,
+      text: `Root for ${name(good)} over ${name(bad)}: ${formatFine(pGood)} if ${name(good)} wins, ${formatFine(pBad)} if ${name(bad)} does.${g.projected ? ` ${PROJECTED_NOTE}.` : ""}`,
+      projected: g.projected === true,
     });
   });
   out.sort((x, y) => y.swing - x.swing || x.gameId - y.gameId);

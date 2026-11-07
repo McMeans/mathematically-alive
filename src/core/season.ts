@@ -31,6 +31,8 @@ export type Game = {
   completed: boolean;
   /** Consensus point spread from the home side's view (negative = home favored), or null if no line. */
   spread: number | null;
+  /** A matchup the conference has projected but not confirmed, standing in until the data has the real game (the Pac-12's flex week). */
+  projected?: boolean;
 };
 
 export type Season = {
@@ -209,7 +211,7 @@ function projectedFlexGames(year: number, teams: Map<number, Team>, games: Game[
       if (!home || !away || busy.has(home.id) || busy.has(away.id)) return;
       out.push({
         id: -(k + 1), week: f.week, start: f.start, neutralSite: false, conferenceGame: false,
-        homeId: home.id, awayId: away.id, homePoints: null, awayPoints: null, completed: false, spread: null,
+        homeId: home.id, awayId: away.id, homePoints: null, awayPoints: null, completed: false, spread: null, projected: true,
       });
     });
   }

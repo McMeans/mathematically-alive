@@ -156,7 +156,7 @@ describe("the Pac-12's week-13 flex games", () => {
       "Boise State at Utah State", "Oregon State at Washington State", "San Diego State at Fresno State", "Texas State at Colorado State",
     ]);
     for (const g of s.games.filter((x) => x.week === 13)) {
-      expect(g).toMatchObject({ conferenceGame: false, completed: false, neutralSite: false, homePoints: null });
+      expect(g).toMatchObject({ conferenceGame: false, completed: false, neutralSite: false, homePoints: null, projected: true });
       expect(g.start.startsWith("2026-11-28")).toBe(true);
     }
     expect(new Set(s.games.map((g) => g.id)).size).toBe(s.games.length);
@@ -166,7 +166,10 @@ describe("the Pac-12's week-13 flex games", () => {
     // CFBD lists a flexed Boise State at Fresno State, flagged a conference game like every game between members.
     const s = fromCfbd([...conference, ["Fresno State", "Boise State", 13, "Fresno State", true]]);
     expect(week13(s)).toEqual(["Boise State at Fresno State", "Oregon State at Washington State", "Texas State at Colorado State"]);
-    expect(s.games.find((g) => g.week === 13 && g.homeId === s.id("Fresno State"))!.conferenceGame).toBe(false);
+    const real = s.games.find((g) => g.week === 13 && g.homeId === s.id("Fresno State"))!;
+    expect(real.conferenceGame).toBe(false);
+    expect(real.projected).toBeUndefined();
+    expect(s.games.filter((g) => g.projected)).toHaveLength(2);
     expect(teamRecord(s, s.id("Boise State"))).toEqual({ wins: 1, losses: 1, conferenceWins: 1, conferenceLosses: 0 });
     const boise = conferenceStandings(s, PAC, played).find((r) => r.teamId === s.id("Boise State"))!;
     expect([boise.wins, boise.losses]).toEqual([1, 0]);
