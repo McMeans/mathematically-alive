@@ -107,4 +107,15 @@ describe("MAC tiebreakers", () => {
     const o = seasonOutlook(s, { conference: "Mid-American", iterations: 200, seed: 3 });
     expect(o.teams.find((t) => t.teamId === s.id("A"))!.status).not.toBe("eliminated");
   });
+
+  it("a MAC team's path and tree name the conference MAC, never Mid-American", () => {
+    // A 1-0 with B, C and D left; the other teams have games of their own left, so the tree has help from elsewhere.
+    const s = build([{ name: "A" }, { name: "B" }, { name: "C" }, { name: "D" }, { name: "E" }],
+      [["A", "E"]], [["A", "B"], ["A", "C"], ["A", "D"], ["B", "C"], ["C", "D"], ["D", "E"]]);
+    const r = explore(s, { conference: "Mid-American", teamId: s.id("A"), iterations: 400, seed: 5 });
+    const text = [r.path.summary, ...r.path.steps, r.tree.helpNote, r.tree.footnote ?? ""].join(" ");
+    expect(r.path.summary).toMatch(/MAC title game/);
+    expect(r.tree.helpNote).toMatch(/MAC game/);
+    expect(text).not.toMatch(/Mid-American/);
+  });
 });
