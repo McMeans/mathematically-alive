@@ -41,11 +41,6 @@ export type TiebreakRules = {
   gameCountTies: boolean;
   /** The steps a way in can still hinge on once its results are set, as the likeliest-way note names them. */
   luckSteps: string;
-  /**
-   * Members (by team name) who can't play in the title game, such as a team moving up to FBS. Their games still
-   * count for everyone else's record and every tiebreak step; they are just never picked.
-   */
-  ineligible?: readonly string[];
 };
 
 const ACC: TiebreakRules = {
@@ -127,8 +122,9 @@ const BIG_TEN: TiebreakRules = {
 // Analytics Team Rating Score (the ranking stand-in), common opponents by order of finish ("with ties broken": level
 // opponents placed by head-to-head), then the combined conference win pct of conference opponents, then a draw.
 // "Two teams superior after any step" both go ("open" spots). The page doesn't say what a step that cuts a tie down
-// does next; like the other conferences, the teams left start over. Sacramento State, a football-only member from
-// 2026, can't play for the title in its first two seasons (ESPN, Feb. 2026).
+// does next; like the other conferences, the teams left start over. Sacramento State, a football-only member new to
+// FBS in 2026, can play for the title: the NCAA made teams moving up eligible at once (D-I Cabinet, June 24, 2026),
+// lifting the two-season wait announced when it joined.
 const MAC: TiebreakRules = {
   conference: "Mid-American",
   seasons: [2026],
@@ -145,7 +141,6 @@ const MAC: TiebreakRules = {
   drop: "restart",
   gameCountTies: false,
   luckSteps: "the ranking tiebreak",
-  ineligible: ["Sacramento State"],
 };
 
 // Two-team and multi-team ties use the same six steps: head-to-head (all tied teams played each other: their combined

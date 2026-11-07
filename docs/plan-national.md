@@ -130,14 +130,15 @@ Status: team-page odds done (field, bye, title, paired Win/Lose CFP columns, "Mu
 
 - Group of Six conferences, one config each from its official document. Under the 2026 format the route is being the
   highest-ranked Group of Six team, champion or not, so the wording is never "Must win <conference>" (`playoffRoute`).
-  - Done: the MAC (rules from its published tiebreak page, Sacramento State ineligible for the title game in
-    2026-2027 via the config's `ineligible` list), its title game in the national pass, its pages.
+  - Done: the MAC (rules from its published tiebreak page), its title game in the national pass, its pages.
+    Sacramento State, first ruled out of the title game for 2026-2027, is eligible under the NCAA's June 2026 rule
+    for teams moving up; the `ineligible` config list it needed is gone (see git history to bring it back).
   - Done: Conference USA (rules from its 2024 policy PDF; Delaware and Missouri State eligible in 2026).
   - Done: the Mountain West (rules from its 2023 procedures PDF; North Dakota State eligible under the NCAA's June
     2026 rule for teams moving up).
   - Next: the American (computer composite step; Army-Navy after its title game), the Pac-12, the Sun Belt
     (divisions: needs engine support).
-  - Leave postseason-barred teams out of the Group of Six bid in `fieldPicker`.
+  - When a member is barred from the postseason: leave it out of its title game and the Group of Six bid.
 - Independents (Notre Dame and others): no title-game section; playoff only.
 - Picker that scales to every conference plus independents.
 
