@@ -73,7 +73,9 @@ describe("national simulation: conference title games", () => {
   });
 
   it("a conference without tiebreak rules can't be simulated", () => {
-    expect(() => run(national, { conferences: ["Sun Belt"] })).toThrow("No tiebreak rules for Sun Belt in 2026");
+    // Every FBS conference has rules in 2026, so the Sun Belt's teams stand in for a made-up one without.
+    const gulf = { ...national, teams: national.teams.map((t) => (t.conference === "Sun Belt" ? { ...t, conference: "Gulf South" } : t)) };
+    expect(() => run(gulf, { conferences: ["Gulf South"] })).toThrow("No tiebreak rules for Gulf South in 2026");
   });
 
   it("a title game already in the data decides the champion", () => {

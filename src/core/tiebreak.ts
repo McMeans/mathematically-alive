@@ -58,7 +58,7 @@ function members(season: Season, conference: string): Members {
   // The title game comes after the tiebreak, so it needn't be played yet.
   const scored = [...schedule.values()].every((list) => list.every((g) => g.completed || isTitleGame({ ids }, g)));
   return {
-    ids, games, pairs, schedule, scored,
+    ids, games, pairs, schedule, scored, divisionOf: null,
     ratings: new Map(season.teams.map((t) => [t.id, t.rating])),
     classes: new Map(season.teams.map((t) => [t.id, t.classification])),
   };
@@ -68,7 +68,33 @@ function members(season: Season, conference: string): Members {
 export function conferenceData(season: Season, conference: string): ConferenceData {
   const data = members(season, conference);
   if (data.ids.size < 2) throw new Error(`${conference} has fewer than two teams`);
-  return { ...data, rules: tiebreakRules(conference, season.year) };
+  const rules = tiebreakRules(conference, season.year);
+  return { ...data, rules, divisionOf: rules.divisions ? divisionsOf(season, data.ids, conference, rules.divisions) : null };
+}
+
+/** Each member's division. Throws when a member is in no division, or a listed school isn't a member. */
+function divisionsOf(season: Season, ids: Set<number>, conference: string, divisions: Readonly<Record<string, readonly string[]>>): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const [division, names] of Object.entries(divisions)) {
+    for (const name of names) {
+      const t = season.teams.find((x) => x.name === name && ids.has(x.id));
+      if (!t) throw new Error(`${name}, in ${conference}'s ${division} division, isn't a ${conference} member in ${season.year}`);
+      out.set(t.id, division);
+    }
+  }
+  const missing = season.teams.filter((t) => ids.has(t.id) && !out.has(t.id)).map((t) => t.name);
+  if (missing.length > 0) throw new Error(`${missing.join(", ")} in no ${conference} division`);
+  return out;
+}
+
+/**
+ * The teams a team competes with for a title-game spot, itself included (its division, or the whole conference), and
+ * how many spots they compete for (1 or 2). Not part of the public API.
+ */
+export function race(data: ConferenceData, teamId: number): { rivals: number[]; spots: number } {
+  const d = data.divisionOf;
+  if (!d) return { rivals: [...data.ids], spots: 2 };
+  return { rivals: [...data.ids].filter((id) => d.get(id) === d.get(teamId)), spots: 1 };
 }
 
 function rows(data: Members, winnerOf: (game: Game) => number): Row[] {
@@ -165,8 +191,9 @@ export function championshipFromData(
         const rest = pick(ids.filter((id) => !top.includes(id)), spots - top.length, 0);
         return "drop" in rest ? rest : { placed: [...first.placed, ...rest.placed] };
       }
-      // A tie cut to two goes to the two-team procedure, from its first step.
-      return pick(top, spots, step.restart || stepsFor(top.length, seeding) !== steps ? 0 : i + 1, seeding);
+      // A tie cut to two goes to the two-team procedure, from its first step, unless it is the same list.
+      const restart = step.restart && rules.cut !== "continue";
+      return pick(top, spots, restart || stepsFor(top.length, seeding) !== steps ? 0 : i + 1, seeding);
     }
     throw new Error(`${rules.conference}'s last tiebreak step didn't decide`);
   };
@@ -197,6 +224,24 @@ export function championshipFromData(
     );
     return [...top, ...extra];
   };
+
+  if (data.divisionOf) {
+    // Each division's champion: the best conference win pct there, a tie broken among those teams for one spot.
+    const divisionOf = data.divisionOf;
+    const champions = [...new Set(divisionOf.values())].map((d) => {
+      const group = tiedTeams(table.filter((r) => divisionOf.get(r.teamId) === d)).map((r) => r.teamId);
+      if (group.length === 1) return group[0];
+      const r = pick(group, 1, 0);
+      if ("drop" in r) throw new Error(`${rules.conference}'s tiebreak can't drop a team out of a division race`);
+      return r.placed[0];
+    });
+    if (champions.length !== 2) throw new Error(`${rules.conference} needs two divisions, not ${champions.length}`);
+    const [a, b] = champions.map((id) => ctx.rowOf.get(id)!);
+    const c = comparePct(a, b);
+    if (c !== 0) return c > 0 ? [a.teamId, b.teamId] : [b.teamId, a.teamId];
+    const [first, second] = seed([a.teamId, b.teamId]).placed;
+    return [first, second];
+  }
 
   const result: number[] = [];
   let slots = 2;

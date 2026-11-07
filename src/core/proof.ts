@@ -10,7 +10,7 @@
 // reports "open" (never a false clinch or elimination).
 import type { Game, Season } from "./season";
 import { mulberry32 } from "./sim";
-import { championshipFromData, conferenceData, type ConferenceData } from "./tiebreak";
+import { championshipFromData, conferenceData, race, type ConferenceData } from "./tiebreak";
 
 export type ProvenStatus = "clinched" | "eliminated" | "open";
 
@@ -139,9 +139,9 @@ function someDraw(data: ConferenceData, teamId: number, winnerOf: (g: Game) => n
 }
 
 /**
- * With every game decided: two teams with a better win percentage leave the team out whatever the
- * tiebreakers do, unless the game-count rule puts it with the top team (that team alone at the top,
- * a different number of games, the same wins or losses).
+ * With every game decided: two teams with a better win percentage (one in its division, where there are
+ * divisions) leave the team out whatever the tiebreakers do, unless the game-count rule puts it with the top
+ * team (that team alone at the top, a different number of games, the same wins or losses).
  */
 function surelyOut(data: ConferenceData, teamId: number, winnerOf: (g: Game) => number): boolean {
   const wins = new Map<number, number>();
@@ -155,18 +155,19 @@ function surelyOut(data: ConferenceData, teamId: number, winnerOf: (g: Game) => 
   }
   const pct = (id: number) => (games.get(id)! === 0 ? 0 : wins.get(id)! / games.get(id)!);
   const mine = pct(teamId);
+  const { rivals, spots } = race(data, teamId);
   let above = 0;
   let top = -1;
   let topP = -Infinity;
   let topTied = false;
-  for (const id of data.ids) {
+  for (const id of rivals) {
     if (id === teamId) continue;
     const p = pct(id);
     if (p > mine) above++;
     if (p > topP) { topP = p; top = id; topTied = false; }
     else if (p === topP) topTied = true;
   }
-  if (above < 2) return false;
+  if (above < spots) return false;
   if (!data.rules.gameCountTies) return true;
   if (topTied || games.get(top) === games.get(teamId)) return true;
   const sameWins = wins.get(top) === wins.get(teamId);
@@ -186,7 +187,8 @@ export function inEveryDraw(data: ConferenceData, teamId: number, winnerOf: (g: 
 }
 
 /**
- * True when two teams are surely ahead of the team and it can't be pulled up into a tied group either.
+ * True when two teams (`spots`: one, with divisions; `ids` then its division) are surely ahead of the team and it
+ * can't be pulled up into a tied group either.
  * Two teams already have a better win percentage than the team's best. The only way past them is the
  * alternate-game-count rule: a team X with a different number of games and the same wins or losses
  * makes the team one of X's "Tied Teams". Extras like that are only ever placed when the whole tied
@@ -203,6 +205,7 @@ export function twoAhead(
   games: Map<number, number>,
   wins: Map<number, number>,
   left: Map<number, number>,
+  spots = 2,
 ): boolean {
   const pct = (id: number, w: number) => (games.get(id)! === 0 ? 0 : w / games.get(id)!);
   const best = pct(teamId, myMax);
@@ -219,7 +222,7 @@ export function twoAhead(
     if (p > firstP) { secondP = firstP; firstP = p; first = id; }
     else if (p > secondP) secondP = p;
   }
-  if (count < 2) return false;
+  if (count < spots) return false;
   for (const id of ids) {
     if (id === teamId) continue;
     const w = wins.get(id)!;
@@ -238,9 +241,10 @@ export const spreadOk = (data: ConferenceData, counts: number[]): boolean =>
   !data.rules.gameCountTies || Math.max(...counts) - Math.min(...counts) <= MAX_SPREAD;
 
 /**
- * True when the team can't make the top two whatever happens in `open` (its own games there are
- * assumed won, its best case): every way the other games go leaves two teams with a better win
- * percentage. Max flow: each game hands its win to one of its teams; a team takes at most the wins
+ * True when the team can't make the top two (with divisions: the top of its division, `ids` its division's
+ * teams, `spots` 1) whatever happens in `open` (its own games there are assumed won, its best case): every way the
+ * other games go leaves two teams (one) with a better win percentage. A game against a team outside `ids` can go to
+ * that team, so it caps no one. Max flow: each game hands its win to one of its teams; a team takes at most the wins
  * that keep it at or below the team's best, except one team allowed past it, tried in turn. Skipped
  * (false) when the alternate-game-count rule could still pull the team into the top group.
  */
@@ -256,6 +260,7 @@ function cannotGetIn(
   left: Map<number, number>,
   open: Game[],
   from: number,
+  spots: number,
 ): boolean {
   const pct = (id: number, w: number) => (games.get(id)! === 0 ? 0 : w / games.get(id)!);
   const best = pct(teamId, myMax);
@@ -269,13 +274,14 @@ function cannotGetIn(
   const index = new Map(others.map((id, i) => [id, i]));
   const cap = Int32Array.from(others, (id) => Math.floor(best * games.get(id)! + 1e-9) - wins.get(id)!);
   const over = others.flatMap((_, i) => (cap[i] < 0 ? [i] : []));
-  if (over.length >= 2) return true;
+  if (over.length >= spots) return true;
   const pairs: [number, number][] = [];
   for (let k = from; k < open.length; k++) {
     const g = open[k];
-    if (g.homeId !== teamId && g.awayId !== teamId) pairs.push([index.get(g.homeId)!, index.get(g.awayId)!]);
+    if (g.homeId !== teamId && g.awayId !== teamId && index.has(g.homeId) && index.has(g.awayId)) pairs.push([index.get(g.homeId)!, index.get(g.awayId)!]);
   }
-  const candidates = over.length === 1 ? over : [-1, ...others.map((_, i) => i)];
+  // One spot: no one may pass the team. Two: one team may (the one already past it, else each in turn).
+  const candidates = spots === 1 ? [-1] : over.length === 1 ? over : [-1, ...others.map((_, i) => i)];
   return !candidates.some((free) => placeAll(pairs, cap, free));
 }
 
@@ -326,8 +332,8 @@ function placeAll(pairs: [number, number][], cap: Int32Array, free: number): boo
 
 /**
  * True when the team is in whatever happens in `open` (its own games there assumed lost, its worst case):
- * no two other teams can both finish at or above its win percentage, or tie it through the game-count
- * rule. Exact for a pair: each needs some more wins from its own games, and the games between them
+ * no two other teams (with divisions: no other team in its division, `ids`, `spots` 1) can both finish at or above
+ * its win percentage, or tie it through the game-count rule. Exact for a pair: each needs some more wins from its own games, and the games between them
  * can only go to one.
  */
 function cannotMissOut(
@@ -341,6 +347,7 @@ function cannotMissOut(
   left: Map<number, number>,
   open: Game[],
   from: number,
+  spots: number,
 ): boolean {
   const mine = games.get(teamId)! === 0 ? 0 : myMin / games.get(teamId)!;
   const need = new Map<number, number>();
@@ -351,7 +358,8 @@ function cannotMissOut(
     const n = couldTieByCount(data, myGames, myMin, myMin, games.get(id)!, w, w + l) ? 0 : Math.max(0, Math.ceil(mine * games.get(id)! - 1e-9) - w);
     if (n <= l) need.set(id, n);
   }
-  if (need.size < 2) return true;
+  if (need.size < spots) return true;
+  if (spots === 1) return false;
   const shared = new Map<string, number>();
   for (let k = from; k < open.length; k++) {
     const g = open[k];
@@ -406,6 +414,7 @@ function canFinish(
     else { fixed.set(g.id, w); wins.set(w, wins.get(w)! + 1); }
   }
   const shortcutOk = spreadOk(data, [...games.values()]);
+  const { rivals, spots } = race(data, teamId);
   // The team's own games first, then games between the teams with the most wins: those decide soonest.
   const isOwn = (g: Game) => g.homeId === teamId || g.awayId === teamId;
   const top = (g: Game) => Math.max(wins.get(g.homeId)!, wins.get(g.awayId)!);
@@ -422,8 +431,8 @@ function canFinish(
     if (--budget < 0) { gaveUp = true; return true; }
     const myMin = wins.get(teamId)!;
     const myMax = myMin + left.get(teamId)!;
-    if (!wantOut && cannotGetIn(data, ids, teamId, myGames, myMin, myMax, games, wins, left, open, k)) return false;
-    if (wantOut && shortcutOk && cannotMissOut(data, ids, teamId, myGames, myMin, games, wins, left, open, k)) return false;
+    if (!wantOut && cannotGetIn(data, rivals, teamId, myGames, myMin, myMax, games, wins, left, open, k, spots)) return false;
+    if (wantOut && shortcutOk && cannotMissOut(data, rivals, teamId, myGames, myMin, games, wins, left, open, k, spots)) return false;
     if (k === open.length) {
       const guess = { made: false };
       const ok = everyDraw

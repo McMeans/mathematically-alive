@@ -22,6 +22,8 @@ export type Members = {
   classes: Map<number, Classification>;
   /** Every regular-season game of every member has a final score, so a scoring-margin step can be worked out. */
   scored: boolean;
+  /** Each member's division, for a conference with divisions (the Sun Belt); null without. */
+  divisionOf: Map<number, string> | null;
 };
 
 /** What a step works with for one season's results. */
@@ -118,6 +120,9 @@ const byOpponent = (ctx: Context, ids: number[]) => (id: number): Frac => {
 /** Opponents every tied team played in conference. */
 const commonOf = (ctx: Context, ids: number[]): number[] =>
   [...ctx.data.ids].filter((o) => !ids.includes(o) && ids.every((id) => played(ctx, id, o)));
+/** Is `o` in the same division as `id`? False without divisions. */
+const sameDivision = (ctx: Context, id: number, o: number): boolean =>
+  ctx.data.divisionOf !== null && ctx.data.divisionOf.get(id) === ctx.data.divisionOf.get(o);
 
 /**
  * Head-to-head. Teams who all played each other: the record among them, by games or by opponent (each
@@ -143,12 +148,27 @@ export function headToHead(opts: { record: "games" | "opponents"; lostToAll: boo
   };
 }
 
-/** Win pct against common conference opponents (those every tied team played). */
-export function commonOpponents(): Step {
+/**
+ * Win pct against common conference opponents (those every tied team played). `nonDivision`: only those outside the
+ * tied teams' division (the Sun Belt's "common non-divisional conference opponents").
+ */
+export function commonOpponents(opts: { nonDivision?: boolean } = {}): Step {
   return {
     name: "common opponents",
     restart: true,
-    run: (ids, ctx) => split(ids, topByFrac(ids, (id) => pctVs(ctx, id, commonOf(ctx, ids)))),
+    run: (ids, ctx) => {
+      const common = commonOf(ctx, ids).filter((o) => !opts.nonDivision || !sameDivision(ctx, ids[0], o));
+      return split(ids, topByFrac(ids, (id) => pctVs(ctx, id, common)));
+    },
+  };
+}
+
+/** Win pct in conference games against the team's own division. */
+export function divisionWinPct(): Step {
+  return {
+    name: "division win pct",
+    restart: true,
+    run: (ids, ctx) => split(ids, topByFrac(ids, (id) => pctVs(ctx, id, [...ctx.data.ids].filter((o) => o !== id && sameDivision(ctx, id, o))))),
   };
 }
 
@@ -156,9 +176,10 @@ export function commonOpponents(): Step {
  * Win pct against the highest placed common opponent, then the next, down the standings. Opponents level on
  * conference win pct either count as one group, or (`level: "head-to-head"`) are placed by head-to-head alone,
  * those it can't separate counting as one group. Only common opponents in a group count; with `whole`, a group
- * counts only when every tied team played every team in it, and is skipped otherwise.
+ * counts only when every tied team played every team in it, and is skipped otherwise. `division`: only the tied
+ * teams' division counts ("the final divisional standings").
  */
-export function placedCommonOpponent(opts: { level: "group" | "head-to-head"; whole?: boolean }): Step {
+export function placedCommonOpponent(opts: { level: "group" | "head-to-head"; whole?: boolean; division?: boolean }): Step {
   /** Teams level on win pct in standings order by head-to-head only; teams it can't separate stay as one group. */
   const tiers = (ctx: Context, group: number[]): number[][] => {
     if (group.length === 1) return [group];
@@ -174,7 +195,7 @@ export function placedCommonOpponent(opts: { level: "group" | "head-to-head"; wh
     restart: true,
     run(ids, ctx) {
       const common = commonOf(ctx, ids);
-      const others = [...ctx.data.ids].filter((o) => !ids.includes(o)).map((o) => ctx.rowOf.get(o)!);
+      const others = [...ctx.data.ids].filter((o) => !ids.includes(o) && (!opts.division || sameDivision(ctx, ids[0], o))).map((o) => ctx.rowOf.get(o)!);
       others.sort((a, b) => comparePct(b, a));
       for (let i = 0; i < others.length; ) {
         let j = i;
@@ -248,9 +269,9 @@ export const isTitleGame = (data: Pick<Members, "ids">, g: Game): boolean => !g.
 
 /**
  * Regular-season wins and games, at most `belowFbs` wins over teams below FBS counted. A win over such a team past the
- * cap is left out of both. The title game is left out.
+ * cap is left out of both; with `fbsOnly`, every game against one is (wins and losses alike). The title game is left out.
  */
-function overallRecord(ctx: Context, id: number, belowFbs: number): Frac {
+function overallRecord(ctx: Context, id: number, belowFbs: number, fbsOnly = false): Frac {
   let wins = 0;
   let games = 0;
   let lower = 0;
@@ -258,6 +279,7 @@ function overallRecord(ctx: Context, id: number, belowFbs: number): Frac {
     if (isTitleGame(ctx.data, g)) continue;
     const w = g.completed ? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId) : winnerIn(g, ctx.winnerOf);
     const opp = g.homeId === id ? g.awayId : g.homeId;
+    if (fbsOnly && ctx.data.classes.get(opp) !== "fbs") continue;
     if (w !== id) { games++; continue; }
     // An opponent missing from the season's teams counts as below FBS, the conservative reading. seasonFromCfbd
     // adds every opponent with its classification, so this doesn't happen on real data.
@@ -278,14 +300,17 @@ export function totalWins(opts: { belowFbs: number }): Step {
   };
 }
 
-/** Regular-season win pct against all opponents, at most `belowFbs` wins over teams below FBS counted. */
-export function overallWinPct(opts: { belowFbs: number }): Step {
+/**
+ * Regular-season win pct against all opponents, at most `belowFbs` wins over teams below FBS counted; with `fbsOnly`,
+ * against FBS teams only (the Sun Belt's).
+ */
+export function overallWinPct(opts: { belowFbs: number; fbsOnly?: boolean }): Step {
   return {
     name: "overall win pct",
     restart: true,
     nonConference: true,
     run: (ids, ctx) => split(ids, topByFrac(ids, (id) => {
-      const [w, n] = overallRecord(ctx, id, opts.belowFbs);
+      const [w, n] = overallRecord(ctx, id, opts.belowFbs, opts.fbsOnly);
       return frac(w, n);
     })),
   };

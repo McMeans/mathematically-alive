@@ -7,7 +7,7 @@
 // drop it and some combination of the rest keeps the team out.
 import { couldTieByCount, spreadOk, guaranteed, inEveryDraw, twoAhead, wayIn } from "./proof";
 import type { Game } from "./season";
-import type { ConferenceData } from "./tiebreak";
+import { race, type ConferenceData } from "./tiebreak";
 
 const BUDGET = 4_000;
 const WITNESS_BUDGET = 50_000;
@@ -97,6 +97,8 @@ function search(data: ConferenceData, teamId: number, locks: Record<number, numb
   const myGames = scheduled.get(teamId)!;
   // The early stop below needs what the proof's does (see spreadOk).
   const shortcutOk = spreadOk(data, [...scheduled.values()]);
+  // With divisions the team competes with its division for one spot, else with everyone for two.
+  const { rivals, spots } = race(data, teamId);
   const likely = games.map(({ g, pHome }) => (pHome >= 0.5 ? g.homeId : g.awayId));
   const choice = new Array<number>(games.length);
   const witness = wayIn(data, teamId, locks, luck, WITNESS_BUDGET);
@@ -143,15 +145,15 @@ function search(data: ConferenceData, teamId: number, locks: Record<number, numb
     const myMin = wins.get(teamId)!;
     const myMax = myMin + left.get(teamId)!;
     let maybeAhead = 0;
-    for (const id of ids) {
+    for (const id of rivals) {
       if (id === teamId) continue;
       const w = wins.get(id)!;
       const most = w + left.get(id)!;
       if (pct(id, most) >= pct(teamId, myMin) || couldTieByCount(data, myGames, myMin, myMax, scheduled.get(id)!, w, most)) maybeAhead++;
     }
-    if (twoAhead(data, ids, teamId, myGames, myMin, myMax, scheduled, wins, left)) return;
+    if (twoAhead(data, rivals, teamId, myGames, myMin, myMax, scheduled, wins, left, spots)) return;
     // In whatever happens from here: the rest go the likelier way, at no extra cost.
-    if ((shortcutOk && maybeAhead < 2) || k === games.length) {
+    if ((shortcutOk && maybeAhead < spots) || k === games.length) {
       if (k === games.length) {
         if (!inEveryDraw(data, teamId, (g) => fixed.get(g.id)!, luck)) return;
       }
