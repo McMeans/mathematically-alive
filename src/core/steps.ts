@@ -121,15 +121,17 @@ const commonOf = (ctx: Context, ids: number[]): number[] =>
 
 /**
  * Head-to-head. Teams who all played each other: the record among them, by games or by opponent (each
- * opponent counted once by the net result). Otherwise a team that beat every other tied team is at the top,
- * and with `lostToAll`, a team that lost to every other one is dropped.
+ * opponent counted once by the net result). Otherwise a team that beat every other tied team is at the top
+ * (unless `beatAll` is false: then the step can't tell them apart), and with `lostToAll`, a team that lost to every
+ * other one is dropped.
  */
-export function headToHead(opts: { record: "games" | "opponents"; lostToAll: boolean }): Step {
+export function headToHead(opts: { record: "games" | "opponents"; lostToAll: boolean; beatAll?: boolean }): Step {
   return {
     name: "head-to-head",
     restart: true,
     run(ids, ctx) {
       if (allPlayed(ctx, ids)) return split(ids, topByFrac(ids, opts.record === "games" ? amongThem(ctx, ids) : byOpponent(ctx, ids)));
+      if (opts.beatAll === false) return null;
       const beat = beatsAll(ctx, ids);
       if (beat.length === 1) return { top: beat };
       if (opts.lostToAll) {
@@ -239,8 +241,8 @@ export function opponentsWinPct(): Step {
 }
 
 /**
- * The title game is a non-conference game between two members in the data; it comes after the tiebreak. So does
- * Army-Navy, the American's one other such game (seasonFromCfbd), so it is left out the same way.
+ * The title game is a non-conference game between two members in the data; it comes after the tiebreak. So do the
+ * other such games (seasonFromCfbd): Army-Navy, and the Pac-12's 2026 flex week. They are left out the same way.
  */
 export const isTitleGame = (data: Pick<Members, "ids">, g: Game): boolean => !g.conferenceGame && data.ids.has(g.homeId) && data.ids.has(g.awayId);
 

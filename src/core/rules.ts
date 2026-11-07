@@ -24,6 +24,12 @@ export type TiebreakRules = {
   /** In order; the last one always decides. */
   steps: readonly Step[];
   /**
+   * A separate procedure for two teams (the Pac-12's), in place of `steps` whenever two are tied: `spot` when they
+   * are tied for one spot, `seed` when both are in and only their order is open. Each list's last step always
+   * decides.
+   */
+  twoTeam?: { spot: readonly Step[]; seed: readonly Step[] };
+  /**
    * "open": a tie is resolved for every open spot at once (a step's top teams fill the spots when they fit,
    * otherwise they start over and the rest are out). "one": one team is placed at a time and the rest are
    * re-tied from scratch.
@@ -224,7 +230,47 @@ const AMERICAN: TiebreakRules = {
   luckSteps: "the ranking tiebreak and overall win pct",
 };
 
-const RULES: readonly TiebreakRules[] = [ACC, BIG_12, SEC, BIG_TEN, MAC, CUSA, MOUNTAIN_WEST, AMERICAN];
+// A seven-game round robin (weeks 5-12); the week-13 flex games don't count in the standings (seasonFromCfbd), and
+// the title-game teams are set after week 12. Separate procedures for two teams and for more:
+// - Two teams tied for first both play, the head-to-head winner seeded first. Two tied for second: win pct against
+//   the next-highest-placed common opponent (a group of teams level in the standings counted as one), win pct
+//   against common conference opponents, the CFP ranking the Tuesday before week 13, then the SportSource Team Rating
+//   Score after the last conference weekend (both the ranking stand-in), then a coin toss. Head-to-head isn't a step.
+// - Three or more: head-to-head win pct among them (only when all played each other; otherwise the next step), win
+//   pct against common conference opponents, the next-highest-placed common opponent (as above), the combined
+//   conference win pct of conference opponents, the SportSource score, then a coin toss. "Once one team gains an
+//   advantage and is seeded, the remaining teams will restart" ("one" spot at a time), and "if the process reduces
+//   the tie to two teams, the two-team procedure will then be applied".
+// Not modelled: the host (the title game is at the higher seed's home).
+const PAC_12: TiebreakRules = {
+  conference: "Pac-12",
+  seasons: [2026],
+  source: "Pac-12 Football Championship Game Tiebreakers, in Pac-12 announces commercial and operational updates ahead of its 2026 football season kickoff, Sept. 3, 2026: https://pac-12.com/news/2026/9/3/pac-12-announces-commercial-and-operational-updates-ahead-of-its-2026-football-season-kickoff.aspx",
+  steps: [
+    headToHead({ record: "games", lostToAll: false, beatAll: false }),
+    commonOpponents(),
+    placedCommonOpponent({ level: "group" }),
+    scheduleStrength(),
+    ranking({ restart: true }),
+    draw(),
+  ],
+  twoTeam: {
+    spot: [placedCommonOpponent({ level: "group" }), commonOpponents(), ranking({ restart: true }), draw()],
+    seed: [
+      headToHead({ record: "games", lostToAll: false, beatAll: false }),
+      placedCommonOpponent({ level: "group" }),
+      commonOpponents(),
+      ranking({ restart: true }),
+      draw(),
+    ],
+  },
+  spots: "one",
+  drop: "restart",
+  gameCountTies: false,
+  luckSteps: "the ranking tiebreak",
+};
+
+const RULES: readonly TiebreakRules[] = [ACC, BIG_12, SEC, BIG_TEN, MAC, CUSA, MOUNTAIN_WEST, AMERICAN, PAC_12];
 
 /** Is there a tiebreak config for the conference in that season? */
 export const hasTiebreakRules = (conference: string, season: number): boolean =>
@@ -238,4 +284,5 @@ export function tiebreakRules(conference: string, season: number): TiebreakRules
 }
 
 /** The rules count non-conference results (a total-wins step). */
-export const countsNonConference = (rules: TiebreakRules): boolean => rules.steps.some((s) => s.nonConference === true);
+export const countsNonConference = (rules: TiebreakRules): boolean =>
+  [rules.steps, rules.twoTeam?.spot ?? [], rules.twoTeam?.seed ?? []].some((list) => list.some((s) => s.nonConference === true));

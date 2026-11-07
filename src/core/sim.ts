@@ -1,7 +1,7 @@
 // Monte Carlo season simulator. Plays out every unplayed game many times and
 // records the outcomes compactly so standings/tiebreaker code can replay them.
 import { MARGIN_SD, normalCdf, winProbability } from "./odds";
-import { isArmyNavy, type Game, type Season, type Team } from "./season";
+import { isArmyNavy, isFlexGame, type Game, type Season, type Team } from "./season";
 
 export const HOME_FIELD = 2.5;
 const MISSING_RATING_OTHER = -10;
@@ -257,9 +257,11 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
   // Shifts and ranks are worked out per team, only when asked for.
   const rating = Float64Array.from(teamIds, (id) => ratingOf(byId, id));
   const gamesOf: number[][] = teamIds.map(() => []);
-  // Army-Navy comes after every conference's tiebreak, so it is left out of the ranking stand-in.
+  // Army-Navy and the Pac-12's flex week come after their conference's tiebreak, so they are left out of the ranking stand-in.
   for (let i = 0; i < G; i++) {
-    if (isArmyNavy(byId.get(games[i].homeId)?.name, byId.get(games[i].awayId)?.name)) continue;
+    const h = byId.get(games[i].homeId);
+    const a = byId.get(games[i].awayId);
+    if (isArmyNavy(h?.name, a?.name) || isFlexGame(season.year, games[i].week, h?.conference, a?.conference)) continue;
     gamesOf[homeIdx[i]].push(i);
     gamesOf[awayIdx[i]].push(i);
   }

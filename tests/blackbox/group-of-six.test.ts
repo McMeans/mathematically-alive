@@ -1,16 +1,19 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { mustWinConference, playoffRoute, seasonFromCfbd, seasonOutlook, simulateNational, type CfbdSnapshot } from "@/core";
+import {
+  mustWinConference, oddsLabels, pathTree, playoffRoute, playoffSignals, seasonFromCfbd, seasonOutlook, simulateNational, simulateSeason,
+  type CfbdSnapshot,
+} from "@/core";
 
 // Every FBS game of 2026 through week 9, from fixtures/cfp-2026.json.
 const season = seasonFromCfbd((JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot }).snapshot);
-const CONFERENCES = ["ACC", "Big 12", "SEC", "Big Ten", "Mid-American", "Conference USA", "Mountain West", "American Athletic"];
+const CONFERENCES = ["ACC", "Big 12", "SEC", "Big Ten", "Mid-American", "Conference USA", "Mountain West", "American Athletic", "Pac-12"];
 const N = 200;
 const SEED = 7;
 const mac = new Set(season.teams.filter((t) => t.conference === "Mid-American").map((t) => t.id));
 const members = (c: string) => new Set(season.teams.filter((t) => t.conference === c).map((t) => t.id));
 
-describe("Group of Six conferences in the national simulation (the MAC, CUSA, the Mountain West and the American)", { timeout: 120_000 }, () => {
+describe("Group of Six conferences in the national simulation (the MAC, CUSA, the Mountain West, the American and the Pac-12)", { timeout: 120_000 }, () => {
   const national = simulateNational(season, { iterations: N, seed: SEED, conferences: CONFERENCES });
   const outlook = seasonOutlook(season, { conference: "Mid-American", iterations: N, seed: SEED, reuse: national });
 
@@ -25,7 +28,7 @@ describe("Group of Six conferences in the national simulation (the MAC, CUSA, th
     });
   });
 
-  for (const [conference, label] of [["Conference USA", "CUSA"], ["Mountain West", "Mountain West"], ["American Athletic", "American"]]) {
+  for (const [conference, label] of [["Conference USA", "CUSA"], ["Mountain West", "Mountain West"], ["American Athletic", "American"], ["Pac-12", "Pac 12"]]) {
     it(`plays the ${label} title game: two of its teams every season, one of them champion`, () => {
       const ids = members(conference);
       expect(ids.size).toBeGreaterThan(2);
@@ -104,6 +107,41 @@ describe("Group of Six conferences in the national simulation (the MAC, CUSA, th
     const pick = r.games.find((g) => g.gameId === game.id)!;
     expect([pick.fieldIfWin, pick.fieldIfLose]).toEqual([t.playoff!.field, t.playoff!.field]);
     expect([pick.titleIfWin, pick.titleIfLose]).toEqual([t.titleGame, t.titleGame]);
+  });
+
+  it("Boise State's projected flex game counts toward the playoff, not toward the Pac-12 title game", () => {
+    const boise = season.teams.find((t) => t.name === "Boise State")!.id;
+    const flex = season.games.find((g) => g.week === 13 && [g.homeId, g.awayId].includes(boise))!;
+    expect(flex.conferenceGame).toBe(false);
+    expect(season.teams.find((t) => t.id === flex.homeId)!.name).toBe("Utah State");
+    const r = simulateNational(season, { iterations: 100, seed: SEED, conferences: CONFERENCES, teamId: boise });
+    const t = r.teams.find((x) => x.teamId === boise)!;
+    expect(t.titleGame).toBeGreaterThan(0.1);
+    const pick = r.games.find((g) => g.gameId === flex.id)!;
+    expect(pick.fieldIfWin).toBeGreaterThan(pick.fieldIfLose);
+    expect([pick.titleIfWin, pick.titleIfLose]).toEqual([t.titleGame, t.titleGame]);
+  });
+
+  it("Boise State's week-by-week shows its projected flex game in week 13, tagged, with its playoff odds either way", () => {
+    const boise = season.teams.find((t) => t.name === "Boise State")!.id;
+    const tree = pathTree(season, { conference: "Pac-12", teamId: boise, iterations: N, seed: SEED, depth: 0 });
+    const week = tree.weeks.find((w) => w.week === 13)!;
+    expect(week.label).toBe("Nov 28");
+    expect(week.nonConference).toMatchObject({ opponent: "Utah State", site: "away", date: "Nov 28", projected: true, won: null, titleIfWin: null });
+    expect(week.nonConference!.ifWin).not.toBeNull();
+    // A game the data has is never tagged.
+    for (const w of tree.weeks) if (w.week !== 13 && w.nonConference) expect(w.nonConference.projected).toBe(false);
+    expect(oddsLabels("Pac-12")).toMatchObject({ projected: "Projected", projectedNote: "A projected matchup, not yet confirmed." });
+  });
+
+  it("a projected flex game among results elsewhere for the playoff says it's projected", () => {
+    const sim = simulateSeason(season, { iterations: 2000, seed: SEED });
+    const run = simulateNational(season, { iterations: 2000, seed: SEED, conferences: CONFERENCES }, sim);
+    const newMexico = season.teams.find((t) => t.name === "New Mexico")!.id;
+    const signals = playoffSignals(season, sim, run, newMexico, 30);
+    const flex = signals.find((g) => g.projected)!;
+    expect(flex.text).toMatch(/^Root for Utah State over Boise State: .* A projected matchup, not yet confirmed\.$/);
+    for (const g of signals.filter((x) => !x.projected)) expect(g.text).not.toMatch(/projected/);
   });
 
   it("with the MAC title game played, the Group of Six bid still goes to the top-ranked Group of Six team", () => {

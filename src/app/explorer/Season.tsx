@@ -69,7 +69,11 @@ function Week({ w, base, teamId, locks, likely, onPick }: { w: SeasonWeek; base:
     locks[gameId] === winner ? "picked" : locks[gameId] === undefined && likely.get(gameId) === winner ? "likely" : "open";
   return (
     <li className="flex w-40 shrink-0 flex-col gap-1.5 md:w-auto">
-      <span className="text-xs font-semibold text-ink-muted">{w.label}</span>
+      <span className="flex h-4 items-center gap-1.5 text-xs font-semibold text-ink-muted">
+        {w.label}
+        {/* A matchup the conference hasn't confirmed: tagged above the card, where there's room. */}
+        {w.nonConference?.projected && <ProjectedTag />}
+      </span>
       {own ? (
         <PickTable
           vs={`${own.site === "away" ? "at" : "vs"} ${own.opponent}`} winChance={own.winChance} cfp={own.cfpIfWin !== null}
@@ -111,6 +115,16 @@ function Week({ w, base, teamId, locks, likely, onPick }: { w: SeasonWeek; base:
   );
 }
 
+/** The tag on a projected matchup (the Pac-12's flex week), its meaning on hover. */
+function ProjectedTag() {
+  const { labels } = useConference();
+  return (
+    <span title={labels.projectedNote} className="whitespace-nowrap rounded border border-dashed border-navy/30 px-1 text-[10px] font-normal leading-4 text-ink-muted">
+      {labels.projected}
+    </span>
+  );
+}
+
 // Every card in a week's first slot is the height of the Win/Lose table, so the weeks line up.
 const CARD_H = "h-[7.5rem]";
 
@@ -147,7 +161,7 @@ function NonConference({ game, win, lose, onWin, onLose }: {
   const vs = `${game.site === "away" ? "at" : "vs"} ${game.opponent}`;
   if (!game.score)
     return (
-      <PickTable vs={vs} winChance={game.winChance} cfp nonConference
+      <PickTable vs={vs} winChance={game.winChance} cfp nonConference projected={game.projected}
         win={{ conf: game.titleIfWin, cfp: game.ifWin, state: win, onClick: onWin }} lose={{ conf: game.titleIfLose, cfp: game.ifLose, state: lose, onClick: onLose }} />
     );
   return <FinalCard vs={vs} won={game.won!} score={game.score} nonConference />;
@@ -173,8 +187,8 @@ type PickRow = { conf: string | null; cfp: string | null; state: PickState; onCl
 // Win and Lose rows under conference and CFP columns, the same shape for every game so the weeks line up.
 // `conf` null: a non-conference game in a conference whose tiebreak ignores non-conference results ("—").
 // `cfp` false: no CFP column.
-function PickTable({ vs, winChance, cfp, nonConference, win, lose }: {
-  vs: string; winChance: string | null; cfp: boolean; nonConference?: boolean; win: PickRow; lose: PickRow;
+function PickTable({ vs, winChance, cfp, nonConference, projected, win, lose }: {
+  vs: string; winChance: string | null; cfp: boolean; nonConference?: boolean; projected?: boolean; win: PickRow; lose: PickRow;
 }) {
   const { labels } = useConference();
   const cols = cfp ? "grid-cols-[1fr_2.75rem_2.75rem]" : "grid-cols-[1fr_2.75rem]";
@@ -191,7 +205,7 @@ function PickTable({ vs, winChance, cfp, nonConference, win, lose }: {
     );
   };
   return (
-    <div role="group" aria-label={nonConference ? `${vs}, non-conference` : vs} className={`flex flex-col gap-1 rounded-lg bg-navy p-1.5 ${CARD_H}`}>
+    <div role="group" aria-label={[vs, nonConference && "non-conference", projected && labels.projectedNote].filter(Boolean).join(", ")} className={`flex flex-col gap-1 rounded-lg bg-navy p-1.5 ${CARD_H}`}>
       <span className={`grid h-4 items-center pl-0.5 pr-2 text-[10px] text-white/60 ${cols}`}>
         <span className="truncate text-[11px] text-white/75">{vs}</span>
         <span className="text-right">{labels.conference}</span>

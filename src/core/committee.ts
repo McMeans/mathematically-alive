@@ -3,7 +3,7 @@
 // and a power-conference title, with weights fitted to past committee rankings (scripts/fit-committee.ts, on the
 // fixtures scripts/fetch-cfp.ts makes). Higher scores rank higher.
 import { COMMITTEE_WEIGHTS } from "./committee-weights";
-import { isArmyNavy, type Game, type Season, type Team } from "./season";
+import { isArmyNavy, isFlexGame, type Game, type Season, type Team } from "./season";
 
 /** What the score weighs. `champion` is 1 for a power-conference champion, else 0. */
 export type CommitteeFeatures = {
@@ -56,12 +56,17 @@ export const committeeScore = (f: CommitteeFeatures, w: CommitteeWeights = COMMI
  * site (a regular-season game postponed into title week, like Cal-Stanford in 2018, is at home). CFBD's conference
  * flag can't tell: title games are conference games before 2025, non-conference games from 2025. Meant for power
  * conferences, whose last regular week has several home games between members, and the American, whose Army-Navy
- * (two members, the week after the title game) is left out.
+ * (two members, the week after the title game) is left out. The Pac-12's flex games (week 13, the week before its
+ * title game) are left out too: data listing only some of them could otherwise leave one alone in the latest week.
  */
 export function titleGameIndex(season: Season, ids: ReadonlySet<number>): number {
-  const name = new Map(season.teams.map((t) => [t.id, t.name]));
-  const between = season.games.flatMap((g, i) =>
-    ids.has(g.homeId) && ids.has(g.awayId) && !isArmyNavy(name.get(g.homeId), name.get(g.awayId)) ? [i] : []);
+  const byId = new Map(season.teams.map((t) => [t.id, t]));
+  const between = season.games.flatMap((g, i) => {
+    const h = byId.get(g.homeId);
+    const a = byId.get(g.awayId);
+    const late = isArmyNavy(h?.name, a?.name) || isFlexGame(season.year, g.week, h?.conference, a?.conference);
+    return ids.has(g.homeId) && ids.has(g.awayId) && !late ? [i] : [];
+  });
   const last = Math.max(...between.map((i) => season.games[i].week));
   const inLast = between.filter((i) => season.games[i].week === last);
   if (inLast.length === between.length) return -1;

@@ -241,10 +241,13 @@ export type SeasonWeek = {
    * `titleIfWin`/`titleIfLose`: its title-game odds the same way, where the conference's tiebreak counts non-conference
    * results (the Big 12's total wins); null elsewhere (the result reaches the title race only through the ranking) or once final.
    * `winChance`: "97% to win", locked or not; null once it's final.
+   * `projected`: a matchup the conference projected but hasn't confirmed (the Pac-12's flex week); `labels.projected` names it.
+   * An unplayed one gets its week even when the conference plays no games that week.
    */
   nonConference: {
     gameId: number; opponentId: number; opponent: string; site: "home" | "away" | "neutral"; date: string; won: boolean | null; score: string | null;
     ifWin: string | null; ifLose: string | null; titleIfWin: string | null; titleIfLose: string | null; winChance: string | null;
+    projected: boolean;
   } | null;
   /**
    * Every game elsewhere that week: locked ones first, then those that matter, then the rest, biggest swing first.
@@ -707,8 +710,10 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
     };
   }
   for (const g of season.games) {
-    const w = byWeek.get(g.week);
-    if (!w || g.conferenceGame || (g.homeId !== teamId && g.awayId !== teamId)) continue;
+    if (g.conferenceGame || (g.homeId !== teamId && g.awayId !== teamId)) continue;
+    // An unplayed game gets its week even when the conference has none that week (the Pac-12's flex week).
+    const w = g.completed ? byWeek.get(g.week) : weekOf(g);
+    if (!w) continue;
     const home = g.homeId === teamId;
     const mine = home ? g.homePoints : g.awayPoints;
     const theirs = home ? g.awayPoints : g.homePoints;
@@ -726,6 +731,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
       titleIfWin: counts ? verdict(f.titleIfWin, g.id, teamId) : null,
       titleIfLose: counts ? verdict(f.titleIfLose, g.id, opp) : null,
       winChance: final ? null : winChance(g),
+      projected: g.projected === true,
     };
   }
   for (const w of byWeek.values()) w.games.sort((a, b) => Number(b.matters) - Number(a.matters) || b.swing - a.swing || a.gameId - b.gameId);

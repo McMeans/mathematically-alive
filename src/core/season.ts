@@ -31,6 +31,8 @@ export type Game = {
   completed: boolean;
   /** Consensus point spread from the home side's view (negative = home favored), or null if no line. */
   spread: number | null;
+  /** A matchup the conference has projected but not confirmed, standing in until the data has the real game (the Pac-12's flex week). */
+  projected?: boolean;
 };
 
 export type Season = {
@@ -141,7 +143,8 @@ export function seasonFromCfbd(raw: CfbdSnapshot): Season {
       week: g.week,
       start: g.startDate,
       neutralSite: g.neutralSite,
-      conferenceGame: g.conferenceGame && !isArmyNavy(g.homeTeam, g.awayTeam),
+      conferenceGame: g.conferenceGame && !isArmyNavy(g.homeTeam, g.awayTeam) &&
+        !isFlexGame(raw.year, g.week, teams.get(g.homeId)?.conference ?? g.homeConference, teams.get(g.awayId)?.conference ?? g.awayConference),
       homeId: g.homeId,
       awayId: g.awayId,
       homePoints: g.completed ? homePoints : null,
@@ -151,6 +154,7 @@ export function seasonFromCfbd(raw: CfbdSnapshot): Season {
     });
   }
 
+  games.push(...projectedFlexGames(raw.year, teams, games));
   games.sort((a, b) => a.start.localeCompare(b.start) || a.id - b.id);
   const teamList = [...teams.values()].sort((a, b) => a.name.localeCompare(b.name));
   return { year: raw.year, fetchedAt: raw.fetchedAt, teams: teamList, games };
@@ -163,6 +167,56 @@ export function seasonFromCfbd(raw: CfbdSnapshot): Season {
  */
 export const isArmyNavy = (home: string | undefined, away: string | undefined): boolean =>
   (home === "Army" && away === "Navy") || (home === "Navy" && away === "Army");
+
+/**
+ * The Pac-12's 2026 flex week. Its eight members play a seven-game round robin in weeks 5-12, and the title-game
+ * teams are set after week 12. In week 13 each plays another member, a game "considered a non-conference matchup for
+ * standings", so seasonFromCfbd makes every game between members that week a non-conference game. The league named
+ * projected pairings, its home teams fixed, to be confirmed six days before at the latest and changeable for CFP
+ * considerations ("The new Pac-12 announces its 2026 football schedule", Feb. 11, 2026:
+ * https://pac-12.com/news/2026/2/9/general-the-new-pac-12-announces-its-2026-football-schedule.aspx). Until the
+ * data has a member's week-13 game, the projected one stands in, with a negative id.
+ */
+const FLEX_WEEKS = [
+  {
+    year: 2026,
+    conference: "Pac-12",
+    week: 13,
+    // Saturday, Nov. 28; no kickoff time yet, so noon Eastern.
+    start: "2026-11-28T17:00:00.000Z",
+    /** [home, away]. */
+    projected: [
+      ["Utah State", "Boise State"],
+      ["Colorado State", "Texas State"],
+      ["Fresno State", "San Diego State"],
+      ["Washington State", "Oregon State"],
+    ],
+  },
+] as const;
+
+/** A game between two members of a conference in its flex week: played after the title-game teams are set, and not in the standings. */
+export const isFlexGame = (year: number, week: number, home: string | null | undefined, away: string | null | undefined): boolean =>
+  FLEX_WEEKS.some((f) => f.year === year && f.week === week && home === f.conference && away === f.conference);
+
+/** The projected flex games the data doesn't have yet: each pairing whose two teams have no game that week. */
+function projectedFlexGames(year: number, teams: Map<number, Team>, games: Game[]): Game[] {
+  const out: Game[] = [];
+  for (const f of FLEX_WEEKS) {
+    if (f.year !== year) continue;
+    const busy = new Set(games.filter((g) => g.week === f.week).flatMap((g) => [g.homeId, g.awayId]));
+    const member = (name: string) => [...teams.values()].find((t) => t.name === name && t.conference === f.conference);
+    f.projected.forEach(([h, a], k) => {
+      const home = member(h);
+      const away = member(a);
+      if (!home || !away || busy.has(home.id) || busy.has(away.id)) return;
+      out.push({
+        id: -(k + 1), week: f.week, start: f.start, neutralSite: false, conferenceGame: false,
+        homeId: home.id, awayId: away.id, homePoints: null, awayPoints: null, completed: false, spread: null, projected: true,
+      });
+    });
+  }
+  return out;
+}
 
 export type TeamRecord = {
   wins: number;
