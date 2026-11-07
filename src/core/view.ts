@@ -76,7 +76,7 @@ export function nationalView(national: NationalResult, opts: { bubble?: number }
   const bracket = games.map(([a, b, home], index) => ({
     index, round: roundOf(index), a: side(a), b: side(b), site: home ? "At the higher seed" : "Neutral site",
   }));
-  return { teams: T, field, bracket, bubble, note: `Projected from ${national.iterations.toLocaleString("en-US")} simulated seasons.` };
+  return { teams: T, field, bracket, bubble, note: `Projected from ${national.iterations.toLocaleString("en-US")} simulated seasons. Modelled odds, not a prediction of the committee.` };
 }
 
 export type PlayoffSignal = {

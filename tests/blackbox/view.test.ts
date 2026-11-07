@@ -46,7 +46,7 @@ describe("national view", () => {
     const quarters = view.bracket.filter((g) => g.round === "Quarterfinal");
     expect(quarters[0]).toMatchObject({ a: { seed: 1 }, b: { winnerOf: 3 }, site: "Neutral site" });
     expect(view.bracket.at(-1)!.round).toBe("Final");
-    expect(view.note).toBe("Projected from 400 simulated seasons.");
+    expect(view.note).toBe("Projected from 400 simulated seasons. Modelled odds, not a prediction of the committee.");
   });
 
   it("a four-team season's bracket is two semifinals and a final", () => {

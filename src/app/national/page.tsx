@@ -43,7 +43,7 @@ export default function NationalPage() {
           Projected playoff field
           <span className="rounded border border-ink-muted/50 px-1 text-[10px] font-semibold leading-4 text-ink-muted">Beta</span>
         </h1>
-        <p className="mt-1 text-sm text-ink-muted">{view.note} Modelled odds, not a prediction of the committee.</p>
+        <p className="mt-1 text-sm text-ink-muted">{view.note}</p>
 
         <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,1fr)_280px]">
           <section aria-labelledby="field">
