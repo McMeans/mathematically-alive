@@ -182,10 +182,16 @@ A game's swing is the gap between the team's title-game odds when the home side 
 
 ### Explore (`explore.ts`)
 
-`explore` is everything the explorer page shows for one team, from one shared simulation: the outlook, the path and the tree. The tree's larger proof budget overrides the outlook's status for that team.
+`explore` is everything the explorer page shows for one team, from one shared simulation: the outlook, the path, the tree and `playoffGames` (below). The tree's larger proof budget overrides the outlook's status for that team.
+
+### National view and playoff signals (`view.ts`)
+
+- `nationalView(national, { bubble })`: null without a playoff run. The projected field is the teams with the best field odds, as many as the format takes, ordered by their average seed in the seasons they get in. Each spot: field odds, the share at exactly that seed, bye and title odds, and "In 92% · seed 3 in 31%". The bubble (default six) is the next teams by field odds ("In 4%", one decimal under 1%). The bracket is `bracketGames` over the projected seeds, each game with its round (First round, Quarterfinal, Semifinal, Final), its sides (a seed and team, or the winner of an earlier game) and "At the higher seed" or "Neutral site".
+- `playoffSignals(season, sim, national, teamId, max = 8)`: unplayed games not involving the team whose result clearly moves its playoff-field odds (the `OVERALL` bar in `signal.ts`, on the split of `sim`'s seasons by who won), biggest swing first, each with "Root for Utah over BYU: 34% if Utah wins, 22% if BYU does." `sim` must be the simulation `national` ran on; otherwise, or without a playoff, it is empty. Cost: two passes over the iterations, small next to the national pass.
 
 ## App (`src/app`)
 
+- `/national`: the projected playoff field with each spot's odds, the bubble and the projected bracket, built at build time from the base national run (`nationalView`). Linked from the explorer header as "Playoff field".
 - `/`: team list. `/team/[id]`: the explorer for that team (`ExplorerPage`, `explorer/*`). Each team page's title names the team ("Utah · Mathematically Alive"). Any other URL, including a team in a conference not covered yet, gets a branded 404 (`not-found.tsx`) that names the covered conferences.
 - The first numbers are computed at build time. What-ifs run in a Web Worker (`sim.worker.ts`) so the main thread never blocks. Explore's worst case is about 2.6 s.
 - Panels:
@@ -194,6 +200,7 @@ A game's swing is the gap between the team's title-game odds when the home side 
   - The season by week. Own-game buttons and elsewhere chips can be clicked to lock a result. Each own game (conference or not) is a small table: Win and Lose rows under ACC and CFP columns, the chance to win (kept after the game is picked), and a "Non-con" tag on non-conference games. A picked win fills green, a picked loss red. Each elsewhere game shows both sides' chance to win under its buttons. Each number is what picking that result would show (see `games` above). Non-conference games show "—" in the conference column for the ACC, the SEC and the Big Ten, where they move the title race only slightly, through the ranking tiebreak. In the Big 12, whose total-wins step counts them, they show the title odds either way. For a team that must win the conference, conference cards drop the CFP column. Its non-conference cards keep it so they stay pickable and a pick on them stays visible. Final results, byes and the tables are all the same height, so the weeks line up.
   - The race table.
   - The "What <team> needs" card, from the likeliest way in (a line says so): the team's own part, then help from elsewhere, one row per team with its needed results counted ("2 losses, 2 wins") and grouped: loses to (teal), beats (green), either way (dashed). "Fill in the likeliest way" picks all its results; the card then shrinks to a bar with Undo. It can also be minimized to one line ("Win out, Utah and Kansas each lose twice").
+  - "Results elsewhere for the playoff" under the weeks: `playoffGames`, recomputed with each what-if in the worker.
   - The header shows "Through <day of the latest final game>", with the fetch time on hover.
 - **Brand:** see `CLAUDE.md`. Space Grotesk and Inter; navy, turf, marker and mist colors; light-only.
 

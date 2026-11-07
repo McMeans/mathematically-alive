@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useId, useState } from "react";
-import { formatChance, formatRecord, mustWinConference, playoffDetail, type OddsLabels, type TeamOutlook, type TeamPath } from "@/core";
+import { formatChance, formatRecord, mustWinConference, playoffDetail, type OddsLabels, type PlayoffSignal, type TeamOutlook, type TeamPath } from "@/core";
 import { NAVY, pct, type ConferenceList, type GameInfo, type TeamInfo } from "./Explorer";
 import { byOdds } from "./Season";
 import { useConference } from "./conference";
@@ -231,5 +231,23 @@ export function Stats({ team, outlook, me, path, teamId, own, names }: {
         </ol>
       </section>
     </div>
+  );
+}
+
+/** Results elsewhere that clearly move the team's playoff odds; the sentences come from core. */
+export function PlayoffElsewhere({ games }: { games: PlayoffSignal[] }) {
+  if (games.length === 0) return null;
+  return (
+    <section aria-labelledby="playoff-elsewhere" className="mt-6">
+      <h3 id="playoff-elsewhere" className="flex items-center gap-1 font-display text-base font-bold">Results elsewhere for the playoff<Beta /></h3>
+      <ul className="mt-2 space-y-1 text-sm text-ink-soft">
+        {games.map((g) => (
+          <li key={g.gameId} className="rounded-md bg-mist px-3 py-2">
+            <span className="mr-1 inline-block h-2 w-2 rounded-full bg-turf" aria-hidden />
+            {g.text}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

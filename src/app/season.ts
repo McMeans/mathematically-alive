@@ -1,5 +1,5 @@
 // Server-side season data and the base (no what-if) computation, shared by pages.
-import { explore, seasonOutlook, simulateNational, simulateSeason, type Season } from "@/core";
+import { explore, nationalView, seasonOutlook, simulateNational, simulateSeason, type Season } from "@/core";
 import data from "./data/season.json";
 
 import { ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
@@ -29,8 +29,8 @@ export const baseOutlooks = SUPPORTED_CONFERENCES.map((conference) => {
 
 /** Outlook, path and tree for one team from one shared simulation in its conference, with no locks (no national run: not serializable). */
 export const baseExplore = (teamId: number, conference: string) => {
-  const { outlook, path, tree } = explore(season, { conference, teamId, iterations: ITERATIONS, seed: SEED, reuse: baseNational });
-  return { outlook, path, tree };
+  const { outlook, path, tree, playoffGames } = explore(season, { conference, teamId, iterations: ITERATIONS, seed: SEED, reuse: baseNational });
+  return { outlook, path, tree, playoffGames };
 };
 
 const asOfFormat = new Intl.DateTimeFormat("en-US", {
@@ -43,3 +43,6 @@ const dayFormat = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York
 const lastPlayed = Math.max(...season.games.filter((g) => g.completed).map((g) => Date.parse(g.start)).filter((t) => !Number.isNaN(t)));
 /** "Through Oct 31": the day of the latest final game, Eastern time; the fetch time when no game is final. */
 export const through = Number.isFinite(lastPlayed) ? `Through ${dayFormat.format(new Date(lastPlayed))}` : asOf;
+
+/** The projected playoff field, bracket and bubble from the base national run; null when the season has no playoff run. */
+export const baseNationalView = nationalView(baseNational);
