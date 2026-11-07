@@ -17,6 +17,6 @@ setTimeout(() => {
 self.onmessage = (e: MessageEvent<SimRequest>) => {
   const { id, conference, teamId, locks } = e.data;
   const { national, ...r } = explore(season, { conference, iterations: ITERATIONS, seed: SEED, teamId, locks, reuse: last });
-  last = national ?? undefined;
+  last = national ?? last;
   self.postMessage({ id, ...r } satisfies SimResponse);
 };
