@@ -68,6 +68,7 @@ describe("results elsewhere for the playoff", () => {
   const signals = playoffSignals(season, sim, national, teamId);
 
   it("never lists the team's own games, and the side it roots for is the one that helps", () => {
+    expect(signals.length).toBeGreaterThan(0);
     const games = new Map(season.games.map((g) => [g.id, g]));
     for (const s of signals) {
       const g = games.get(s.gameId)!;
