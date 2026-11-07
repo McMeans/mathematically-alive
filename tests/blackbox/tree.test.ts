@@ -505,6 +505,21 @@ describe("help from elsewhere", () => {
     expect(first.nonConference).toMatchObject({ opponent: "Team6", site: "away", won: true, score: "21-14", ifWin: null, ifLose: null });
   });
 
+  it("an unplayed non-conference game in a week the conference doesn't play gets its own week; a played one doesn't", () => {
+    // An ACC team's rivalry game the week after the last ACC games (week 20), and an early win in a week with no ACC
+    // games left to play (week 0).
+    const { s } = needsHelp();
+    const last = Math.max(...s.games.map((g) => g.week));
+    const rivalry = game(1, 5, undefined, { conferenceGame: false, week: last + 1, start: "2026-11-28T18:00:00Z" });
+    const opener = game(1, 6, 1, { conferenceGame: false, week: 0, start: "2026-08-29T18:00:00Z" });
+    const t = pathTree({ ...s, teams: [...s.teams, team(5, "SEC"), team(6, "X")], games: [...s.games, rivalry, opener] }, { ...base, teamId: 1 });
+    const week = t.weeks.find((w) => w.week === last + 1)!;
+    expect(week).toMatchObject({ label: "Nov 28", own: null, played: null, games: [], quiet: 0 });
+    expect(week.nonConference).toMatchObject({ gameId: rivalry.id, opponent: "Team5", site: "home", won: null, projected: false });
+    expect(t.weeks.map((w) => w.week)).not.toContain(0);
+    expect(t.weeks.at(-1)!.week).toBe(last + 1);
+  });
+
   it("a non-conference game shows the playoff odds either way when the result can move them", () => {
     const { s, other } = needsHelp();
     const next = game(1, 5, undefined, { conferenceGame: false, week: other.week });
