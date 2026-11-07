@@ -119,6 +119,8 @@ covers it and what-ifs rerun only what a lock touches.
 
 ## Phase 5: playoff UI
 
+Status: team-page odds done (field, bye, title, paired Win/Lose CFP columns, "Must win" from the field rules; timings in `SPEC.md`). The national view and the results-elsewhere list are still to do.
+
 - Team page: playoff odds from the national run (in, seed, bye, title), "Must win <conference>" from the field
   rules, Beta tag and modelled wording.
 - A national view: projected field and bracket, each spot's odds, the bubble.

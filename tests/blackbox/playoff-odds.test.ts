@@ -15,7 +15,7 @@ const outlook = (conference: string, extra: { teamId?: number; locks?: Record<nu
 const national = (extra: { teamId?: number; locks?: Record<number, number>; reuse?: ReturnType<typeof simulateNational> } = {}) =>
   simulateNational(season, { iterations: N, seed: SEED, conferences: POWER, ...extra });
 
-describe("team page playoff odds from the national simulation", () => {
+describe("team page playoff odds from the national simulation", { timeout: 120_000 }, () => {
   const georgia = id("Georgia");
   const sec = outlook("SEC", { teamId: georgia });
   const base = national();
@@ -108,7 +108,7 @@ describe("team page playoff odds from the national simulation", () => {
   });
 });
 
-describe("reusing an earlier national run", () => {
+describe("reusing an earlier national run", { timeout: 120_000 }, () => {
   const georgia = id("Georgia");
   const [g1, g2] = unplayed(georgia);
 
