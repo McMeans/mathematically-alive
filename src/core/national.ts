@@ -30,7 +30,8 @@ export type NationalOptions = {
   /**
    * An earlier run of the same season, seed and iterations, with any locks. Title races it simulated that no lock
    * differing between the two runs touches (a differing locked game's teams aren't in them) are copied from it
-   * instead of played again: the same draws give the same games. Anything else is ignored.
+   * instead of played again: the same draws give the same games. When nothing differs and no `teamId` is asked for,
+   * the earlier run itself comes back. Anything else is ignored.
    */
   reuse?: NationalResult;
 };
@@ -104,8 +105,17 @@ export type NationalResult = {
 };
 
 /** What a later run needs to reuse a run's title games (NationalOptions.reuse). */
-type Reusable = { season: Season; seed: number; iterations: number; conferences: readonly string[]; locks: Record<number, number>; titles: Int32Array; rankings: Uint16Array };
+type Reusable = { season: Season; seed: number; iterations: number; conferences: readonly string[]; locks: Record<number, number>; titles: Int32Array; rankings: Uint16Array; focus: boolean };
 const reusable = new WeakMap<NationalResult, Reusable>();
+
+/** Whether an earlier run is this one: same season, seed, iterations, conferences (any order) and locks, and no focus team. */
+function sameRun(season: Season, opts: NationalOptions, conferences: readonly string[], r: Reusable | undefined): boolean {
+  if (!r || r.season !== season || r.seed !== opts.seed || r.iterations !== opts.iterations || r.focus) return false;
+  if ([...r.conferences].sort().join() !== [...conferences].sort().join()) return false;
+  const locks = opts.locks ?? {};
+  const keys = new Set([...Object.keys(locks), ...Object.keys(r.locks)]);
+  return [...keys].every((k) => locks[Number(k)] === r.locks[Number(k)]);
+}
 
 /** Per race, where to copy the earlier run's title games from (its titles at (iteration * stride + at) * 3), or null to play them. */
 function reusedTitles(season: Season, opts: NationalOptions, n: number, races: TitleRace[]): ({ titles: Int32Array; stride: number; at: number } | null)[] {
@@ -172,6 +182,8 @@ export function playTitleGame(
 export function simulateNational(season: Season, opts: NationalOptions, shared?: SimResult): NationalResult {
   const { iterations, seed } = opts;
   const conferences = [...new Set(opts.conferences)];
+  // Nothing differs from the earlier run (no focus team asked for): it is this run.
+  if (opts.reuse && opts.teamId === undefined && sameRun(season, opts, conferences, reusable.get(opts.reuse))) return opts.reuse;
   const races = conferences.map((c) => titleRace(season, c));
   const sim = shared ?? simulateSeason(season, { iterations, seed, locks: opts.locks });
   const n = sim.iterations;
@@ -487,6 +499,6 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       }
     },
   };
-  reusable.set(result, { season, seed, iterations: n, conferences, locks: { ...(opts.locks ?? {}) }, titles, rankings });
+  reusable.set(result, { season, seed, iterations: n, conferences, locks: { ...(opts.locks ?? {}) }, titles, rankings, focus: opts.teamId !== undefined });
   return result;
 }

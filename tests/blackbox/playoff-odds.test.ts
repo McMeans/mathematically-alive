@@ -12,6 +12,7 @@ const unplayed = (teamId: number) => season.games.filter((g) => !g.completed && 
 const opponent = (g: Season["games"][number], teamId: number) => (g.homeId === teamId ? g.awayId : g.homeId);
 const outlook = (conference: string, extra: { teamId?: number; locks?: Record<number, number> } = {}) =>
   seasonOutlook(season, { conference, iterations: N, seed: SEED, ...extra });
+const unlocked = () => national();
 const national = (extra: { teamId?: number; locks?: Record<number, number>; reuse?: ReturnType<typeof simulateNational> } = {}) =>
   simulateNational(season, { iterations: N, seed: SEED, conferences: POWER, ...extra });
 
@@ -123,16 +124,21 @@ describe("reusing an earlier national run", { timeout: 120_000 }, () => {
 
   it("ignores a run of another seed", () => {
     const other = simulateNational(season, { iterations: N, seed: SEED + 1, conferences: POWER });
-    expect(national({ reuse: other }).teams).toEqual(base().teams);
+    expect(national({ reuse: other }).teams).toEqual(unlocked().teams);
+  });
+
+  it("hands back the earlier run itself when nothing differs", () => {
+    const earlier = national();
+    expect(national({ reuse: earlier })).toBe(earlier);
+    expect(national({ reuse: earlier, teamId: id("Georgia") })).not.toBe(earlier);
   });
 
   it("works with a run that simulated the conferences in another order", () => {
     const other = simulateNational(season, { iterations: N, seed: SEED, conferences: [...POWER].reverse() });
-    expect(national({ reuse: other }).teams).toEqual(base().teams);
+    expect(national({ reuse: other }).teams).toEqual(unlocked().teams);
   });
 });
 
-const base = () => national();
 
 describe("seasons the national simulation can't run", () => {
   it("fall back to the rough estimate, with no national detail", () => {
