@@ -130,9 +130,6 @@ describe("reusing an earlier national run", () => {
     const other = simulateNational(season, { iterations: N, seed: SEED, conferences: [...POWER].reverse() });
     expect(national({ reuse: other }).teams).toEqual(base().teams);
   });
-
-    expect(national({ reuse: earlier }).teams).toEqual(base().teams);
-  });
 });
 
 const base = () => national();
