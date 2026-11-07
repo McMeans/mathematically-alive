@@ -74,7 +74,7 @@ describe("results elsewhere for the playoff", () => {
       expect(g.completed).toBe(false);
       expect([g.homeId, g.awayId]).not.toContain(teamId);
       const helps = s.rooting === s.homeId ? s.oddsIfHomeWins : s.oddsIfAwayWins;
-      expect(helps).toBeGreaterThanOrEqual(Math.min(s.oddsIfHomeWins, s.oddsIfAwayWins));
+      expect(helps).toBe(Math.max(s.oddsIfHomeWins, s.oddsIfAwayWins));
       expect(s.swing).toBeGreaterThanOrEqual(0.01);
       expect(s.text).toMatch(/^Root for .+ over .+: .+ if .+ wins, .+ if .+ does\.$/);
     }
