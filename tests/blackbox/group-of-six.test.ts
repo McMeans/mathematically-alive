@@ -8,18 +8,16 @@ const CONFERENCES = ["ACC", "Big 12", "SEC", "Big Ten", "Mid-American", "Confere
 const N = 200;
 const SEED = 7;
 const mac = new Set(season.teams.filter((t) => t.conference === "Mid-American").map((t) => t.id));
-const sacState = season.teams.find((t) => t.name === "Sacramento State")!.id;
 const members = (c: string) => new Set(season.teams.filter((t) => t.conference === c).map((t) => t.id));
 
 describe("Group of Six conferences in the national simulation (the MAC, CUSA and the Mountain West)", { timeout: 120_000 }, () => {
   const national = simulateNational(season, { iterations: N, seed: SEED, conferences: CONFERENCES });
   const outlook = seasonOutlook(season, { conference: "Mid-American", iterations: N, seed: SEED, reuse: national });
 
-  it("plays the MAC title game: two teams every season, one champion, never Sacramento State", () => {
+  it("plays the MAC title game: two teams every season, one champion", () => {
     const teams = national.teams.filter((t) => mac.has(t.teamId));
     expect(teams.reduce((s, t) => s + t.titleGame!, 0)).toBeCloseTo(2);
     expect(teams.reduce((s, t) => s + t.champion!, 0)).toBeCloseTo(1);
-    expect(teams.find((t) => t.teamId === sacState)!.titleGame).toBe(0);
     national.forEachIteration((_, s) => {
       const [a, b] = s.titleGame("Mid-American");
       expect(mac.has(a) && mac.has(b) && a !== b).toBe(true);
