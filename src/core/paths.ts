@@ -2,6 +2,7 @@
 // Odds are Monte Carlo counts over simulated seasons. "clinched" and "eliminated"
 // are mathematically proven (provenStatus checks every remaining combination);
 // odds of exactly 1 or 0 without a proof stay "open".
+import type { NationalResult } from "./national";
 import type { TeamOutlook } from "./outlook";
 import { simulateSeason, tiebreakDraw, type SimResult } from "./sim";
 import { provenStatus } from "./proof";
@@ -16,6 +17,8 @@ export type PathOptions = {
   seed: number;
   /** Forced results: game id -> id of the team that wins it. */
   locks?: Record<number, number>;
+  /** An earlier national run to copy untouched title races from (`NationalOptions.reuse`). */
+  reuse?: NationalResult;
 };
 
 export type PathStatus = "clinched" | "alive" | "eliminated";
@@ -110,6 +113,19 @@ export function oddsLabels(conference: string): OddsLabels {
 /** The team makes the playoff only as conference champion (never at large), so its playoff odds are its title odds. */
 export function mustWinConference(o: TeamOutlook): boolean {
   return o.playoff > 0 && o.atLarge === 0;
+}
+
+/**
+ * The playoff odds past getting in, from the national simulation (EXPERIMENTAL): a first-round bye and the national
+ * title, as label and display value. Empty when the odds are the estimate (no national run) or the team never
+ * makes the field.
+ */
+export function playoffDetail(o: TeamOutlook): { label: string; value: string }[] {
+  if (!o.cfp || o.cfp.field === 0) return [];
+  const rows = [{ label: "National title", value: formatSideOdds(o.cfp.champion, "alive") }];
+  // A four-team field has no byes.
+  if (o.cfp.quarterfinal !== null) rows.unshift({ label: "First-round bye", value: formatSideOdds(o.cfp.bye, "alive") });
+  return rows;
 }
 
 /** Whole-percent odds. "<1%" and ">99%" stand in for 0 or 100 when the true value isn't exact. */

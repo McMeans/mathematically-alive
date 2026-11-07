@@ -1,5 +1,5 @@
 // Server-side season data and the base (no what-if) computation, shared by pages.
-import { explore, seasonOutlook, type Season } from "@/core";
+import { explore, seasonOutlook, simulateNational, simulateSeason, type Season } from "@/core";
 import data from "./data/season.json";
 
 import { ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
@@ -17,15 +17,21 @@ export function conferenceOf(teamId: number): string | null {
 /** Teams in one conference, in data order. */
 export const conferenceTeams = (conference: string) => season.teams.filter((t) => t.conference === conference);
 
-/** Team list odds for every supported conference, for pages without a selected team. */
-export const baseOutlooks = SUPPORTED_CONFERENCES.map((conference) => ({
-  conference,
-  outlook: seasonOutlook(season, { conference, iterations: ITERATIONS, seed: SEED }),
-}));
+// The base (no what-if) season and national run, once per build process: every page copies its title races from it.
+const baseSim = simulateSeason(season, { iterations: ITERATIONS, seed: SEED });
+const baseNational = simulateNational(season, { iterations: ITERATIONS, seed: SEED, conferences: SUPPORTED_CONFERENCES }, baseSim);
 
-/** Outlook, path and tree for one team from one shared simulation in its conference, with no locks. */
-export const baseExplore = (teamId: number, conference: string) =>
-  explore(season, { conference, teamId, iterations: ITERATIONS, seed: SEED });
+/** Team list odds for every supported conference, for pages without a selected team. */
+export const baseOutlooks = SUPPORTED_CONFERENCES.map((conference) => {
+  const { iterations, teams } = seasonOutlook(season, { conference, iterations: ITERATIONS, seed: SEED, reuse: baseNational }, baseSim);
+  return { conference, outlook: { iterations, teams } };
+});
+
+/** Outlook, path and tree for one team from one shared simulation in its conference, with no locks (no national run: not serializable). */
+export const baseExplore = (teamId: number, conference: string) => {
+  const { outlook, path, tree } = explore(season, { conference, teamId, iterations: ITERATIONS, seed: SEED, reuse: baseNational });
+  return { outlook, path, tree };
+};
 
 const asOfFormat = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short",

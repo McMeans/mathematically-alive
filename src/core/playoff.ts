@@ -80,28 +80,39 @@ export function fieldPicker(season: Season): FieldPicker {
   );
   const notreDame = season.teams.find((t) => t.name === "Notre Dame")?.id;
 
+  // Places (indexes into the ranking) of the automatic bids, reused across calls: this runs once per simulated season.
+  const autos: number[] = [];
+  const powerCount = power.size;
   return (ranking, isChampion) => {
     const n = ranking.length;
-    if (format.autoBids === "none") return Array.from({ length: Math.min(format.teams, n) }, (_, k) => ranking[k]);
-    const take = new Set<number>();
+    const T = Math.min(format.teams, n);
+    if (format.autoBids === "none") return Array.from({ length: T }, (_, k) => ranking[k]);
+    autos.length = 0;
     if (format.autoBids === "top5Champions") {
-      for (let k = 0; k < n && take.size < 5; k++) if (isChampion(ranking[k])) take.add(ranking[k]);
+      for (let k = 0; k < n && autos.length < 5; k++) if (isChampion(ranking[k])) autos.push(k);
     } else {
       let g6Taken = false;
-      for (let k = 0; k < n; k++) {
+      let champs = 0;
+      // Past the top 12 with every power champion and the Group of Six team found, nothing else gets a bid.
+      for (let k = 0; k < n && !(k >= 12 && g6Taken && champs === powerCount); k++) {
         const id = ranking[k];
         const c = conf.get(id);
-        if (c != null && power.has(c) && isChampion(id)) take.add(id);
-        else if (!g6Taken && g6.has(id)) { take.add(id); g6Taken = true; }
-        else if (id === notreDame && k < 12) take.add(id);
+        if (c != null && power.has(c) && isChampion(id)) { autos.push(k); champs++; }
+        else if (!g6Taken && g6.has(id)) { autos.push(k); g6Taken = true; }
+        else if (id === notreDame && k < 12) autos.push(k);
       }
     }
-    for (let k = 0; k < n && take.size < format.teams; k++) take.add(ranking[k]);
+    // The rest go at large, best ranked first; the field lists everyone in ranking order.
+    let atLarge = Math.max(0, T - autos.length);
+    const field: number[] = [];
+    for (let k = 0; k < n && field.length < Math.max(T, autos.length); k++) {
+      if (autos.includes(k)) field.push(ranking[k]);
+      else if (atLarge > 0) { field.push(ranking[k]); atLarge--; }
+    }
     // Seeds: by ranking, except that "topChampions" puts the four highest-ranked champions first.
-    const inField = Array.from({ length: n }, (_, k) => ranking[k]).filter((id) => take.has(id));
-    if (format.seeding === "ranking") return inField;
-    const top = inField.filter((id) => isChampion(id)).slice(0, 4);
-    return [...top, ...inField.filter((id) => !top.includes(id))];
+    if (format.seeding === "ranking") return field;
+    const top = field.filter((id) => isChampion(id)).slice(0, 4);
+    return [...top, ...field.filter((id) => !top.includes(id))];
   };
 }
 

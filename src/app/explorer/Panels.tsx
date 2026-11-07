@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useId, useState } from "react";
-import { formatChance, formatRecord, mustWinConference, type OddsLabels, type TeamOutlook, type TeamPath } from "@/core";
+import { formatChance, formatRecord, mustWinConference, playoffDetail, type OddsLabels, type TeamOutlook, type TeamPath } from "@/core";
 import { NAVY, pct, type ConferenceList, type GameInfo, type TeamInfo } from "./Explorer";
 import { byOdds } from "./Season";
 import { useConference } from "./conference";
@@ -125,6 +125,19 @@ export function Beta() {
 /** The playoff odds, or "Must win <conference>" when the team only gets in as champion (then they'd just repeat the Win <conference> odds). */
 export const playoffText = (o: TeamOutlook, odds: string, labels: OddsLabels) => (mustWinConference(o) ? labels.mustWin : odds);
 
+/** Bye and national-title odds under the playoff number, when the national simulation has them. */
+export function PlayoffDetail({ outlook, className = "" }: { outlook: TeamOutlook; className?: string }) {
+  const rows = playoffDetail(outlook);
+  if (rows.length === 0) return null;
+  return (
+    <p className={`flex flex-wrap gap-x-3 text-xs text-ink-muted ${className}`}>
+      {rows.map((r) => (
+        <span key={r.label}>{r.label} <span className="font-semibold text-navy">{r.value}</span></span>
+      ))}
+    </p>
+  );
+}
+
 function Tile({ label, value, tone, badge, small }: { label: string; value: string; tone: string; badge?: boolean; small?: boolean }) {
   return (
     <div className="rounded-lg bg-mist p-3">
@@ -189,6 +202,7 @@ export function Stats({ team, outlook, me, path, teamId, own, names }: {
         </p>
       </div>
       <StatTiles outlook={me} ifWinOut={path.ifWinOut} />
+      <PlayoffDetail outlook={me} />
       <section aria-labelledby="proj">
         <h3 id="proj" className="text-xs font-semibold text-ink-muted">Projected</h3>
         <dl className="mt-2 divide-y divide-ink-muted/20 text-sm">
