@@ -51,9 +51,12 @@ const FORMATS: readonly PlayoffFormat[] = [
   },
 ];
 
+/** The season's format, or undefined. Not part of the public API. */
+export const findFormat = (year: number): PlayoffFormat | undefined => FORMATS.find((x) => x.seasons.includes(year));
+
 /** The season's playoff format. Throws for a season with none. */
 export function playoffFormat(year: number): PlayoffFormat {
-  const f = FORMATS.find((x) => x.seasons.includes(year));
+  const f = findFormat(year);
   if (!f) throw new Error(`No playoff format for ${year}`);
   return f;
 }

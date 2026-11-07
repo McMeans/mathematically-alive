@@ -10,7 +10,7 @@
 // game's draw and what-if runs stay paired with the base run.
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { powerConferences, teamRating, titleGameIndex } from "./committee";
-import { bracketGames, championsNeeded, fieldPicker, playoffFormat } from "./playoff";
+import { bracketGames, championsNeeded, fieldPicker, findFormat } from "./playoff";
 import type { Game, Season } from "./season";
 import { COMMITTEE_SALT, HOME_FIELD, PLAYOFF_SALT, mix, neutralOdds, simulateSeason, tiebreakDraw, titleRoll, type SimResult } from "./sim";
 import { championshipFromData, conferenceData, type ConferenceData } from "./tiebreak";
@@ -76,7 +76,8 @@ export type NationalResult = {
   /**
    * Whether stages 4 and 5 ran. They need the champions the season's format uses: none in a four-team season, the
    * power conferences' from 2026 (all of them must be in `conferences`). The 2024-2025 formats need every
-   * conference's champion, and Group of Six title games aren't simulated, so those seasons get no playoff.
+   * conference's champion, and Group of Six title games aren't simulated, so those seasons get no playoff; nor does
+   * a season with no format.
    */
   playoff: boolean;
   /** Every FBS team, the stand-in's average order (best mean rank first). */
@@ -135,12 +136,12 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const n = sim.iterations;
   const C = races.length;
   const power = new Set(powerConferences(season.year));
-  const format = playoffFormat(season.year);
-  const needs = championsNeeded(format);
+  const format = findFormat(season.year);
+  const needs = format ? championsNeeded(format) : "all";
   const playoff = needs === "none" || (needs === "power" && [...power].every((c) => conferences.includes(c)));
-  const pick = fieldPicker(season);
-  const bracket = bracketGames(format.teams);
-  const T = format.teams;
+  const pick = playoff ? fieldPicker(season) : () => [];
+  const T = format?.teams ?? 12;
+  const bracket = bracketGames(T);
   const odds = neutralOdds(season);
 
   const byId = new Map(season.teams.map((t) => [t.id, t]));

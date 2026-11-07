@@ -175,6 +175,12 @@ describe("national simulation: playoff field and bracket", () => {
     expect(simulateNational(season, { iterations: 20, seed: 7, conferences: [] }).playoff).toBe(false);
   });
 
+  it("a season with no playoff format gets no playoff, and isn't an error", () => {
+    const r = simulateNational({ ...national, year: 2027 }, { iterations: 20, seed: 7, conferences: [] });
+    expect(r.playoff).toBe(false);
+    expect(r.teams.every((t) => t.playoff === null)).toBe(true);
+  });
+
   it("a four-team season plays semifinals and a final from the stand-in's top four", () => {
     const { season } = load(2023);
     const r = simulateNational(season, { iterations: 200, seed: 7, conferences: [] });
