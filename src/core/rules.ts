@@ -6,6 +6,7 @@ import {
   draw,
   headToHead,
   opponentsWinPct,
+  overallWinPct,
   placedCommonOpponent,
   ranking,
   scheduleStrength,
@@ -173,7 +174,34 @@ const CUSA: TiebreakRules = {
   luckSteps: "the ranking tiebreak",
 };
 
-const RULES: readonly TiebreakRules[] = [ACC, BIG_12, SEC, BIG_TEN, MAC, CUSA];
+// Two-team and multi-team ties use the same six steps: head-to-head (two teams: their game; three or more: the mini
+// round-robin when all played each other, otherwise one that beat all the others is in), the CFP ranking of Nov. 21
+// for a ranked team that wins on the final weekend, else a composite of selected computer rankings (both modelled by
+// the ranking stand-in), overall win pct with at most one FCS win counted, record against the next highest placed
+// team down the standings (lower teams level on win pct as one position; a position some tied team didn't play in
+// full is skipped), win pct against common conference opponents, then a coin toss or drawing. A multi-team tie goes
+// on "until one or more teams gain an advantage", and the two highest-ranked go when the ranking step decides, so
+// spots are "open". Teams ineligible for a bowl under NCAA or Mountain West rules can't play; the NCAA made teams
+// moving up to FBS eligible at once from 2026 (D-I Cabinet, June 24, 2026), so North Dakota State is eligible.
+const MOUNTAIN_WEST: TiebreakRules = {
+  conference: "Mountain West",
+  seasons: [2026],
+  source: "Mountain West Football Championship Tiebreaking Procedures, Aug. 1, 2023 (the latest published): https://storage.googleapis.com/themw-com/2023/09/ec9093ac-2023-mw-football-championship-tiebreakers-final.pdf",
+  steps: [
+    headToHead({ record: "games", lostToAll: false }),
+    ranking({ restart: true }),
+    overallWinPct({ belowFbs: 1 }),
+    placedCommonOpponent({ level: "group", whole: true }),
+    commonOpponents(),
+    draw(),
+  ],
+  spots: "open",
+  drop: "restart",
+  gameCountTies: false,
+  luckSteps: "the ranking tiebreak and overall win pct",
+};
+
+const RULES: readonly TiebreakRules[] = [ACC, BIG_12, SEC, BIG_TEN, MAC, CUSA, MOUNTAIN_WEST];
 
 /** Is there a tiebreak config for the conference in that season? */
 export const hasTiebreakRules = (conference: string, season: number): boolean =>

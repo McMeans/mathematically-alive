@@ -60,7 +60,7 @@ describe("national simulation: conference title games", () => {
   }, 30_000);
 
   it("teams in conferences it doesn't simulate have no title-game odds", () => {
-    const g6 = result.teams.filter((t) => t.conference === "Mountain West" || t.conference === null);
+    const g6 = result.teams.filter((t) => t.conference === "Sun Belt" || t.conference === null);
     expect(g6.length).toBeGreaterThan(5);
     for (const t of g6) {
       expect(t.titleGame).toBeNull();
@@ -69,11 +69,11 @@ describe("national simulation: conference title games", () => {
   });
 
   it("asking for a title game it didn't simulate is an error", () => {
-    expect(() => result.forEachIteration((_, s) => s.titleGame("Mountain West"))).toThrow("Mountain West's title game isn't simulated");
+    expect(() => result.forEachIteration((_, s) => s.titleGame("Sun Belt"))).toThrow("Sun Belt's title game isn't simulated");
   });
 
   it("a conference without tiebreak rules can't be simulated", () => {
-    expect(() => run(national, { conferences: ["Mountain West"] })).toThrow("No tiebreak rules for Mountain West in 2026");
+    expect(() => run(national, { conferences: ["Sun Belt"] })).toThrow("No tiebreak rules for Sun Belt in 2026");
   });
 
   it("a title game already in the data decides the champion", () => {
