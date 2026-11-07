@@ -10,6 +10,7 @@
 // - otherwise those at the top start over (from the first step, or the next one, as the step says) and the rest
 //   are out of this tie.
 // With `spots: "one"` a tie is resolved for one spot at a time, and the rest are re-tied from scratch after each.
+// Rules with a two-team procedure (`twoTeam`) use it whenever two teams are tied, including a bigger tie cut to two.
 
 import { countsNonConference as needsNonConference, tiebreakRules, type TiebreakRules } from "./rules";
 import type { Game, Season } from "./season";
@@ -108,13 +109,13 @@ export function championshipParticipants(
   return championshipFromData(conferenceData(season, conference), winnerOf, opts);
 }
 
-const searchedSteps = new WeakMap<TiebreakRules, readonly (Step | null)[]>();
-/** The rules' steps as proofs run them: steps that count non-conference results skipped (null). */
-const conferenceSteps = (rules: TiebreakRules): readonly (Step | null)[] => {
-  let steps = searchedSteps.get(rules);
+const searchedSteps = new WeakMap<readonly Step[], readonly (Step | null)[]>();
+/** A list of steps as proofs run it: steps that count non-conference results skipped (null). */
+const conferenceSteps = (list: readonly Step[]): readonly (Step | null)[] => {
+  let steps = searchedSteps.get(list);
   if (!steps) {
-    steps = rules.steps.map((s) => (s.nonConference ? null : s));
-    searchedSteps.set(rules, steps);
+    steps = list.map((s) => (s.nonConference ? null : s));
+    searchedSteps.set(list, steps);
   }
   return steps;
 };
@@ -138,18 +139,24 @@ export function championshipFromData(
     rank: opts.rank ?? ((id: number) => data.ratings.get(id) ?? -Infinity),
     rowOf: new Map(table.map((r) => [r.teamId, r])),
   };
-  const steps = opts.allGames === false ? conferenceSteps(rules) : rules.steps;
+  const run = (list: readonly Step[]): readonly (Step | null)[] => (opts.allGames === false ? conferenceSteps(list) : list);
+  const multi = run(rules.steps);
+  const twoSpot = rules.twoTeam ? run(rules.twoTeam.spot) : multi;
+  const twoSeed = rules.twoTeam ? run(rules.twoTeam.seed) : multi;
+  /** The steps for a tie of `n` teams; `seeding`: all of them are in, only their order is open. */
+  const stepsFor = (n: number, seeding: boolean) => (n !== 2 ? multi : seeding ? twoSeed : twoSpot);
 
-  /** Choose `spots` of the tied teams `ids`, trying steps from `from` on. */
-  const pick = (ids: number[], spots: number, from: number): Outcome => {
+  /** Choose `spots` of the tied teams `ids`, trying steps from `from` on (`seeding`: ordering teams already in). */
+  const pick = (ids: number[], spots: number, from: number, seeding = false): Outcome => {
     if (ids.length <= spots) return seed(ids);
+    const steps = stepsFor(ids.length, seeding);
     for (let i = from; i < steps.length; i++) {
       const step = steps[i];
       if (step === null) continue;
       const r = step.run(ids, ctx, spots);
       if (r === null) continue;
       if ("picked" in r) return { placed: r.picked };
-      if ("drop" in r) return rules.drop === "retie" ? r : pick(ids.filter((id) => id !== r.drop), spots, 0);
+      if ("drop" in r) return rules.drop === "retie" ? r : pick(ids.filter((id) => id !== r.drop), spots, 0, seeding);
       const { top } = r;
       if (top.length < spots) {
         // All of them are in; the rest start over for the spots left.
@@ -158,7 +165,8 @@ export function championshipFromData(
         const rest = pick(ids.filter((id) => !top.includes(id)), spots - top.length, 0);
         return "drop" in rest ? rest : { placed: [...first.placed, ...rest.placed] };
       }
-      return pick(top, spots, step.restart ? 0 : i + 1);
+      // A tie cut to two goes to the two-team procedure, from its first step.
+      return pick(top, spots, step.restart || stepsFor(top.length, seeding) !== steps ? 0 : i + 1, seeding);
     }
     throw new Error(`${rules.conference}'s last tiebreak step didn't decide`);
   };
@@ -169,7 +177,7 @@ export function championshipFromData(
     const tail: number[] = [];
     let rest = ids;
     while (rest.length > 1) {
-      const r = pick(rest, 1, 0);
+      const r = pick(rest, 1, 0, true);
       const id = "drop" in r ? r.drop : r.placed[0];
       if ("drop" in r) tail.unshift(id);
       else out.push(id);

@@ -139,7 +139,10 @@ Status: team-page odds done (field, bye, title, paired Win/Lose CFP columns, "Mu
   - Done: the American (rules from its 2025 tiebreakers PDF; the CFP-ranking and computer-composite steps are the
     ranking stand-in). Army-Navy, which CFBD flags a conference game, is non-conference and played after the title
     game and the field: it counts in no standings, tiebreak, ranking or field, and is never taken for the title game.
-  - Next: the Pac-12, the Sun Belt (divisions: needs engine support).
+  - Done: the Pac-12 (rules from its Sept. 2026 release: separate two-team and multi-team procedures, now an engine
+    option). Its week-13 flex games are non-conference and come after the title-game teams are set; the projected
+    pairings stand in until the data lists them.
+  - Next: the Sun Belt (divisions: needs engine support).
   - When a member is barred from the postseason: leave it out of its title game and the Group of Six bid.
 - Independents (Notre Dame and others): no title-game section; playoff only.
 - Picker that scales to every conference plus independents.
