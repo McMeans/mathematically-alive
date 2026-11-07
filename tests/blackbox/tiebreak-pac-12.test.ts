@@ -123,7 +123,7 @@ describe("Pac-12 tiebreakers", () => {
 const MEMBERS = ["Boise State", "Colorado State", "Fresno State", "Oregon State", "San Diego State", "Texas State", "Utah State", "Washington State"];
 type RawGame = [home: string, away: string, week: number, winner: string | null, conferenceGame: boolean];
 function fromCfbd(rows: RawGame[], year = 2026, conference = PAC): Season & { id: (n: string) => number } {
-  const names = [...MEMBERS, "Nevada"];
+  const names = [...MEMBERS, "Nevada", "Hawai'i"];
   const idOf = (n: string) => names.indexOf(n) + 1;
   const conf = (n: string) => (MEMBERS.includes(n) ? conference : "Mountain West");
   const games: CfbdGame[] = rows.map(([home, away, week, winner, conferenceGame], i) => ({
@@ -178,6 +178,26 @@ describe("the Pac-12's week-13 flex games", () => {
   it("a member's week-13 game against a non-member keeps its pairing out", () => {
     const s = fromCfbd([...conference, ["Nevada", "Boise State", 13, null, false]]);
     expect(week13(s)).toEqual(["Boise State at Nevada", "Oregon State at Washington State", "San Diego State at Fresno State", "Texas State at Colorado State"]);
+  });
+
+  it("a lone flex game between members in week 13 is never taken for the title game", () => {
+    // Boise State and Fresno State top the standings. CFBD lists Fresno State's flex game with Boise State (Fresno
+    // State won) and three members' week-13 games against non-members, so no projected game stands in and Fresno
+    // State-Boise State is the only game between members in the latest week, with no title game in the data yet.
+    const s = fromCfbd([
+      ["Boise State", "Utah State", 5, "Boise State", true], ["Fresno State", "San Diego State", 6, "Fresno State", true],
+      ["Fresno State", "Boise State", 13, "Fresno State", true], ["Nevada", "Texas State", 13, null, false],
+      ["Hawai'i", "Oregon State", 13, null, false], ["Washington State", "Nevada", 13, null, false],
+    ]);
+    expect(s.games.filter((g) => g.week === 13 && MEMBERS.includes(s.teams.find((t) => t.id === g.homeId)!.name)
+      && MEMBERS.includes(s.teams.find((t) => t.id === g.awayId)!.name))).toHaveLength(1);
+    const o = seasonOutlook(s, { conference: PAC, iterations: 400, seed: 2 }).teams;
+    const fresno = o.find((t) => t.teamId === s.id("Fresno State"))!;
+    const boise = o.find((t) => t.teamId === s.id("Boise State"))!;
+    expect([fresno.titleGame, boise.titleGame]).toEqual([1, 1]);
+    // The title game is simulated: either can win it, whatever the flex game's result.
+    expect(boise.champion).toBeGreaterThan(0.2);
+    expect(fresno.champion).toBeLessThan(0.8);
   });
 
   it("no flex games for another season or conference", () => {
