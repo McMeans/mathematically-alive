@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { formatRecord, formatSideOdds, formatTitleOdds, type Impact, type SeasonWeek, type TeamOutlook } from "@/core";
 import type { Locks, TeamInfo } from "./Explorer";
-import { Beta, playoffText } from "./Panels";
+import { Beta, PlayoffDetail, playoffText } from "./Panels";
 import { useConference } from "./conference";
 
 type PickState = "picked" | "likely" | "open";
@@ -311,6 +311,7 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
           <div className="flex flex-col gap-1 border-t border-navy/10 pt-2 text-sm text-ink-soft">
             <p className="flex justify-between">{labels.champion}<span className="font-bold text-navy">{sideOdds(me.champion, me)}</span></p>
             <p className="flex justify-between"><span className="flex items-center gap-1">{labels.playoff}<Beta /></span><span className="font-bold text-navy">{playoffText(me, sideOdds(me.playoff, me), labels)}</span></p>
+            <PlayoffDetail outlook={me} className="justify-end" />
           </div>
         </section>
       </div>

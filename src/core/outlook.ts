@@ -1,6 +1,9 @@
 // Season outlook for one conference: how likely each team is to reach the
 // conference championship game, win it, and (experimentally) make the playoff.
-import { playTitleGame, titleRace } from "./national";
+import { powerConferences } from "./committee";
+import { playTitleGame, simulateNational, titleRace, type NationalPlayoff, type NationalResult } from "./national";
+import { championsNeeded, findFormat } from "./playoff";
+import { hasTiebreakRules } from "./rules";
 import { simulateSeason, type SimResult } from "./sim";
 import { provenStatus } from "./proof";
 import { teamRecord } from "./season";
@@ -14,6 +17,8 @@ export type OutlookOptions = {
   locks?: Record<number, number>;
   /** A conference team whose own unplayed games get odds as if each were picked either way (`TeamOutlook.games`). */
   teamId?: number;
+  /** An earlier national run to copy untouched title races from (`NationalOptions.reuse`). */
+  reuse?: NationalResult;
 };
 
 export type TeamOutlook = {
@@ -26,8 +31,13 @@ export type TeamOutlook = {
   titleGame: number;
   /** Fraction of iterations the team wins the conference championship game. */
   champion: number;
-  /** EXPERIMENTAL rough estimate of making the playoff; see PLAYOFF_FIELD. */
+  /**
+   * Fraction of iterations the team makes the playoff (EXPERIMENTAL). From the national simulation (`cfp`) when the
+   * season can run one; otherwise a rough estimate, see PLAYOFF_FIELD.
+   */
   playoff: number;
+  /** Its full playoff odds from the national simulation; null when the season can't run one (then `playoff` is the estimate). */
+  cfp: NationalPlayoff | null;
   /** Fraction of iterations the team makes the playoff without winning the conference (EXPERIMENTAL, like `playoff`). 0 means its only way in is the title. */
   atLarge: number;
   /**
@@ -40,7 +50,12 @@ export type TeamOutlook = {
   status: "clinched" | "alive" | "eliminated";
 };
 
-export type SeasonOutlook = { iterations: number; teams: TeamOutlook[] };
+export type SeasonOutlook = {
+  iterations: number;
+  teams: TeamOutlook[];
+  /** The national run the playoff odds came from; null when they are the estimate. Pass it as `reuse` for a what-if. */
+  national: NationalResult | null;
+};
 
 /**
  * EXPERIMENTAL playoff model, not the committee's. The conference champion
@@ -50,6 +65,19 @@ export type SeasonOutlook = { iterations: number; teams: TeamOutlook[] };
 const PLAYOFF_FIELD = 11;
 const MISSING_RATING = 0;
 
+/**
+ * Whether the season can run the national simulation for `conference`: it has a playoff format whose field needs
+ * at most the power conferences' champions, every power conference has tiebreak rules and teams in the data, and
+ * `conference` is one of them.
+ */
+function nationalReady(season: Season, conference: string): boolean {
+  const format = findFormat(season.year);
+  if (!format || championsNeeded(format) === "all") return false;
+  const power = powerConferences(season.year);
+  const count = (c: string) => season.teams.filter((t) => t.conference === c).length;
+  return power.includes(conference) && power.every((c) => hasTiebreakRules(c, season.year) && count(c) >= 2);
+}
+
 /** `shared`: a simulation of the same season, iterations, seed and locks to reuse. */
 export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: SimResult): SeasonOutlook {
   const { conference, iterations, seed } = opts;
@@ -57,6 +85,11 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
   const { data } = race;
 
   const sim = shared ?? simulateSeason(season, { iterations, seed, locks: opts.locks });
+  // The playoff odds: the national simulation over the same simulated seasons when the season can run one.
+  const national: NationalResult | null = nationalReady(season, conference)
+    ? simulateNational(season, { iterations, seed, locks: opts.locks, conferences: powerConferences(season.year), teamId: opts.teamId, reuse: opts.reuse }, sim)
+    : null;
+  const estimate = national === null;
   const gameIndex = new Map<number, number>(season.games.map((g, i) => [g.id, i]));
   const fbs = season.teams.filter((t) => t.classification === "fbs");
   // Playoff spots for a non-FBS champion (not in the FBS arrays).
@@ -115,7 +148,9 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
     return before < PLAYOFF_FIELD;
   };
 
-  sim.forEachIteration((iteration, winnerAt, teams) => {
+  // With the national run, it has played this conference's title games (the same ones, from the same streams) and
+  // the focus team's what-ifs already.
+  if (estimate) sim.forEachIteration((iteration, winnerAt, teams) => {
     const winnerOf = (g: Game): number => winnerAt(gameIndex.get(g.id)!);
     const [a, b, champ] = playTitleGame(race, seed, iteration, winnerOf, teams.rank, teams.shift);
     titleGame.set(a, titleGame.get(a)! + 1);
@@ -187,6 +222,23 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
   });
 
   const n = sim.iterations;
+  if (national) {
+    for (const t of national.teams) {
+      if (!data.ids.has(t.teamId)) continue;
+      titleGame.set(t.teamId, Math.round(t.titleGame! * n));
+      champion.set(t.teamId, Math.round(t.champion! * n));
+    }
+    // Field shares from the national run; at large: in the field without winning the conference.
+    national.forEachIteration((_, ns) => {
+      const ch = ns.champion(conference);
+      for (const id of ns.field!) {
+        const k = fbsIndex.get(id);
+        if (k !== undefined && id !== ch && data.ids.has(id)) atLarge[k]++;
+      }
+    });
+  }
+  const fieldIf = new Map(national?.games.map((x) => [x.gameId, x]) ?? []);
+  const cfpOf = new Map(national?.teams.map((t) => [t.teamId, t.playoff!]) ?? []);
   const statusOf = (p: number, id: number): TeamOutlook["status"] => {
     if (p !== 0 && p !== 1) return "alive";
     const s = provenStatus(season, conference, id, opts.locks);
@@ -194,6 +246,7 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
   };
   return {
     iterations: n,
+    national,
     teams: inConf.map((id) => ({
       teamId: id,
       record: teamRecord(season, id, opts.locks),
@@ -201,11 +254,14 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
       expectedConferenceWins: sim.teams[id].expectedConferenceWins,
       titleGame: titleGame.get(id)! / n,
       champion: champion.get(id)! / n,
-      playoff: (fbsIndex.has(id) ? playoff[fbsIndex.get(id)!] : (outside.get(id) ?? 0)) / n,
+      playoff: national ? (cfpOf.get(id)?.field ?? 0) : (fbsIndex.has(id) ? playoff[fbsIndex.get(id)!] : (outside.get(id) ?? 0)) / n,
+      cfp: cfpOf.get(id) ?? null,
       atLarge: fbsIndex.has(id) ? atLarge[fbsIndex.get(id)!] / n : 0,
       games: id !== focus ? [] : own.map((o) => ({
         gameId: season.games[o.i].id,
-        titleIfWin: o.title[0] / n, titleIfLose: o.title[1] / n, playoffIfWin: o.playoff[0] / n, playoffIfLose: o.playoff[1] / n,
+        titleIfWin: fieldIf.get(season.games[o.i].id)?.titleIfWin ?? o.title[0] / n,
+        titleIfLose: fieldIf.get(season.games[o.i].id)?.titleIfLose ?? o.title[1] / n, playoffIfWin: fieldIf.get(season.games[o.i].id)?.fieldIfWin ?? o.playoff[0] / n,
+        playoffIfLose: fieldIf.get(season.games[o.i].id)?.fieldIfLose ?? o.playoff[1] / n,
       })),
       status: statusOf(titleGame.get(id)! / n, id),
     })),
