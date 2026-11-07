@@ -4,13 +4,13 @@ import { mustWinConference, playoffRoute, seasonFromCfbd, seasonOutlook, simulat
 
 // Every FBS game of 2026 through week 9, from fixtures/cfp-2026.json.
 const season = seasonFromCfbd((JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot }).snapshot);
-const CONFERENCES = ["ACC", "Big 12", "SEC", "Big Ten", "Mid-American", "Conference USA", "Mountain West"];
+const CONFERENCES = ["ACC", "Big 12", "SEC", "Big Ten", "Mid-American", "Conference USA", "Mountain West", "American Athletic"];
 const N = 200;
 const SEED = 7;
 const mac = new Set(season.teams.filter((t) => t.conference === "Mid-American").map((t) => t.id));
 const members = (c: string) => new Set(season.teams.filter((t) => t.conference === c).map((t) => t.id));
 
-describe("Group of Six conferences in the national simulation (the MAC, CUSA and the Mountain West)", { timeout: 120_000 }, () => {
+describe("Group of Six conferences in the national simulation (the MAC, CUSA, the Mountain West and the American)", { timeout: 120_000 }, () => {
   const national = simulateNational(season, { iterations: N, seed: SEED, conferences: CONFERENCES });
   const outlook = seasonOutlook(season, { conference: "Mid-American", iterations: N, seed: SEED, reuse: national });
 
@@ -25,7 +25,7 @@ describe("Group of Six conferences in the national simulation (the MAC, CUSA and
     });
   });
 
-  for (const [conference, label] of [["Conference USA", "CUSA"], ["Mountain West", "Mountain West"]]) {
+  for (const [conference, label] of [["Conference USA", "CUSA"], ["Mountain West", "Mountain West"], ["American Athletic", "American"]]) {
     it(`plays the ${label} title game: two of its teams every season, one of them champion`, () => {
       const ids = members(conference);
       expect(ids.size).toBeGreaterThan(2);
@@ -75,6 +75,23 @@ describe("Group of Six conferences in the national simulation (the MAC, CUSA and
     // Reusing the five-conference run leaves the SEC's odds as the run had them.
     const field = new Map(national.teams.map((t) => [t.teamId, t.playoff!.field]));
     for (const t of sec.teams) expect(t.playoff).toBe(field.get(t.teamId));
+  });
+
+  it("Army-Navy, played after the field is picked, changes no simulated ranking or field", () => {
+    const id = (n: string) => season.teams.find((t) => t.name === n)!.id;
+    const game = season.games.find((g) => [g.homeId, g.awayId].sort().join() === [id("Army"), id("Navy")].sort().join())!;
+    const runs = [id("Army"), id("Navy")].map((winner) => {
+      const r = simulateNational(season, { iterations: 50, seed: SEED, conferences: CONFERENCES, locks: { [game.id]: winner }, teamId: id("Navy") });
+      // Navy's other games still get odds both ways; Army-Navy, which can't change the field, gets none.
+      expect(r.games.length).toBeGreaterThan(0);
+      expect(r.games.map((g) => g.gameId)).not.toContain(game.id);
+      const out: { ranking: number[]; field: number[] | null; titles: (readonly number[])[] }[] = [];
+      r.forEachIteration((_, s) => out.push({ ranking: [...s.ranking], field: s.field && [...s.field], titles: CONFERENCES.map((c) => s.titleGame(c)) }));
+      return out;
+    });
+    expect(runs[0].length).toBe(50);
+    expect(runs[0][0].field).toHaveLength(12);
+    expect(runs[0]).toEqual(runs[1]);
   });
 
   it("with the MAC title game played, the Group of Six bid still goes to the top-ranked Group of Six team", () => {

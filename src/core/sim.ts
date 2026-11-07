@@ -1,7 +1,7 @@
 // Monte Carlo season simulator. Plays out every unplayed game many times and
 // records the outcomes compactly so standings/tiebreaker code can replay them.
 import { MARGIN_SD, normalCdf, winProbability } from "./odds";
-import type { Game, Season, Team } from "./season";
+import { isArmyNavy, type Game, type Season, type Team } from "./season";
 
 export const HOME_FIELD = 2.5;
 const MISSING_RATING_OTHER = -10;
@@ -257,7 +257,12 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
   // Shifts and ranks are worked out per team, only when asked for.
   const rating = Float64Array.from(teamIds, (id) => ratingOf(byId, id));
   const gamesOf: number[][] = teamIds.map(() => []);
-  for (let i = 0; i < G; i++) { gamesOf[homeIdx[i]].push(i); gamesOf[awayIdx[i]].push(i); }
+  // Army-Navy comes after every conference's tiebreak, so it is left out of the ranking stand-in.
+  for (let i = 0; i < G; i++) {
+    if (isArmyNavy(byId.get(games[i].homeId)?.name, byId.get(games[i].awayId)?.name)) continue;
+    gamesOf[homeIdx[i]].push(i);
+    gamesOf[awayIdx[i]].push(i);
+  }
   const indexOf = (id: number): number => {
     const t = teamIndex.get(id);
     if (t === undefined) throw new Error(`unknown team ${id}`);

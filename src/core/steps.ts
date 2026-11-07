@@ -238,7 +238,10 @@ export function opponentsWinPct(): Step {
   };
 }
 
-/** The title game is a non-conference game between two members in the data; it comes after the tiebreak. */
+/**
+ * The title game is a non-conference game between two members in the data; it comes after the tiebreak. So does
+ * Army-Navy, the American's one other such game (seasonFromCfbd), so it is left out the same way.
+ */
 export const isTitleGame = (data: Pick<Members, "ids">, g: Game): boolean => !g.conferenceGame && data.ids.has(g.homeId) && data.ids.has(g.awayId);
 
 /**
