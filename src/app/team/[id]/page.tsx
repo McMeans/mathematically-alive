@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { conferenceName } from "@/core";
 import { ExplorerPage } from "@/app/ExplorerPage";
 import { conferenceOf, supportedTeams } from "@/app/season";
 
@@ -14,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!team) return {};
   return {
     title: `${team.name} · Mathematically Alive`,
-    description: `Every path for ${team.name} to the ${team.conference} title game and the playoff.`,
+    description: `Every path for ${team.name} to the ${conferenceName(team.conference!)} title game and the playoff.`,
   };
 }
 

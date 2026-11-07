@@ -88,14 +88,31 @@ export function formatFine(p: number): string {
 /** A team's record for display: "4-5 (2-4 ACC)", or just "4-5" without a conference. */
 export function formatRecord(record: TeamRecord, conference: string | null): string {
   const overall = `${record.wins}-${record.losses}`;
-  return conference ? `${overall} (${record.conferenceWins}-${record.conferenceLosses} ${conference})` : overall;
+  return conference ? `${overall} (${record.conferenceWins}-${record.conferenceLosses} ${conferenceShort(conference)})` : overall;
 }
+
+/** How the site names each conference (CFBD's name -> display name, and the short form where space is tight). */
+const CONFERENCE_NAMES: Record<string, { name: string; short: string }> = {
+  "Mid-American": { name: "MAC", short: "MAC" },
+  "Pac-12": { name: "Pac 12", short: "Pac 12" },
+  "Sun Belt": { name: "Sun Belt", short: "SBC" },
+  "American Athletic": { name: "American", short: "American" },
+  "Conference USA": { name: "CUSA", short: "CUSA" },
+  "Mountain West": { name: "Mountain West", short: "MW" },
+};
+
+/** The conference's name as the site shows it ("MAC" for CFBD's "Mid-American"); unlisted names show as they are. */
+export const conferenceName = (conference: string): string => CONFERENCE_NAMES[conference]?.name ?? conference;
+
+/** The short form, where space is tight ("MW", "SBC"); otherwise the display name. */
+export const conferenceShort = (conference: string): string => CONFERENCE_NAMES[conference]?.short ?? conference;
 
 /** What each odds tile is called. */
 export type OddsLabels = { titleGame: string; champion: string; playoff: string; winOut: string; beta: string; conferenceRecord: string; mustWin: string; nonConference: string; conference: string; cfp: string };
 
 /** Labels for the odds tiles, so every view names each number the same way. */
-export function oddsLabels(conference: string): OddsLabels {
+export function oddsLabels(key: string): OddsLabels {
+  const conference = conferenceName(key);
   return {
     titleGame: "Title game",
     champion: `Win ${conference}`,
@@ -105,7 +122,7 @@ export function oddsLabels(conference: string): OddsLabels {
     conferenceRecord: `${conference} record, counting your picks`,
     mustWin: `Must win ${conference}`,
     nonConference: "Non-con",
-    conference,
+    conference: conferenceShort(key),
     cfp: "CFP",
   };
 }
@@ -234,14 +251,14 @@ export function teamPath(season: Season, opts: PathOptions, shared?: SimResult):
 
   let summary: string;
   const steps: string[] = [];
-  if (status === "clinched") summary = `${team} is in the ${conference} title game whatever happens.`;
-  else if (status === "eliminated") summary = `${team} can't make the ${conference} title game: no combination of remaining results gets it there.`;
-  else if (ifWinOut !== null) summary = `Win out and ${team} makes the ${conference} title game ${formatOdds(ifWinOut)} of the time.`;
+  if (status === "clinched") summary = `${team} is in the ${conferenceName(conference)} title game whatever happens.`;
+  else if (status === "eliminated") summary = `${team} can't make the ${conferenceName(conference)} title game: no combination of remaining results gets it there.`;
+  else if (ifWinOut !== null) summary = `Win out and ${team} makes the ${conferenceName(conference)} title game ${formatOdds(ifWinOut)} of the time.`;
   else if (keyGames.length > 0) summary = rootLine(keyGames[0]);
-  else summary = `${team} has a ${formatOdds(titleGame)} chance of making the ${conference} title game.`;
+  else summary = `${team} has a ${formatOdds(titleGame)} chance of making the ${conferenceName(conference)} title game.`;
 
   if (status === "alive") {
-    steps.push(`Right now ${team} makes the ${conference} title game ${formatOdds(titleGame)} of the time.`);
+    steps.push(`Right now ${team} makes the ${conferenceName(conference)} title game ${formatOdds(titleGame)} of the time.`);
     if (ifWinOut !== null) steps.push(`If ${team} wins out: ${formatOdds(ifWinOut)}.`);
     for (const k of keyGames) steps.push(rootLine(k));
   }

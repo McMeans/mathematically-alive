@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useId, useState } from "react";
-import { formatChance, formatRecord, mustWinConference, playoffDetail, playoffRoute, type OddsLabels, type PlayoffSignal, type TeamOutlook, type TeamPath } from "@/core";
+import { conferenceName, formatChance, formatRecord, mustWinConference, playoffDetail, playoffRoute, type OddsLabels, type PlayoffSignal, type TeamOutlook, type TeamPath } from "@/core";
 import { NAVY, pct, type ConferenceList, type GameInfo, type TeamInfo } from "./Explorer";
 import { byOdds } from "./Season";
 import { useConference } from "./conference";
@@ -54,7 +54,7 @@ export function TeamList({ conferences, names, selectedId, onSelect }: {
                 onClick={() => { setShown(c.conference); setQ(""); }}
                 className="min-h-11 flex-1 rounded-full border border-navy/20 px-3 text-sm font-bold text-navy hover:bg-mist aria-pressed:border-navy aria-pressed:bg-navy aria-pressed:text-white md:min-h-8"
               >
-                {c.conference}
+                {conferenceName(c.conference)}
               </button>
             ))}
           </div>

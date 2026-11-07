@@ -14,7 +14,7 @@
 // Uses the same simulated seasons and title-game draw as teamPath, so the root
 // odds equal teamPath's titleGame for the same seed and locks.
 import { seasonOutlook, type TeamOutlook } from "./outlook";
-import { formatFine, formatOdds, formatSideOdds, formatTitleOdds, mustWinConference, type PathOptions, type PathStatus } from "./paths";
+import { conferenceName, conferenceShort, formatFine, formatOdds, formatSideOdds, formatTitleOdds, mustWinConference, type PathOptions, type PathStatus } from "./paths";
 import { teamRecord } from "./season";
 import type { Game, Season } from "./season";
 import { FAINT, OVERALL, SCENARIO, isClear } from "./signal";
@@ -463,7 +463,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
       note: null,
       rest: 0,
       record: last && level > 0 && covered
-        ? `${base.conferenceWins + wins}-${base.conferenceLosses + level - wins} ${conference}`
+        ? `${base.conferenceWins + wins}-${base.conferenceLosses + level - wins} ${conferenceShort(conference)}`
         : null,
       likely: false,
       children: [],
@@ -960,23 +960,23 @@ function likelySide(winner: number | undefined, g: Game, h: HelpGame): number | 
 }
 
 function helpNote(help: HelpGame[], status: string, team: string, conference: string): string {
-  if (help.length === 0) return `No other ${conference} games are left to play.`;
+  if (help.length === 0) return `No other ${conferenceName(conference)} games are left to play.`;
   if (status !== "open") {
     return `${team} is ${status === "clinched" ? "in" : "out"} whatever happens, so no result elsewhere changes that.`;
   }
   const quiet = help.filter((x) => tier(x) === 2).length;
   if (quiet === help.length) {
-    return `Nothing else moves the needle: none of the other ${plural(quiet, `${conference} game`, `${conference} games`)} clearly changes ${team}'s odds.`;
+    return `Nothing else moves the needle: none of the other ${plural(quiet, `${conferenceName(conference)} game`, `${conferenceName(conference)} games`)} clearly changes ${team}'s odds.`;
   }
-  if (quiet === 0) return `Every other ${conference} game left can change ${team}'s odds.`;
+  if (quiet === 0) return `Every other ${conferenceName(conference)} game left can change ${team}'s odds.`;
   return quiet === 1
-    ? `The other ${conference} game left doesn't clearly change ${team}'s odds.`
-    : `The other ${quiet} ${conference} games don't clearly change ${team}'s odds.`;
+    ? `The other ${conferenceName(conference)} game left doesn't clearly change ${team}'s odds.`
+    : `The other ${quiet} ${conferenceName(conference)} games don't clearly change ${team}'s odds.`;
 }
 
 function footnote(cut: number, depth: number, conference: string): string | null {
   if (cut <= 0) return null;
-  return `The tree stops after ${plural(depth, "game", "games")}; ${plural(cut, `later ${conference} game isn't`, `later ${conference} games aren't`)} shown.`;
+  return `The tree stops after ${plural(depth, "game", "games")}; ${plural(cut, `later ${conferenceName(conference)} game isn't`, `later ${conferenceName(conference)} games aren't`)} shown.`;
 }
 
 /** A proven outcome as a title-game status for the odds wording: only "in" and "out" are proven. */

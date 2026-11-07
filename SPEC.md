@@ -4,7 +4,7 @@ What the app is, how its numbers are made, and the rules the code follows. Read 
 
 ## What it is
 
-A Next.js site. Pick a college football team and see what has to happen for it to reach its conference championship game. A team's page uses its own conference; the supported ones are listed in `SUPPORTED_CONFERENCES` (`src/app/config.ts`): the ACC, the Big 12, the SEC, the Big Ten and the MAC (CFBD's "Mid-American", the first Group of Six conference). A playoff estimate exists but is experimental.
+A Next.js site. Pick a college football team and see what has to happen for it to reach its conference championship game. A team's page uses its own conference; the supported ones are listed in `SUPPORTED_CONFERENCES` (`src/app/config.ts`): the ACC, the Big 12, the SEC, the Big Ten and the MAC (CFBD's "Mid-American", the first Group of Six conference; see conference names below). A playoff estimate exists but is experimental.
 
 It answers three questions for the picked team:
 
@@ -162,6 +162,8 @@ Exact checks, not Monte Carlo. Can the team still miss, or still make, the title
 - **One rival left:** if at most one other team can still get in, the team is in, because two teams play for the title. This catches clinches the main search runs out of budget on.
 
 ### Display rules (`paths.ts`)
+
+- Conference names: data and config keep CFBD's names; everything the user sees goes through `conferenceName` ("MAC", "Pac 12", "Sun Belt", "American", "CUSA", "Mountain West"; the rest as CFBD spells them) or, where space is tight (records, column labels), `conferenceShort` ("SBC", "MW").
 
 All wording users see is made in the core so tests can check it. `formatTitleOdds(p, status)` and `formatSideOdds(p, status)` follow these rules:
 

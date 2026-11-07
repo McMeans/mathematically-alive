@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { championshipParticipants, seasonOutlook, type Game, type Season } from "@/core";
+import { championshipParticipants, explore, seasonOutlook, type Game, type Season } from "@/core";
 
 // Tiny made-up MACs. Teams are named by letter; `rating` stands in for the SportSource Team Rating Score.
 type Spec = { name: string; rating?: number };
@@ -59,5 +59,52 @@ describe("MAC tiebreakers", () => {
     expect(of("A").status).toBe("clinched");
     expect(of("Sacramento State").titleGame).toBe(0);
     expect(of("Sacramento State").status).toBe("eliminated");
+  });
+
+  it("a team with an ineligible leader and one rival ahead still has a likeliest way in", () => {
+    // Sacramento State 3-0 and B 2-0 are both ahead of A's best (2-1), but only B takes a spot. A's way in starts
+    // with beating B; counting Sacramento State as a rival, A would have no way in at all.
+    const s = build(
+      [{ name: "Sacramento State", rating: 20 }, { name: "A" }, { name: "B" }, { name: "C" }, { name: "D" }, { name: "E" }],
+      [["Sacramento State", "C"], ["Sacramento State", "D"], ["Sacramento State", "E"], ["B", "D"], ["B", "E"], ["D", "A"]],
+      [["A", "B"], ["B", "C"], ["A", "C"]],
+    );
+    const r = explore(s, { conference: "Mid-American", teamId: s.id("A"), iterations: 400, seed: 5 });
+    expect(r.outlook.find((o) => o.teamId === s.id("A"))!.status).toBe("alive");
+    const picks = new Map(r.tree.likeliest!.picks.map((p) => [p.gameId, p.winner]));
+    const game = (h: string, a: string) => s.games.find((g) => g.homeId === s.id(h) && g.awayId === s.id(a))!.id;
+    expect(picks.get(game("A", "B"))).toBe(s.id("A"));
+  });
+
+  it("clinched with an ineligible leader and two rivals who can't both pass it", () => {
+    // Sacramento State 4-0 and A 3-1 are done. B and F are 2-0 and play each other: the winner finishes ahead of
+    // A, the loser behind. Either can get in, but A is in whatever happens; counting Sacramento State as one of
+    // the two teams ahead of A, a 4-0 Sacramento State plus a 3-0 winner would leave A out.
+    const s = build(
+      [{ name: "Sacramento State" }, ...["A", "B", "F", "C", "D", "E"].map((name) => ({ name }))],
+      [["Sacramento State", "A"], ["Sacramento State", "C"], ["Sacramento State", "D"], ["Sacramento State", "E"],
+        ["A", "C"], ["A", "D"], ["A", "E"], ["B", "C"], ["B", "D"], ["F", "D"], ["F", "E"]],
+      [["B", "F"]],
+    );
+    const o = seasonOutlook(s, { conference: "Mid-American", iterations: 200, seed: 3 });
+    const of = (n: string) => o.teams.find((t) => t.teamId === s.id(n))!.status;
+    expect(of("A")).toBe("clinched");
+    expect([of("B"), of("F")]).toEqual(["alive", "alive"]);
+  });
+
+  it("not eliminated when its only way in needs the eligible leader to win every game, with an ineligible team above", () => {
+    // Sacramento State 1-0 and A 4-1 are done. C1-C6 are 3-0 and each plays B: a C that wins finishes 4-0, above
+    // A; one that loses finishes 3-1, below. A gets in only if B beats all six. Proofs that took Sacramento State
+    // for a team that takes a spot would leave B no room above A and call A eliminated.
+    const cs = ["C1", "C2", "C3", "C4", "C5", "C6"];
+    const fillers = ["F1", "F2", "F3", "F4"];
+    const s = build(
+      [{ name: "Sacramento State" }, { name: "A" }, { name: "B" }, ...[...cs, ...fillers].map((name) => ({ name }))],
+      [["Sacramento State", "A"], ...fillers.map((f): [string, string] => ["A", f]),
+        ...cs.flatMap((c) => fillers.slice(0, 3).map((f): [string, string] => [c, f]))],
+      cs.map((c): [string, string] => ["B", c]),
+    );
+    const o = seasonOutlook(s, { conference: "Mid-American", iterations: 200, seed: 3 });
+    expect(o.teams.find((t) => t.teamId === s.id("A"))!.status).not.toBe("eliminated");
   });
 });

@@ -264,7 +264,7 @@ function cannotGetIn(
   for (const x of others) {
     if (!data.eligible.has(x)) continue;
     let top = -Infinity;
-    for (const y of others) if (y !== x) top = Math.max(top, pct(y, wins.get(y)!));
+    for (const y of others) if (y !== x && data.eligible.has(y)) top = Math.max(top, pct(y, wins.get(y)!));
     if (tieRouteOpen(data, myGames, myMin, myMax, games.get(x)!, wins.get(x)!, wins.get(x)! + left.get(x)!, top)) return false;
   }
   const index = new Map(others.map((id, i) => [id, i]));
