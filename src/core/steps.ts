@@ -153,9 +153,10 @@ export function commonOpponents(): Step {
 /**
  * Win pct against the highest placed common opponent, then the next, down the standings. Opponents level on
  * conference win pct either count as one group, or (`level: "head-to-head"`) are placed by head-to-head alone,
- * those it can't separate counting as one group. Only common opponents in a group count.
+ * those it can't separate counting as one group. Only common opponents in a group count; with `whole`, a group
+ * counts only when every tied team played every team in it, and is skipped otherwise.
  */
-export function placedCommonOpponent(opts: { level: "group" | "head-to-head" }): Step {
+export function placedCommonOpponent(opts: { level: "group" | "head-to-head"; whole?: boolean }): Step {
   /** Teams level on win pct in standings order by head-to-head only; teams it can't separate stay as one group. */
   const tiers = (ctx: Context, group: number[]): number[][] => {
     if (group.length === 1) return [group];
@@ -180,7 +181,7 @@ export function placedCommonOpponent(opts: { level: "group" | "head-to-head" }):
         i = j;
         for (const tier of opts.level === "group" ? [level] : tiers(ctx, level)) {
           const group = tier.filter((o) => common.includes(o));
-          if (group.length === 0) continue;
+          if (group.length === 0 || (opts.whole && group.length < tier.length)) continue;
           const r = split(ids, topByFrac(ids, (id) => pctVs(ctx, id, group)));
           if (r) return r;
         }
@@ -240,28 +241,48 @@ export function opponentsWinPct(): Step {
 /** The title game is a non-conference game between two members in the data; it comes after the tiebreak. */
 export const isTitleGame = (data: Pick<Members, "ids">, g: Game): boolean => !g.conferenceGame && data.ids.has(g.homeId) && data.ids.has(g.awayId);
 
+/**
+ * Regular-season wins and games, at most `belowFbs` wins over teams below FBS counted. A win over such a team past the
+ * cap is left out of both. The title game is left out.
+ */
+function overallRecord(ctx: Context, id: number, belowFbs: number): Frac {
+  let wins = 0;
+  let games = 0;
+  let lower = 0;
+  for (const g of ctx.data.schedule.get(id)!) {
+    if (isTitleGame(ctx.data, g)) continue;
+    const w = g.completed ? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId) : winnerIn(g, ctx.winnerOf);
+    const opp = g.homeId === id ? g.awayId : g.homeId;
+    if (w !== id) { games++; continue; }
+    // An opponent missing from the season's teams counts as below FBS, the conservative reading. seasonFromCfbd
+    // adds every opponent with its classification, so this doesn't happen on real data.
+    if (ctx.data.classes.get(opp) !== "fbs" && lower++ >= belowFbs) continue;
+    wins++;
+    games++;
+  }
+  return [wins, games];
+}
+
 /** Regular-season wins, at most `belowFbs` of them over teams below FBS. The title game is left out. */
 export function totalWins(opts: { belowFbs: number }): Step {
   return {
     name: "total wins",
     restart: true,
     nonConference: true,
-    run: (ids, ctx) =>
-      split(ids, topBy(ids, (id) => {
-        let wins = 0;
-        let lower = 0;
-        for (const g of ctx.data.schedule.get(id)!) {
-          if (isTitleGame(ctx.data, g)) continue;
-          const w = g.completed ? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId) : winnerIn(g, ctx.winnerOf);
-          if (w !== id) continue;
-          const opp = g.homeId === id ? g.awayId : g.homeId;
-          // An opponent missing from the season's teams counts as below FBS, the conservative reading. seasonFromCfbd
-          // adds every opponent with its classification, so this doesn't happen on real data.
-          if (ctx.data.classes.get(opp) === "fbs") wins++;
-          else if (lower++ < opts.belowFbs) wins++;
-        }
-        return wins;
-      }, cmpNum)),
+    run: (ids, ctx) => split(ids, topBy(ids, (id) => overallRecord(ctx, id, opts.belowFbs)[0], cmpNum)),
+  };
+}
+
+/** Regular-season win pct against all opponents, at most `belowFbs` wins over teams below FBS counted. */
+export function overallWinPct(opts: { belowFbs: number }): Step {
+  return {
+    name: "overall win pct",
+    restart: true,
+    nonConference: true,
+    run: (ids, ctx) => split(ids, topByFrac(ids, (id) => {
+      const [w, n] = overallRecord(ctx, id, opts.belowFbs);
+      return frac(w, n);
+    })),
   };
 }
 

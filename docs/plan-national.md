@@ -133,8 +133,10 @@ Status: team-page odds done (field, bye, title, paired Win/Lose CFP columns, "Mu
   - Done: the MAC (rules from its published tiebreak page, Sacramento State ineligible for the title game in
     2026-2027 via the config's `ineligible` list), its title game in the national pass, its pages.
   - Done: Conference USA (rules from its 2024 policy PDF; Delaware and Missouri State eligible in 2026).
-  - Next: the Mountain West (North Dakota State's eligibility to check), the American (computer
-    composite step; Army-Navy after its title game), the Pac-12, the Sun Belt (divisions: needs engine support).
+  - Done: the Mountain West (rules from its 2023 procedures PDF; North Dakota State eligible under the NCAA's June
+    2026 rule for teams moving up).
+  - Next: the American (computer composite step; Army-Navy after its title game), the Pac-12, the Sun Belt
+    (divisions: needs engine support).
   - Leave postseason-barred teams out of the Group of Six bid in `fieldPicker`.
 - Independents (Notre Dame and others): no title-game section; playoff only.
 - Picker that scales to every conference plus independents.
