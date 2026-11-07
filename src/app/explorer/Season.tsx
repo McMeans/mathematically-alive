@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
-import { formatRecord, formatSideOdds, formatTitleOdds, type Impact, type SeasonWeek, type TeamOutlook } from "@/core";
+import { formatRecord, formatSideOdds, formatTitleOdds, type Impact, type IndependentGame, type IndependentOutlook, type SeasonWeek, type TeamOutlook } from "@/core";
 import type { Locks, TeamInfo } from "./Explorer";
-import { Beta, PlayoffDetail, playoffText } from "./Panels";
+import { Beta, IndependentDetail, PlayoffDetail, playoffText } from "./Panels";
 import { useConference } from "./conference";
 
 type PickState = "picked" | "likely" | "open";
@@ -171,7 +171,7 @@ function NonConference({ game, win, lose, onWin, onLose }: {
  * Best title-game odds first. Proven in goes above everything and proven out below everything, so a team
  * still alive at 0% in the sample ("<0.1%") stays above every team that's out. Ties go alphabetical.
  */
-export function byOdds(names: Record<number, string>) {
+function byOdds(names: Record<number, string>) {
   const key = (o: TeamOutlook) => (o.status === "clinched" ? 2 : o.status === "eliminated" ? -1 : o.titleGame);
   return (a: TeamOutlook, b: TeamOutlook) => key(b) - key(a) || names[a.teamId].localeCompare(names[b.teamId]);
 }
@@ -186,21 +186,21 @@ type PickRow = { conf: string | null; cfp: string | null; state: PickState; onCl
 
 // Win and Lose rows under conference and CFP columns, the same shape for every game so the weeks line up.
 // `conf` null: a non-conference game in a conference whose tiebreak ignores non-conference results ("—").
-// `cfp` false: no CFP column.
-function PickTable({ vs, winChance, cfp, nonConference, projected, win, lose }: {
-  vs: string; winChance: string | null; cfp: boolean; nonConference?: boolean; projected?: boolean; win: PickRow; lose: PickRow;
+// `cfp` false: no CFP column. `conference` false: no conference column (an independent: only the CFP).
+function PickTable({ vs, winChance, cfp, conference = true, nonConference, projected, win, lose }: {
+  vs: string; winChance: string | null; cfp: boolean; conference?: boolean; nonConference?: boolean; projected?: boolean; win: PickRow; lose: PickRow;
 }) {
   const { labels } = useConference();
-  const cols = cfp ? "grid-cols-[1fr_2.75rem_2.75rem]" : "grid-cols-[1fr_2.75rem]";
+  const cols = cfp && conference ? "grid-cols-[1fr_2.75rem_2.75rem]" : "grid-cols-[1fr_2.75rem]";
   // A picked win fills green, a picked loss red.
   const row = (text: string, r: PickRow, fill: string) => {
     const look = r.state === "picked" ? `${fill} text-white` : r.state === "likely" ? "bg-white/10 text-white outline-dashed outline-1 -outline-offset-2 outline-white/60 hover:bg-white/20" : "bg-white/10 text-white hover:bg-white/20";
-    const label = [r.conf && `${labels.conference} ${r.conf}`, r.cfp && `${labels.cfp} ${r.cfp}`].filter(Boolean).join(", ");
+    const label = [conference && r.conf && `${labels.conference} ${r.conf}`, r.cfp && `${labels.cfp} ${r.cfp}`].filter(Boolean).join(", ");
     return (
       <button type="button" aria-label={`${text}: ${label}`} aria-pressed={r.state === "picked"} onClick={r.onClick} className={`press grid h-8 items-center rounded-md px-2 text-xs ${cols} ${look}`}>
         <span className="text-left font-bold">{text}</span>
-        <span className={`text-right ${r.conf === null ? "text-white/50" : r.state === "picked" ? "" : darkTone(r.conf)}`}>{r.conf ?? "—"}</span>
-        {cfp && <span className={`text-right ${r.conf === null ? "" : "text-white/70"}`}>{r.cfp ?? "—"}</span>}
+        {conference && <span className={`text-right ${r.conf === null ? "text-white/50" : r.state === "picked" ? "" : darkTone(r.conf)}`}>{r.conf ?? "—"}</span>}
+        {cfp && <span className={`text-right ${conference && r.conf === null ? "" : conference ? "text-white/70" : ""}`}>{r.cfp ?? "—"}</span>}
       </button>
     );
   };
@@ -208,7 +208,7 @@ function PickTable({ vs, winChance, cfp, nonConference, projected, win, lose }: 
     <div role="group" aria-label={[vs, nonConference && "non-conference", projected && labels.projectedNote].filter(Boolean).join(", ")} className={`flex flex-col gap-1 rounded-lg bg-navy p-1.5 ${CARD_H}`}>
       <span className={`grid h-4 items-center pl-0.5 pr-2 text-[10px] text-white/60 ${cols}`}>
         <span className="truncate text-[11px] text-white/75">{vs}</span>
-        <span className="text-right">{labels.conference}</span>
+        {conference && <span className="text-right">{labels.conference}</span>}
         {cfp && <span className="text-right">{labels.cfp}</span>}
       </span>
       {row("Win", win, "bg-turf")}
@@ -378,6 +378,110 @@ function RaceRow({ o, name, me }: { o: TeamOutlook; name: string; me: boolean })
         <span className={`block h-1.5 rounded-full transition-[width] duration-500 ease-out ${me ? "bg-marker" : "bg-navy"}`} style={{ width: `${Math.max(3, Math.round(o.titleGame * 100))}%` }} />
       </span>
       <span className="w-10 text-right text-xs font-bold">{titleOdds(o)}</span>
+    </div>
+  );
+}
+
+/**
+ * An independent's remaining games, one card each: Win and Lose with its playoff odds if that happens. A picked win
+ * fills green, a picked loss red.
+ */
+export function IndependentGames({ games, teamId, locks, onPick }: { games: IndependentGame[]; teamId: number; locks: Locks; onPick: PickFn }) {
+  const state = (gameId: number, winner: number): PickState => (locks[gameId] === winner ? "picked" : "open");
+  return (
+    <section aria-label="Its games" className="mt-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <p className={label}>Its games · pick any result</p>
+        <p className="text-xs text-ink-muted">Each button shows the playoff odds if it happens.</p>
+      </div>
+      {games.length === 0 ? (
+        <p className="mt-2 text-sm text-ink-muted">No games left.</p>
+      ) : (
+        <ol className="scroll-thin mt-2 flex gap-2 overflow-x-auto pb-2 md:grid md:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] md:overflow-visible">
+          {games.map((g) => (
+            <li key={g.gameId} className="flex w-40 shrink-0 flex-col gap-1.5 md:w-auto">
+              <span className="flex h-4 items-center gap-1.5 text-xs font-semibold text-ink-muted">
+                {g.date}
+                {g.projected && <ProjectedTag />}
+              </span>
+              <PickTable
+                vs={`${g.site === "away" ? "at" : "vs"} ${g.opponent}`} winChance={g.winChance} cfp conference={false} projected={g.projected}
+                win={{ conf: null, cfp: g.ifWin, state: state(g.gameId, teamId), onClick: () => onPick(g.gameId, teamId) }}
+                lose={{ conf: null, cfp: g.ifLose, state: state(g.gameId, g.opponentId), onClick: () => onPick(g.gameId, g.opponentId) }}
+              />
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+/** An independent's right column: its playoff odds with the picks so far, how it gets in, and the picks themselves. */
+export function IndependentWhatIf({ team, me, today, locks, games, teamId, onPick, onReset }: {
+  team: TeamInfo;
+  me: IndependentOutlook;
+  today: IndependentOutlook;
+  locks: Locks;
+  games: IndependentGame[];
+  teamId: number;
+  onPick: PickFn;
+  onReset: () => void;
+}) {
+  const { conference, labels } = useConference();
+  const picks = games.filter((g) => locks[g.gameId] !== undefined)
+    .map((g) => ({ id: g.gameId, what: locks[g.gameId] === teamId ? `Beat ${g.opponent}` : `Lose to ${g.opponent}`, when: g.date }));
+  const has = picks.length > 0;
+  const odds = (o: IndependentOutlook) => formatSideOdds(o.playoff, o.postseasonBan ? "eliminated" : "alive");
+  const verdict = odds(me);
+  return (
+    <div className="flex flex-col tall:min-h-0 tall:flex-1">
+      <div className="flex flex-col gap-5 border-b border-ink-muted/25 p-5 xl:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-2xl font-bold">{team.name}</h2>
+            <p className="text-sm text-ink-soft">
+              {formatRecord(me.record, conference)}{has && " with your picks"}
+            </p>
+          </div>
+          {has && (
+            <button type="button" onClick={onReset} className="press flex h-8 shrink-0 animate-rise items-center gap-1.5 rounded-full border border-ink-muted/40 bg-white px-3 text-xs font-bold text-navy hover:bg-mist">
+              <span aria-hidden>↺</span> Reset
+            </button>
+          )}
+        </div>
+
+        <section className="flex flex-col gap-3 rounded-xl bg-mist p-4">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="flex items-center gap-1 text-xs text-ink-muted">{has ? `${labels.playoff}, with your picks` : labels.playoff}<Beta /></p>
+              <p key={verdict} className="animate-rise font-display text-5xl font-bold leading-none text-navy">{verdict}</p>
+            </div>
+            {has && <p className="text-xs text-ink-muted">Today {odds(today)}</p>}
+          </div>
+          <IndependentDetail outlook={me} className="border-t border-navy/10 pt-2" />
+        </section>
+      </div>
+      <div className="scroll-thin flex flex-col gap-5 p-5 xl:p-6 tall:min-h-0 tall:flex-1 tall:overflow-y-auto">
+        <section className="flex flex-col gap-1.5">
+          <p className={label}>Your picks</p>
+          {has ? (
+            picks.map((p) => (
+              <div key={p.id} className="flex animate-rise items-center justify-between gap-2 rounded-lg border border-navy/10 px-2.5 py-1.5">
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-sm font-semibold">{p.what}</span>
+                  <span className="text-[11px] text-ink-muted">{p.when}</span>
+                </span>
+                <button type="button" aria-label={`Remove ${p.what}`} onClick={() => onPick(p.id, undefined)} className="h-8 w-8 shrink-0 rounded text-ink-muted hover:bg-mist">
+                  ×
+                </button>
+              </div>
+            ))
+          ) : (
+            <p className="text-xs text-ink-muted">Pick results in its games to see what they do.</p>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

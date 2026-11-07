@@ -5,7 +5,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { SUPPORTED_CONFERENCES } from "../src/app/config";
-import { checkSnapshot, seasonFromCfbd, type CfbdSnapshot } from "../src/core";
+import { INDEPENDENTS, checkSnapshot, seasonFromCfbd, type CfbdSnapshot } from "../src/core";
 
 /** The newest data/season-<year>.json. */
 function source(): string {
@@ -17,7 +17,7 @@ function source(): string {
 async function main() {
   const from = source();
   const season = seasonFromCfbd(JSON.parse(await readFile(from, "utf8")) as CfbdSnapshot);
-  const { errors, notSupported } = checkSnapshot(season, SUPPORTED_CONFERENCES);
+  const { errors, notSupported } = checkSnapshot(season, [...SUPPORTED_CONFERENCES, INDEPENDENTS]);
   if (errors.length > 0) {
     throw new Error(`${from}: ${errors.join(" ")} Refresh the snapshot, add rules from the conference's official document, or take the conference out of SUPPORTED_CONFERENCES.`);
   }

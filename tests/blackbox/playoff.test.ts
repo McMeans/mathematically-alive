@@ -90,6 +90,18 @@ describe("playoff field from a ranking", () => {
       expect(field).toContain(g6[0]);
       expect(field).not.toContain(g6[1]);
     });
+
+    it("a team barred from the postseason is skipped: the next team takes its at-large spot, and the next Group of Six team the bid", () => {
+      const r = ranked(1);
+      const barred = [r[1], g6[0]];
+      const banned: Season = { ...season, teams: season.teams.map((t) => (barred.includes(t.id) ? { ...t, postseasonBan: true } : t)) };
+      const field = playoffField(banned, r, champions);
+      expect(field).toHaveLength(12);
+      for (const id of barred) expect(field).not.toContain(id);
+      expect(field).toContain(g6[1]);
+      // At large: the top eight left, past the one barred.
+      expect(field.slice(0, 7)).toEqual(r.filter((id) => id !== r[1]).slice(0, 7));
+    });
   });
 });
 

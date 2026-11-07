@@ -53,6 +53,8 @@ export type TeamOutlook = {
    * the team is in a Group of Six conference, so its conference title is no automatic bid.
    */
   groupOfSix: boolean;
+  /** Barred from the postseason this season (`Team.postseasonBan`): no title game, no playoff. */
+  postseasonBan: boolean;
 };
 
 export type SeasonOutlook = {
@@ -73,9 +75,9 @@ const MISSING_RATING = 0;
 /**
  * Whether the season can run the national simulation for `conference`: it has a playoff format whose field needs
  * at most the power conferences' champions, and every power conference has tiebreak rules and teams in the data.
- * `conference` itself has rules (titleRace has checked).
+ * `conference` itself has rules (titleRace has checked). Not part of the public API.
  */
-function nationalReady(season: Season): boolean {
+export function nationalReady(season: Season): boolean {
   const format = findFormat(season.year);
   if (!format || championsNeeded(format) === "all") return false;
   const power = powerConferences(season.year);
@@ -85,10 +87,11 @@ function nationalReady(season: Season): boolean {
 
 /**
  * The conferences whose title games the national run plays: the earlier run's (`reuse`) when they cover the power
- * conferences and this one, so it can be reused whole; otherwise the power conferences plus this one.
+ * conferences and this one, so it can be reused whole; otherwise the power conferences plus this one (none for an
+ * independent). Not part of the public API.
  */
-function nationalConferences(season: Season, conference: string, reuse?: NationalResult): readonly string[] {
-  const need = [...new Set([...powerConferences(season.year), conference])];
+export function nationalConferences(season: Season, conference: string | null, reuse?: NationalResult): readonly string[] {
+  const need = [...new Set([...powerConferences(season.year), ...(conference === null ? [] : [conference])])];
   return reuse && need.every((c) => reuse.conferences.includes(c)) ? reuse.conferences : need;
 }
 
@@ -108,6 +111,7 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
   const estimate = national === null;
   const gameIndex = new Map<number, number>(season.games.map((g, i) => [g.id, i]));
   const fbs = season.teams.filter((t) => t.classification === "fbs");
+  const barred = new Set(season.teams.filter((t) => t.postseasonBan).map((t) => t.id));
   // Playoff spots for a non-FBS champion (not in the FBS arrays).
   const outside = new Map<number, number>();
   const inConf = [...data.ids];
@@ -281,6 +285,7 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
       })),
       status: statusOf(titleGame.get(id)! / n, id),
       groupOfSix,
+      postseasonBan: barred.has(id),
     })),
   };
 }

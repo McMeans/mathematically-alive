@@ -32,7 +32,11 @@ export type TiebreakOptions = {
 };
 
 /** Per-conference data that doesn't change between simulated seasons, with the conference's rules. */
-export type ConferenceData = Members & { rules: TiebreakRules };
+export type ConferenceData = Members & {
+  rules: TiebreakRules;
+  /** Members who can play in the title game: all but those barred from the postseason (`Team.postseasonBan`). */
+  eligible: ReadonlySet<number>;
+};
 
 /** Conferences whose tiebreak counts non-conference results (the Big 12's total-wins step). Not part of the public API. */
 export const countsNonConference = (data: ConferenceData): boolean => needsNonConference(data.rules);
@@ -69,7 +73,15 @@ export function conferenceData(season: Season, conference: string): ConferenceDa
   const data = members(season, conference);
   if (data.ids.size < 2) throw new Error(`${conference} has fewer than two teams`);
   const rules = tiebreakRules(conference, season.year);
-  return { ...data, rules, divisionOf: rules.divisions ? divisionsOf(season, data.ids, conference, rules.divisions) : null };
+  const eligible = new Set(season.teams.filter((t) => data.ids.has(t.id) && !t.postseasonBan).map((t) => t.id));
+  const divisionOf = rules.divisions ? divisionsOf(season, data.ids, conference, rules.divisions) : null;
+  // Barred members' games still count for everyone's record and every tiebreak step; they are just never picked.
+  if (divisionOf) {
+    for (const d of new Set(divisionOf.values())) {
+      if (![...eligible].some((id) => divisionOf.get(id) === d)) throw new Error(`${conference}'s ${d} division has no team eligible for the postseason`);
+    }
+  } else if (eligible.size < 2) throw new Error(`${conference} has fewer than two teams eligible for the postseason`);
+  return { ...data, rules, eligible, divisionOf };
 }
 
 /** Each member's division. Throws when a member is in no division, or a listed school isn't a member. */
@@ -89,12 +101,14 @@ function divisionsOf(season: Season, ids: Set<number>, conference: string, divis
 
 /**
  * The teams a team competes with for a title-game spot, itself included (its division, or the whole conference), and
- * how many spots they compete for (1 or 2). Not part of the public API.
+ * how many spots they compete for (1 or 2). A member barred from the postseason takes no spot, so it is no rival.
+ * Not part of the public API.
  */
 export function race(data: ConferenceData, teamId: number): { rivals: number[]; spots: number } {
   const d = data.divisionOf;
-  if (!d) return { rivals: [...data.ids], spots: 2 };
-  return { rivals: [...data.ids].filter((id) => d.get(id) === d.get(teamId)), spots: 1 };
+  const rivals = [...data.ids].filter((id) => id === teamId || data.eligible.has(id));
+  if (!d) return { rivals, spots: 2 };
+  return { rivals: rivals.filter((id) => d.get(id) === d.get(teamId)), spots: 1 };
 }
 
 function rows(data: Members, winnerOf: (game: Game) => number): Row[] {
@@ -229,7 +243,7 @@ export function championshipFromData(
     // Each division's champion: the best conference win pct there, a tie broken among those teams for one spot.
     const divisionOf = data.divisionOf;
     const champions = [...new Set(divisionOf.values())].map((d) => {
-      const group = tiedTeams(table.filter((r) => divisionOf.get(r.teamId) === d)).map((r) => r.teamId);
+      const group = tiedTeams(table.filter((r) => divisionOf.get(r.teamId) === d && data.eligible.has(r.teamId))).map((r) => r.teamId);
       if (group.length === 1) return group[0];
       const r = pick(group, 1, 0);
       if ("drop" in r) throw new Error(`${rules.conference}'s tiebreak can't drop a team out of a division race`);
@@ -245,7 +259,7 @@ export function championshipFromData(
 
   const result: number[] = [];
   let slots = 2;
-  let cands = table;
+  let cands = table.filter((r) => data.eligible.has(r.teamId));
   while (slots > 0 && cands.length > 0) {
     const tied = tiedTeams(cands);
     if (tied.length <= slots) {

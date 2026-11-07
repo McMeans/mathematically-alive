@@ -398,6 +398,8 @@ function canFinish(
   /** Set to whether a true answer for a way out is certain: a result set was found, not a budget or draw limit hit. */
   certain?: { yes: boolean },
 ): boolean {
+  // A team barred from the postseason is never in.
+  if (!data.eligible.has(teamId)) return wantOut;
   const ids = [...data.ids];
   const fixed = new Map<number, number>();
   const open: Game[] = [];
