@@ -3,7 +3,7 @@
 import { MARGIN_SD, normalCdf, winProbability } from "./odds";
 import type { Game, Season, Team } from "./season";
 
-const HOME_FIELD = 2.5;
+export const HOME_FIELD = 2.5;
 const MISSING_RATING_OTHER = -10;
 // Ratings are estimates. Each simulated season shifts every team's rating by a
 // normal draw with this SD (points), shared by all its games, so a team that is
@@ -45,10 +45,13 @@ function homeSpread(byId: Map<number, Team>, game: Game): number {
   return -(ratingOf(byId, game.homeId) - ratingOf(byId, game.awayId)) - home;
 }
 
-/** Chance team a beats team b on a neutral field in one simulated season, given each team's rating shift. */
-export function neutralOdds(season: Season): (a: number, b: number, shiftA: number, shiftB: number) => number {
+/**
+ * Chance team a beats team b in one simulated season, given each team's rating shift: on a neutral field, or with
+ * `edgeA` points for a (HOME_FIELD when a is at home).
+ */
+export function neutralOdds(season: Season): (a: number, b: number, shiftA: number, shiftB: number, edgeA?: number) => number {
   const byId = new Map<number, Team>(season.teams.map((t) => [t.id, t]));
-  return (a, b, shiftA, shiftB) => normalCdf((ratingOf(byId, a) + shiftA - ratingOf(byId, b) - shiftB) / GAME_SD);
+  return (a, b, shiftA, shiftB, edgeA = 0) => normalCdf((ratingOf(byId, a) + shiftA - ratingOf(byId, b) - shiftB + edgeA) / GAME_SD);
 }
 
 // Lookup tables, since the inner loop needs millions of normal draws and CDF values.
@@ -84,11 +87,13 @@ function normalAt(seed: number, iteration: number, salt: number): number {
   return Q_TABLE[k] + (Q_TABLE[k + 1] - Q_TABLE[k]) * (f - k);
 }
 // Salts for each team's rating shift and ranking noise: SHIFT_SALT + team index, RANK_SALT + team index; the
-// committee stand-in's noise (national.ts): COMMITTEE_SALT + FBS team index. Each conference's tiebreak draw and
+// committee stand-in's noise (national.ts): COMMITTEE_SALT + FBS team index; each playoff game's roll:
+// PLAYOFF_SALT + its place in the bracket. Each conference's tiebreak draw and
 // title-game roll use salts hashed from its name (conferenceSalt), above all of these.
 const SHIFT_SALT = 1 << 20;
 const RANK_SALT = 1 << 21;
 export const COMMITTEE_SALT = 1 << 22;
+export const PLAYOFF_SALT = 1 << 23;
 
 const salts = new Map<string, number>();
 /** An even salt in [2^30, 2^31) from the conference's name (FNV-1a), so each conference has its own streams. */

@@ -10,11 +10,14 @@ const run = (season: Season, extra: { locks?: Record<number, number>; seed?: num
   simulateNational(season, { iterations: N, seed: extra.seed ?? 7, locks: extra.locks, conferences: extra.conferences ?? POWER });
 const byName = (season: Season, name: string) => season.teams.find((t) => t.name === name)!.id;
 
-type Snap = { titles: (readonly [number, number])[]; champs: number[]; ranking: number[] };
+type Snap = { titles: (readonly [number, number])[]; champs: number[]; ranking: number[]; field: number[] | null; playoffChampion: number | null };
 const seasons = (r: ReturnType<typeof run>, conferences = POWER): Snap[] => {
   const out: Snap[] = [];
   r.forEachIteration((_, s: NationalSeason) => {
-    out.push({ titles: conferences.map((c) => s.titleGame(c)), champs: conferences.map((c) => s.champion(c)), ranking: [...s.ranking] });
+    out.push({
+      titles: conferences.map((c) => s.titleGame(c)), champs: conferences.map((c) => s.champion(c)), ranking: [...s.ranking],
+      field: s.field && [...s.field], playoffChampion: s.playoffChampion,
+    });
   });
   return out;
 };

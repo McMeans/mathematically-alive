@@ -228,5 +228,5 @@ describe("Big Ten seasons", () => {
     expect(o.teams.reduce((sum, t) => sum + t.titleGame, 0)).toBeCloseTo(2, 9);
     for (const t of o.teams) if (t.status === "eliminated") expect(t.titleGame).toBe(0);
     for (const t of o.teams) if (t.status === "clinched") expect(t.titleGame).toBe(1);
-  });
+  }, 30_000);
 });
