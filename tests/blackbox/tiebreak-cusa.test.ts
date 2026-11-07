@@ -43,6 +43,35 @@ describe("Conference USA tiebreakers", () => {
     expect(pair(s)).toEqual([s.id("L"), s.id("A")]);
   });
 
+  // L 5-0 takes one spot. A and B are 1-1 for the other: they never met, both lost to L (their only common opponent),
+  // and A beat P (1-2) while B beat Q (0-3). So A's opponents went 6-2 to B's 5-3.
+  const sosRace = (bRating: number) => build(
+    [{ name: "L" }, { name: "A" }, { name: "B", rating: bRating }, { name: "P" }, { name: "Q" }, { name: "R" }],
+    [["L", "A"], ["L", "B"], ["L", "P"], ["L", "Q"], ["L", "R"], ["A", "P"], ["B", "Q"], ["P", "R"], ["R", "Q"]],
+  );
+
+  it("level through the computer ranking: the stronger conference schedule plays, whatever the draw", () => {
+    const s = sosRace(0);
+    for (const d of [0, 0.99]) {
+      expect(championshipParticipants(s, "Conference USA", played, { draw: () => d })).toEqual([s.id("L"), s.id("A")]);
+    }
+  });
+
+  it("the computer ranking decides before strength of schedule", () => {
+    const s = sosRace(10);
+    expect(pair(s)).toEqual([s.id("L"), s.id("B")]);
+  });
+
+  it("level on every step: a coin toss decides", () => {
+    // As above, but A and B each beat a winless team, so their opponents' records match too.
+    const s = build(
+      [{ name: "L" }, { name: "A" }, { name: "B" }, { name: "P" }, { name: "Q" }],
+      [["L", "A"], ["L", "B"], ["L", "P"], ["L", "Q"], ["A", "P"], ["B", "Q"]],
+    );
+    const picks = [0, 0.99].map((d) => championshipParticipants(s, "Conference USA", played, { draw: () => d })[1]);
+    expect(new Set(picks)).toEqual(new Set([s.id("A"), s.id("B")]));
+  });
+
   it("a CUSA team's path names the conference CUSA, never Conference USA", () => {
     const s = build([{ name: "A" }, { name: "B" }, { name: "C" }, { name: "D" }],
       [["A", "D"], ["B", "C"]], [["A", "B"], ["C", "D"], ["A", "C"], ["B", "D"]]);

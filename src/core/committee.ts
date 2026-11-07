@@ -39,7 +39,7 @@ export type CommitteeOptions = {
 /**
  * The conferences whose champions get the stand-in's champion weight: the power conferences of that season (the
  * Pac-12 until it lost all but two members after 2023). Group of Six champions are ranked on record, rating and
- * schedule alone, since their title games aren't simulated yet.
+ * schedule alone: the weight was fitted to power-conference titles.
  */
 export const powerConferences = (year: number): readonly string[] =>
   year <= 2023 ? ["ACC", "Big 12", "Big Ten", "Pac-12", "SEC"] : ["ACC", "Big 12", "Big Ten", "SEC"];
