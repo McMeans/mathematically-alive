@@ -31,13 +31,16 @@ describe("Conference USA tiebreakers", () => {
   });
 
   it("level on head-to-head and common opponents: order of finish decides before the computer ranking", () => {
-    // A and B 3-1, never met, both 3-1 against the same four opponents. A beat C1, the best placed of them, B lost
-    // to it. B rates higher, but CUSA ranks order of finish first (the MAC does the reverse).
+    // L 6-0 takes one spot. A and B are 3-2 for the other: they never met, and both lost to L and went 3-1 against
+    // C1, C2, W1 and W2. C1 (2-2) is the best placed common opponent after L; A beat it, B lost to it. B rates
+    // higher, but CUSA ranks order of finish first (the MAC does the reverse), so A plays.
     const s = build(
-      [{ name: "A" }, { name: "B", rating: 10 }, { name: "C1" }, { name: "C2" }, { name: "W1" }, { name: "W2" }],
-      [["A", "C1"], ["C2", "A"], ["A", "W1"], ["A", "W2"], ["C1", "B"], ["B", "C2"], ["B", "W1"], ["B", "W2"], ["C1", "C2"], ["W1", "W2"]],
+      [{ name: "L" }, { name: "A" }, { name: "B", rating: 10 }, { name: "C1" }, { name: "C2" }, { name: "W1" }, { name: "W2" }],
+      [["L", "A"], ["L", "B"], ["L", "C1"], ["L", "C2"], ["L", "W1"], ["L", "W2"],
+        ["A", "C1"], ["C2", "A"], ["A", "W1"], ["A", "W2"], ["C1", "B"], ["B", "C2"], ["B", "W1"], ["B", "W2"],
+        ["C1", "C2"], ["W1", "W2"]],
     );
-    expect(pair(s)).toEqual([s.id("A"), s.id("B")]);
+    expect(pair(s)).toEqual([s.id("L"), s.id("A")]);
   });
 
   it("a CUSA team's path names the conference CUSA, never Conference USA", () => {
