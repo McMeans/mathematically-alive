@@ -90,12 +90,15 @@ user's choice over a deploy hook). `checkSnapshot` in `src/core` is the build ch
 
 ## Phase 4: national simulation in stages
 
-Status: stages 2–3 done (core PR): `simulateNational` and `committeeRanking`. The user chose a stand-in fitted to past
-rankings, with the first 2026 ranking included. Fitted on each season's latest committee ranking 2014–2026
+Status: done. Stages 2–3 (core PR #36): `simulateNational` and `committeeRanking`. The user chose a stand-in fitted
+to past rankings, with the first 2026 ranking included. Fitted on each season's latest committee ranking 2014–2026
 (`fixtures/cfp-<year>.json`, `pnpm cfp`, `pnpm fit-committee`), its top 12 holds 10.8 of the committee's on average
-(the placeholder 8.9). Group of Six title games aren't simulated (no rules yet) and their champions get no champion
-weight. A national pass costs about 1.7 s at 20,000 iterations (regular season 0.4 s, stages 2–3 1.25 s); no page runs
-it yet. Measured: one team's `explore` median 2.83 s to 2.93 s (noise), `pnpm build` 108 s to 104 s. Next: stages 4–5.
+(the placeholder 8.9). Stages 4–5: `playoffFormat` (cited per season), `playoffField`, and the bracket inside
+`simulateNational`. The 2026 Group of Six bid goes to the highest-ranked G6 team, champion or not, so G6 title games
+aren't needed for the 2026 field; the 2024–2025 formats need every champion, so the national pass gives those seasons
+no playoff. A national pass costs about 1.8–1.95 s at 20,000 iterations (regular season 0.4 s, stages 2–3 1.25 s,
+stages 4–5 about 0.25 s); no page runs it yet. Measured at stages 4–5: one team's `explore` median 2.5–2.9 s both
+before and after (noise), `pnpm build` 89 s to 92 s. Next: phase 5.
 
 One pass per simulated season, every stage a pure function in `src/core` and testable through the public API:
 
