@@ -1,18 +1,18 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatOdds, formatRecord, type PathTree, type TeamOutlook, type TeamPath } from "@/core";
+import { formatOdds, formatRecord, type PathTree, type PlayoffSignal, type TeamOutlook, type TeamPath } from "@/core";
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
 import { Logo } from "@/app/Logo";
 import { WayCard } from "./WayIn";
 import { SeasonWeeks, WhatIf } from "./Season";
-import { StatTiles, TeamList } from "./Panels";
+import { PlayoffElsewhere, StatTiles, TeamList } from "./Panels";
 import { ConferenceProvider } from "./conference";
 
 export type GameInfo = { id: number; homeId: number; awayId: number; week: number; start: string };
 export type TeamInfo = { id: number; name: string; color: string | null; altColor: string | null };
 /** One conference in the team picker: its teams and their odds today. */
 export type ConferenceList = { conference: string; teams: TeamInfo[]; outlook: TeamOutlook[] };
-export type Result = { outlook: TeamOutlook[]; path: TeamPath; tree: PathTree };
+export type Result = { outlook: TeamOutlook[]; path: TeamPath; tree: PathTree; playoffGames: PlayoffSignal[] };
 export type Locks = Record<number, number>;
 
 type Props = {
@@ -85,7 +85,7 @@ export function Explorer({ teamId, conference, teams, conferences, names, asOf, 
     const w = new Worker(new URL("../sim.worker.ts", import.meta.url), { type: "module" });
     w.onmessage = (e: MessageEvent<SimResponse>) => {
       if (e.data.id !== latest.current) return; // a newer request is in flight
-      setResult({ outlook: e.data.outlook, path: e.data.path, tree: e.data.tree });
+      setResult({ outlook: e.data.outlook, path: e.data.path, tree: e.data.tree, playoffGames: e.data.playoffGames });
       setBusy(false);
     };
     w.onerror = w.onmessageerror = () => {
@@ -163,6 +163,7 @@ export function Explorer({ teamId, conference, teams, conferences, names, asOf, 
               <h1 className="font-display text-lg font-bold tracking-tight sm:text-xl">Mathematically Alive</h1>
             </div>
             <div className="flex items-center gap-3">
+              <a href="/national" className="text-sm font-bold text-navy underline-offset-2 hover:underline">Playoff field</a>
               <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">{conference}</span>
               <span title={asOf} className="hidden text-sm text-ink-muted sm:inline">
                 {through}
@@ -237,6 +238,7 @@ export function Explorer({ teamId, conference, teams, conferences, names, asOf, 
             <div className={`transition-opacity duration-200 ${busy ? "opacity-70" : ""}`}>
               <SeasonWeeks weeks={tree.weeks} base={initial.tree.weeks} teamId={teamId} locks={locks} likely={likely} onPick={pick} />
               {tree.footnote && <p className="mt-2 text-xs text-ink-muted">{tree.footnote}</p>}
+              <PlayoffElsewhere games={result.playoffGames} />
             </div>
           </main>
 

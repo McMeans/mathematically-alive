@@ -35,3 +35,5 @@ export { simulateNational } from "./national";
 export type { NationalOptions, NationalPlayoff, NationalResult, NationalSeason, NationalTeam } from "./national";
 export { playoffField, playoffFormat } from "./playoff";
 export type { PlayoffFormat } from "./playoff";
+export { nationalView, playoffSignals } from "./view";
+export type { BracketGame, BracketSide, BubbleTeam, FieldSpot, NationalView, PlayoffSignal } from "./view";
