@@ -81,10 +81,7 @@ describe("Group of Six conferences in the national simulation (the MAC, CUSA, th
     const id = (n: string) => season.teams.find((t) => t.name === n)!.id;
     const game = season.games.find((g) => [g.homeId, g.awayId].sort().join() === [id("Army"), id("Navy")].sort().join())!;
     const runs = [id("Army"), id("Navy")].map((winner) => {
-      const r = simulateNational(season, { iterations: 50, seed: SEED, conferences: CONFERENCES, locks: { [game.id]: winner }, teamId: id("Navy") });
-      // Navy's other games still get odds both ways; Army-Navy, which can't change the field, gets none.
-      expect(r.games.length).toBeGreaterThan(0);
-      expect(r.games.map((g) => g.gameId)).not.toContain(game.id);
+      const r = simulateNational(season, { iterations: 50, seed: SEED, conferences: CONFERENCES, locks: { [game.id]: winner } });
       const out: { ranking: number[]; field: number[] | null; titles: (readonly number[])[] }[] = [];
       r.forEachIteration((_, s) => out.push({ ranking: [...s.ranking], field: s.field && [...s.field], titles: CONFERENCES.map((c) => s.titleGame(c)) }));
       return out;
@@ -92,6 +89,21 @@ describe("Group of Six conferences in the national simulation (the MAC, CUSA, th
     expect(runs[0].length).toBe(50);
     expect(runs[0][0].field).toHaveLength(12);
     expect(runs[0]).toEqual(runs[1]);
+  });
+
+  it("Army's pick of Army-Navy shows its odds unchanged either way", () => {
+    // Army rated as a top team here, so it has real playoff and title odds to compare.
+    const strong = { ...season, teams: season.teams.map((t) => (t.name === "Army" ? { ...t, rating: 30 } : t)) };
+    const army = strong.teams.find((t) => t.name === "Army")!.id;
+    const navy = strong.teams.find((t) => t.name === "Navy")!.id;
+    const game = strong.games.find((g) => [g.homeId, g.awayId].includes(army) && [g.homeId, g.awayId].includes(navy))!;
+    const r = simulateNational(strong, { iterations: 100, seed: SEED, conferences: CONFERENCES, teamId: army });
+    const t = r.teams.find((x) => x.teamId === army)!;
+    expect(t.playoff!.field).toBeGreaterThan(0.1);
+    expect(t.titleGame).toBeGreaterThan(0.1);
+    const pick = r.games.find((g) => g.gameId === game.id)!;
+    expect([pick.fieldIfWin, pick.fieldIfLose]).toEqual([t.playoff!.field, t.playoff!.field]);
+    expect([pick.titleIfWin, pick.titleIfLose]).toEqual([t.titleGame, t.titleGame]);
   });
 
   it("with the MAC title game played, the Group of Six bid still goes to the top-ranked Group of Six team", () => {

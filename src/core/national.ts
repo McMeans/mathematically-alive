@@ -266,7 +266,7 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   // The focus team's unplayed games (season.games indexes), with field counts by its result: [win, lose].
   const focus = opts.teamId !== undefined && fbsIndex.has(opts.teamId) && playoff ? opts.teamId : null;
   const own = focus === null ? [] : games.flatMap((g, i) =>
-    !g.completed && !late[i] && (g.homeId === focus || g.awayId === focus) ? [{ i, field: [0, 0], title: [0, 0] }] : []);
+    !g.completed && (g.homeId === focus || g.awayId === focus) ? [{ i, field: [0, 0], title: [0, 0] }] : []);
   const focusRace = focus === null ? -1 : races.findIndex((r) => r.data.ids.has(focus));
   const raceOf = (id: number): number => races.findIndex((r) => r.data.ids.has(id));
   const gumbel = new Float64Array(F);
@@ -371,7 +371,8 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       // Only the flipped game's two teams and the touched races' title-game teams can score differently.
       fscore.set(score);
       const changed: number[] = [was, other];
-      const swap = (k: number, dw: number, dl: number) => { if (k >= 0) { w[k] += dw; l[k] += dl; } };
+      // Army-Navy counts in no record, so flipping it changes none: its odds come out the same either way.
+      const swap = (k: number, dw: number, dl: number) => { if (k >= 0 && !late[o.i]) { w[k] += dw; l[k] += dl; } };
       const wi = idx(was);
       const oi = idx(other);
       // Take the touched races' title games back out of the season's records, flip the game, play them again.
