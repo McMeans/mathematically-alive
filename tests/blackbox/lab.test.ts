@@ -131,8 +131,7 @@ describe("season lab: picks in a link", () => {
   it("a title pick for a conference with no title game is left out", () => {
     const ind = season.teams.find((t) => t.conference === "FBS Independents");
     expect(ind).toBeDefined();
-    if (!ind) return;
-    const out = decodeLabLocks(season, encodeLabLocks(season, { titles: { "FBS Independents": ind.id } }));
+    const out = decodeLabLocks(season, encodeLabLocks(season, { titles: { "FBS Independents": ind!.id } }));
     expect(out.locks.titles).toEqual({});
     expect(out.dropped).toBe(1);
   });
@@ -141,5 +140,8 @@ describe("season lab: picks in a link", () => {
     expect(() => encodeLabLocks(season, { games: { 1: 2 } })).toThrow(/unknown game 1/);
     expect(() => encodeLabLocks(season, { games: { [g1.id]: -5 } })).toThrow(/not in game/);
     expect(() => encodeLabLocks(season, { titles: { Nowhere: 1 } })).toThrow(/isn't a conference/);
+    expect(() => encodeLabLocks(season, { titles: { SEC: -5 } })).toThrow(/team -5 is not in SEC/);
+    expect(() => encodeLabLocks(season, { bracket: { 99: g1.homeId } })).toThrow(/bracket game 99/);
+    expect(() => encodeLabLocks(season, { bracket: { 0: -5 } })).toThrow(/team -5 isn't in the season/);
   });
 });

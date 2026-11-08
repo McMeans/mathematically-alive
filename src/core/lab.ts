@@ -133,7 +133,10 @@ const VERSION = 1;
 const conferencesOf = (season: Season): string[] =>
   [...new Set(season.teams.flatMap((t) => (t.conference ? [t.conference] : [])))].sort();
 
-/** Picks as a short URL-safe string. Throws for a game pick on a game the season doesn't have, or a team not in it. */
+/**
+ * Picks as a short URL-safe string. Throws for a pick that can't be one: a game the season doesn't have or a team not
+ * in it, a title pick for a team outside its conference, a bracket game that doesn't exist or a team the season doesn't have.
+ */
 export function encodeLabLocks(season: Season, locks: Partial<LabLocks>): string {
   const { games, titles, bracket } = filled(locks);
   const out: number[] = [];
@@ -160,12 +163,19 @@ export function encodeLabLocks(season: Season, locks: Partial<LabLocks>): string
   for (const c of cs) {
     const at = confs.indexOf(c);
     if (at < 0) throw new Error(`${c} isn't a conference in ${season.year}`);
+    if (season.teams.find((t) => t.id === titles[c])?.conference !== c) throw new Error(`team ${titles[c]} is not in ${c}`);
     put(at);
     put(titles[c]);
   }
   const ks = Object.keys(bracket).map(Number).sort((a, b) => a - b);
   put(ks.length);
-  for (const k of ks) { put(k); put(bracket[k]); }
+  const size = bracketGames(findFormat(season.year)?.teams ?? 12).length;
+  for (const k of ks) {
+    if (!Number.isInteger(k) || k < 0 || k >= size) throw new Error(`bracket game ${k} doesn't exist`);
+    if (!season.teams.some((t) => t.id === bracket[k])) throw new Error(`team ${bracket[k]} isn't in the season`);
+    put(k);
+    put(bracket[k]);
+  }
   return toBase64Url(out);
 }
 
