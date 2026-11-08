@@ -38,11 +38,16 @@ function ratingOf(byId: Map<number, Team>, id: number): number {
   return t?.classification === "fbs" ? 0 : MISSING_RATING_OTHER;
 }
 
-/** The game's spread when it has one, else one derived from ratings and home field. */
+/** A team's strength for game odds: its rating plus what its betting lines say SP+ is missing. */
+function strengthOf(byId: Map<number, Team>, id: number): number {
+  return ratingOf(byId, id) + (byId.get(id)?.marketShift ?? 0);
+}
+
+/** The game's spread when it has one, else one derived from strengths and home field. */
 function homeSpread(byId: Map<number, Team>, game: Game): number {
   if (game.spread !== null) return game.spread;
   const home = game.neutralSite ? 0 : HOME_FIELD;
-  return -(ratingOf(byId, game.homeId) - ratingOf(byId, game.awayId)) - home;
+  return -(strengthOf(byId, game.homeId) - strengthOf(byId, game.awayId)) - home;
 }
 
 /**
@@ -51,7 +56,7 @@ function homeSpread(byId: Map<number, Team>, game: Game): number {
  */
 export function neutralOdds(season: Season): (a: number, b: number, shiftA: number, shiftB: number, edgeA?: number) => number {
   const byId = new Map<number, Team>(season.teams.map((t) => [t.id, t]));
-  return (a, b, shiftA, shiftB, edgeA = 0) => normalCdf((ratingOf(byId, a) + shiftA - ratingOf(byId, b) - shiftB + edgeA) / GAME_SD);
+  return (a, b, shiftA, shiftB, edgeA = 0) => normalCdf((strengthOf(byId, a) + shiftA - strengthOf(byId, b) - shiftB + edgeA) / GAME_SD);
 }
 
 // Lookup tables, since the inner loop needs millions of normal draws and CDF values.
