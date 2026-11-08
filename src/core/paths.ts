@@ -6,7 +6,7 @@ import type { NationalResult } from "./national";
 import type { TeamOutlook } from "./outlook";
 import { simulateSeason, tiebreakDraw, type SimResult } from "./sim";
 import { provenStatus } from "./proof";
-import type { Game, Season, TeamRecord } from "./season";
+import { INDEPENDENTS, type Game, type Season, type TeamRecord } from "./season";
 import { OVERALL, isClear } from "./signal";
 import { championshipFromData, conferenceData } from "./tiebreak";
 
@@ -85,10 +85,10 @@ export function formatFine(p: number): string {
   return formatOdds(p);
 }
 
-/** A team's record for display: "4-5 (2-4 ACC)", or just "4-5" without a conference. */
+/** A team's record for display: "4-5 (2-4 ACC)", or just "4-5" for an independent or without a conference. */
 export function formatRecord(record: TeamRecord, conference: string | null): string {
   const overall = `${record.wins}-${record.losses}`;
-  return conference ? `${overall} (${record.conferenceWins}-${record.conferenceLosses} ${conferenceShort(conference)})` : overall;
+  return conference && conference !== INDEPENDENTS ? `${overall} (${record.conferenceWins}-${record.conferenceLosses} ${conferenceShort(conference)})` : overall;
 }
 
 /** How the site names each conference (CFBD's name -> display name, and the short form where space is tight). */
@@ -99,6 +99,7 @@ const CONFERENCE_NAMES: Record<string, { name: string; short: string }> = {
   "American Athletic": { name: "American", short: "American" },
   "Conference USA": { name: "CUSA", short: "CUSA" },
   "Mountain West": { name: "Mountain West", short: "MW" },
+  "FBS Independents": { name: "Independents", short: "Independents" },
 };
 
 /** The conference's name as the site shows it ("MAC" for CFBD's "Mid-American"); unlisted names show as they are. */
@@ -145,11 +146,16 @@ export function mustWinConference(o: TeamOutlook): boolean {
   return !o.groupOfSix && o.playoff > 0 && o.atLarge === 0;
 }
 
+/** Why a team barred from the postseason (`Team.postseasonBan`) shows Out everywhere. Not part of the public API. */
+export const BARRED = "Barred from the postseason this season: no title game, no playoff";
+
 /**
- * How the team's playoff odds come about, when that needs saying: a Group of Six team's way in is ranking above
- * every other Group of Six team, whether or not it wins its conference. Null otherwise.
+ * How the team's playoff odds come about, when that needs saying: a team barred from the postseason can't get in;
+ * a Group of Six team's way in is ranking above every other Group of Six team, whether or not it wins its
+ * conference. Null otherwise.
  */
 export function playoffRoute(o: TeamOutlook): string | null {
+  if (o.postseasonBan) return BARRED;
   return o.groupOfSix ? "Gets in as the highest-ranked Group of Six team, conference champion or not" : null;
 }
 
@@ -261,7 +267,9 @@ export function teamPath(season: Season, opts: PathOptions, shared?: SimResult):
 
   let summary: string;
   const steps: string[] = [];
-  if (status === "clinched") summary = `${team} is in the ${conferenceName(conference)} title game whatever happens.`;
+  const barred = season.teams.find((t) => t.id === teamId)?.postseasonBan === true;
+  if (barred) summary = `${team} is barred from the postseason this season, so it can't play in the ${conferenceName(conference)} title game.`;
+  else if (status === "clinched") summary = `${team} is in the ${conferenceName(conference)} title game whatever happens.`;
   else if (status === "eliminated") summary = `${team} can't make the ${conferenceName(conference)} title game: no combination of remaining results gets it there.`;
   else if (ifWinOut !== null) summary = `Win out and ${team} makes the ${conferenceName(conference)} title game ${formatOdds(ifWinOut)} of the time.`;
   else if (keyGames.length > 0) summary = rootLine(keyGames[0]);

@@ -79,11 +79,21 @@ export function fieldPicker(season: Season): FieldPicker {
       .map((t) => t.id),
   );
   const notreDame = season.teams.find((t) => t.name === "Notre Dame")?.id;
+  // Teams barred from the postseason are skipped: no bid of any kind, and the next team takes the spot.
+  const barred = new Set(season.teams.filter((t) => t.postseasonBan).map((t) => t.id));
 
   // Places (indexes into the ranking) of the automatic bids, reused across calls: this runs once per simulated season.
   const autos: number[] = [];
+  // The ranking without barred teams, reused across calls the same way.
+  const eligible: number[] = [];
   const powerCount = power.size;
-  return (ranking, isChampion) => {
+  return (all, isChampion) => {
+    let ranking: ArrayLike<number> = all;
+    if (barred.size > 0) {
+      eligible.length = 0;
+      for (let k = 0; k < all.length; k++) if (!barred.has(all[k])) eligible.push(all[k]);
+      ranking = eligible;
+    }
     const n = ranking.length;
     const T = Math.min(format.teams, n);
     if (format.autoBids === "none") return Array.from({ length: T }, (_, k) => ranking[k]);
@@ -118,8 +128,9 @@ export function fieldPicker(season: Season): FieldPicker {
 
 /**
  * The season's playoff field, seeded (seed 1 first), from a ranking of FBS teams (best first) and the conference
- * champions. What counts as a champion depends on the format: every conference's in 2024-2025, the power
- * conferences' from 2026. Four-team seasons ignore champions.
+ * champions. A team barred from the postseason (`Team.postseasonBan`) is skipped, so the Group of Six bid goes to
+ * the highest-ranked Group of Six team that can play. What counts as a champion depends on the format: every
+ * conference's in 2024-2025, the power conferences' from 2026. Four-team seasons ignore champions.
  */
 export function playoffField(season: Season, ranking: readonly number[], champions: readonly number[]): number[] {
   const set = new Set(champions);

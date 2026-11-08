@@ -128,6 +128,8 @@ Status: team-page odds done (field, bye, title, paired Win/Lose CFP columns, "Mu
 
 ## Phase 6: the rest of FBS
 
+Status: done.
+
 - Group of Six conferences, one config each from its official document. Under the 2026 format the route is being the
   highest-ranked Group of Six team, champion or not, so the wording is never "Must win <conference>" (`playoffRoute`).
   - Done: the MAC (rules from its published tiebreak page), its title game in the national pass, its pages.
@@ -145,10 +147,11 @@ Status: team-page odds done (field, bye, title, paired Win/Lose CFP columns, "Mu
   - Done: the Sun Belt (rules from its tie-breaking procedures page, updated for 2026). The engine now has divisions
     (each division's champion plays; proofs and the likeliest-way search go by the division) and a "continue" cut
     (a tie of three or more cut down goes on down the steps).
-  - Next: independents (pages without a title game) and the postseason-ban case below.
-  - When a member is barred from the postseason: leave it out of its title game and the Group of Six bid.
-- Independents (Notre Dame and others): no title-game section; playoff only.
-- Picker that scales to every conference plus independents.
+  - Done: postseason bans. A barred team (`Team.postseasonBan`, from a per-season list; none in 2026) never plays
+    in its title game, takes no spot in the proofs or the likeliest-way search, and gets no playoff spot, so the
+    Group of Six bid goes to the next team.
+- Done: independents (Notre Dame, UConn): pages about the playoff alone (`exploreIndependent`), no title-game section.
+- Done: the team picker's tabs wrap, with short names, for every conference plus independents.
 
 ## Order and size
 

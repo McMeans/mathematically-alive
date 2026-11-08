@@ -3,6 +3,9 @@
 
 export type Classification = "fbs" | "fcs" | "other";
 
+/** How CFBD names the FBS independents' "conference". An FBS team with no conference at all counts as one too. */
+export const INDEPENDENTS = "FBS Independents";
+
 export type Team = {
   id: number;
   name: string;
@@ -14,6 +17,11 @@ export type Team = {
   altColor: string | null;
   /** SP+ rating in points per game above average, when published. */
   rating: number | null;
+  /**
+   * Barred from the postseason this season (an NCAA or conference penalty): it can't play in its conference's title
+   * game or the playoff, though its games count for everyone else. Set from POSTSEASON_BANS; absent otherwise.
+   */
+  postseasonBan?: boolean;
 };
 
 export type Game = {
@@ -114,6 +122,7 @@ export function seasonFromCfbd(raw: CfbdSnapshot): Season {
       color: t.color ?? null,
       altColor: t.alternateColor ?? null,
       rating: ratingByName.get(t.school) ?? null,
+      ...(POSTSEASON_BANS[raw.year]?.includes(t.school) ? { postseasonBan: true } : {}),
     });
   }
 
@@ -159,6 +168,14 @@ export function seasonFromCfbd(raw: CfbdSnapshot): Season {
   const teamList = [...teams.values()].sort((a, b) => a.name.localeCompare(b.name));
   return { year: raw.year, fetchedAt: raw.fetchedAt, teams: teamList, games };
 }
+
+/**
+ * FBS teams barred from the postseason, by season and school name (`Team.postseasonBan`). None in 2026: Akron, the
+ * last one (a 2025 Academic Progress Rate ban), had it lifted by an NCAA waiver in March 2026
+ * (https://gozips.com/news/2026/3/4/akron-football-bowl-eligible-for-2026-practice-restrictions-lifted), and teams
+ * moving up to FBS are eligible at once (NCAA Division I Cabinet, June 24, 2026).
+ */
+const POSTSEASON_BANS: Readonly<Record<number, readonly string[]>> = { 2026: [] };
 
 /**
  * Army-Navy, by the two schools' names. Both are American members (Army for football only, since 2024), so CFBD flags

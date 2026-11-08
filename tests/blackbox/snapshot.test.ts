@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkFetch, checkSnapshot, seasonFromCfbd, type CfbdGame, type CfbdSnapshot, type CfbdTeam } from "@/core";
+import { INDEPENDENTS, checkFetch, checkSnapshot, seasonFromCfbd, type CfbdGame, type CfbdSnapshot, type CfbdTeam } from "@/core";
 
 // A tiny made-up national snapshot: two ACC teams that play each other, a pair in a made-up conference with no rules, an independent and an
 // FCS team.
@@ -44,6 +44,12 @@ describe("checkSnapshot", () => {
 
   it("reports every other FBS conference as not supported, independents included, and leaves out FCS", () => {
     expect(checkSnapshot(seasonFromCfbd(snapshot()), ["ACC"]).notSupported).toEqual(["FBS Independents", "Gulf South"]);
+  });
+
+  it("independents can be supported: they need no conference schedule or tiebreak rules", () => {
+    const { errors, notSupported } = checkSnapshot(seasonFromCfbd(snapshot()), ["ACC", INDEPENDENTS]);
+    expect(errors).toEqual([]);
+    expect(notSupported).toEqual(["Gulf South"]);
   });
 
   it("fails a supported conference with a member that plays no conference game against another member", () => {

@@ -215,7 +215,8 @@ describe("help from elsewhere on a real season", () => {
       }
     }
     expect([...seen].sort()).toEqual(["either way", "some"]);
-  }, 60_000);
+    // 36 trees: about 15 s plain and 35 s under coverage on a typical runner, over 60 s on a slow one.
+  }, 120_000);
 
   it("the card's rivals and the week by week agree with the picks, for every team", () => {
     const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };

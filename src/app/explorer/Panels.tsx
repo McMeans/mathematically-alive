@@ -1,9 +1,11 @@
 "use client";
 import Link from "next/link";
 import { useId, useState } from "react";
-import { conferenceName, formatChance, formatRecord, mustWinConference, playoffDetail, playoffRoute, type OddsLabels, type PlayoffSignal, type TeamOutlook, type TeamPath } from "@/core";
+import {
+  INDEPENDENTS, conferenceName, conferenceShort, formatChance, formatRecord, formatSideOdds, mustWinConference, playoffDetail, playoffRoute,
+  type IndependentOutlook, type OddsLabels, type PlayoffSignal, type TeamOutlook, type TeamPath,
+} from "@/core";
 import { NAVY, pct, type ConferenceList, type GameInfo, type TeamInfo } from "./Explorer";
-import { byOdds } from "./Season";
 import { useConference } from "./conference";
 
 /** White or navy text, whichever reads better on the team color (WCAG relative luminance). */
@@ -29,32 +31,34 @@ export function TeamList({ conferences, names, selectedId, onSelect }: {
   // Rendered twice (desktop column and phone sheet), so the label needs a per-copy id.
   const searchId = useId();
   const query = q.trim().toLowerCase();
-  // A search looks through every conference; otherwise the chosen tab. Either way one list, best odds first.
-  const order = byOdds(names);
+  // A search looks through every conference; otherwise the chosen tab. Either way one list, best odds first (the
+  // title game; the playoff for independents), ties alphabetical.
   const rows = conferences
     .filter((c) => query !== "" || c.conference === shown)
     .flatMap((c) => {
       const byId = new Map(c.teams.map((t) => [t.id, t]));
-      return c.outlook
+      return c.rows
         .filter((o) => byId.get(o.teamId)!.name.toLowerCase().includes(query))
-        .map((o) => ({ t: byId.get(o.teamId)!, o, conference: c.conference }));
+        .map((o) => ({ t: byId.get(o.teamId)!, o }));
     })
-    .sort((a, b) => order(a.o, b.o));
+    .sort((a, b) => b.o.key - a.o.key || names[a.t.id].localeCompare(names[b.t.id]));
   return (
     <div>
       {/* Search and column labels stay put while the list scrolls under them. */}
       <div className="sticky top-0 z-10 bg-white">
         {conferences.length > 1 && (
-          <div role="group" aria-label="Conference" className="flex gap-1 px-3 pt-3">
+          // Every FBS conference plus the independents: the chips wrap, each named short, and the full name on hover.
+          <div role="group" aria-label="Conference" className="flex flex-wrap gap-1 px-3 pt-3">
             {conferences.map((c) => (
               <button
                 key={c.conference}
                 type="button"
                 aria-pressed={query === "" && c.conference === shown}
+                title={conferenceName(c.conference)}
                 onClick={() => { setShown(c.conference); setQ(""); }}
-                className="min-h-11 flex-1 rounded-full border border-navy/20 px-3 text-sm font-bold text-navy hover:bg-mist aria-pressed:border-navy aria-pressed:bg-navy aria-pressed:text-white md:min-h-8"
+                className="min-h-11 grow whitespace-nowrap rounded-full border border-navy/20 px-2.5 text-xs font-bold text-navy hover:bg-mist aria-pressed:border-navy aria-pressed:bg-navy aria-pressed:text-white md:min-h-8"
               >
-                {conferenceName(c.conference)}
+                {conferenceShort(c.conference)}
               </button>
             ))}
           </div>
@@ -76,11 +80,11 @@ export function TeamList({ conferences, names, selectedId, onSelect }: {
         <div aria-hidden className="flex items-center gap-2 px-3 pb-1 text-xs font-semibold text-ink-muted">
           <span className="w-2.5" />
           <span className="flex-1">Team</span>
-          <span className="text-right">Odds</span>
+          <span className="text-right">{query === "" && shown === INDEPENDENTS ? "Playoff" : "Odds"}</span>
         </div>
       </div>
       <ul>
-        {rows.map(({ t, o, conference: c }) => {
+        {rows.map(({ t, o }) => {
           const id = t.id;
           const selected = id === selectedId;
           const fill = t.color ?? NAVY;
@@ -101,11 +105,11 @@ export function TeamList({ conferences, names, selectedId, onSelect }: {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate leading-5">{t.name}</span>
                   <span className={`block text-[11px] leading-4 tabular-nums ${selected ? "font-normal" : "text-ink-muted"}`}>
-                    {formatRecord(o.record, c)}
+                    {o.record}
                   </span>
                 </span>
-                <span className={`w-10 text-right tabular-nums ${o.status === "eliminated" && !selected ? "font-normal text-ink-muted" : ""}`}>
-                  {formatChance(o.titleGame, o.status)}
+                <span className={`w-10 text-right tabular-nums ${o.out && !selected ? "font-normal text-ink-muted" : ""}`}>
+                  {o.odds}
                 </span>
               </Link>
             </li>
@@ -251,5 +255,48 @@ export function PlayoffElsewhere({ games }: { games: PlayoffSignal[] }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+/** An independent's route in and its bye and national-title odds, under its playoff number. */
+export function IndependentDetail({ outlook, className = "" }: { outlook: IndependentOutlook; className?: string }) {
+  const rows = outlook.postseasonBan ? [] : [
+    { label: "First-round bye", value: formatSideOdds(outlook.cfp.bye, "alive") },
+    { label: "National title", value: formatSideOdds(outlook.cfp.champion, "alive") },
+  ];
+  return (
+    <p className={`flex flex-wrap gap-x-3 text-xs text-ink-muted ${className}`}>
+      <span className="basis-full">{outlook.route}</span>
+      {rows.map((r) => (
+        <span key={r.label}>{r.label} <span className="font-semibold text-navy">{r.value}</span></span>
+      ))}
+    </p>
+  );
+}
+
+/** An independent's odds on phones: the playoff, a bye and the national title. */
+export function IndependentTiles({ outlook, condensed }: { outlook: IndependentOutlook; condensed?: boolean }) {
+  const { labels } = useConference();
+  const out = outlook.postseasonBan ? "eliminated" : "alive";
+  const tiles = [
+    [labels.playoff, formatSideOdds(outlook.playoff, out), true],
+    ["First-round bye", formatSideOdds(outlook.cfp.bye, out), false],
+    ["National title", formatSideOdds(outlook.cfp.champion, out), false],
+  ] as const;
+  if (condensed)
+    return (
+      <dl className="flex animate-rise items-baseline justify-between gap-3 text-xs text-ink-muted">
+        {tiles.map(([l, value, badge]) => (
+          <div key={l} className="flex items-baseline gap-1.5">
+            <dt className="flex items-center gap-1">{l}{badge && <Beta />}</dt>
+            <dd className="font-display text-base font-bold text-navy">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    );
+  return (
+    <dl className="grid grid-cols-3 gap-2">
+      {tiles.map(([l, value, badge]) => <Tile key={l} label={l} value={value} tone="text-navy" badge={badge} />)}
+    </dl>
   );
 }
