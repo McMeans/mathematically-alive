@@ -39,6 +39,9 @@ function useLab(initial: LabView) {
   const worker = useRef<Worker | null>(null);
   const latest = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // The picks as of the last change, for the worker's reply to a shared link (its handler sees only the first render).
+  const current = useRef<LabLocks>(none());
+  const opening = useRef(0);
 
   function setAddress(code: string | null) {
     const url = new URL(window.location.href);
@@ -67,12 +70,21 @@ function useLab(initial: LabView) {
     const w = new Worker(new URL("../lab.worker.ts", import.meta.url), { type: "module" });
     w.onmessage = (e: MessageEvent<LabResponse>) => {
       const r = e.data;
-      if (r.id !== latest.current) return; // a newer pick is on its way
       if (r.kind === "opened") {
+        // A pick made before the link was read wins over the link's pick for the same game.
+        const mine = latest.current !== opening.current;
+        const l = current.current;
+        const next = mine
+          ? { games: { ...r.locks.games, ...l.games }, titles: { ...r.locks.titles, ...l.titles }, bracket: { ...r.locks.bracket, ...l.bracket } }
+          : r.locks;
         setNote(r.note);
-        setLocks(r.locks);
-        run(r.locks);
-      } else if (r.kind === "result") {
+        current.current = next;
+        setLocks(next);
+        run(next);
+        return;
+      }
+      if (r.id !== latest.current) return; // a newer pick is on its way
+      if (r.kind === "result") {
         setView(r.view);
         setAddress(r.code);
         if (r.final) setRefining(false);
@@ -91,7 +103,8 @@ function useLab(initial: LabView) {
     const picks = params.get("picks");
     const games = params.get("games");
     if (picks !== null || games !== null) {
-      w.postMessage({ kind: "open", id: ++latest.current, picks, games } satisfies LabRequest);
+      opening.current = ++latest.current;
+      w.postMessage({ kind: "open", id: opening.current, picks, games } satisfies LabRequest);
     }
     return () => { clearTimeout(timer.current); w.terminate(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load: the worker and a shared link's picks
@@ -99,6 +112,7 @@ function useLab(initial: LabView) {
 
   function update(next: LabLocks) {
     setHistory((h) => [...h.slice(-49), locks]);
+    current.current = next;
     setLocks(next);
     setNote("");
     run(next);
@@ -107,22 +121,47 @@ function useLab(initial: LabView) {
     const prev = history.at(-1);
     if (!prev) return;
     setHistory((h) => h.slice(0, -1));
+    current.current = prev;
     setLocks(prev);
     run(prev);
   }
-  /** Pick a winner; picking the current one clears it. */
-  function pick(kind: "games" | "bracket", key: number, winner: number) {
-    const next = { ...locks, [kind]: { ...locks[kind] } };
-    if (next[kind][key] === winner) delete next[kind][key];
-    else next[kind][key] = winner;
-    update(next);
+  /** Pick a game's winner; picking the current one clears it. */
+  function pickGame(gameId: number, winner: number) {
+    const games = { ...locks.games };
+    if (games[gameId] === winner) delete games[gameId];
+    else games[gameId] = winner;
+    update({ ...locks, games });
+  }
+  /**
+   * Pick a bracket game's winner; picking the current one clears it. Changing or clearing a pick also clears the
+   * later picks that team was carried into, which no longer have it in their game.
+   */
+  function pickBracket(bracket: BracketGame[], index: number, winner: number) {
+    const picks = { ...locks.bracket };
+    const old = picks[index];
+    if (old === winner) delete picks[index];
+    else picks[index] = winner;
+    if (old !== undefined) {
+      const queue = [index];
+      while (queue.length > 0) {
+        const from = queue.shift()!;
+        for (const g of bracket) {
+          const fed = [g.a, g.b].some((s) => "winnerOf" in s && s.winnerOf === from);
+          if (fed && picks[g.index] === old) {
+            delete picks[g.index];
+            queue.push(g.index);
+          }
+        }
+      }
+    }
+    update({ ...locks, bracket: picks });
   }
   const status = failed ? "Couldn’t update. Showing the last result." : refining ? "Refining…" : "";
-  return { locks, view, status, note, canUndo: history.length > 0, pick, undo, reset: () => update(none()) };
+  return { locks, view, status, note, canUndo: history.length > 0, pickGame, pickBracket, undo, reset: () => update(none()) };
 }
 
 export function Lab({ initial, games, names, teams, paged }: Props) {
-  const { locks, view, status, note, canUndo, pick, undo, reset } = useLab(initial);
+  const { locks, view, status, note, canUndo, pickGame, pickBracket, undo, reset } = useLab(initial);
   const [tab, setTab] = useState<"games" | "playoff">("games");
   const pagedSet = useMemo(() => new Set(paged), [paged]);
   const name = (id: number) => names[id] ?? `Team ${id}`;
@@ -149,7 +188,7 @@ export function Lab({ initial, games, names, teams, paged }: Props) {
 
       <div role="tablist" aria-label="Season Lab" className="mt-4 flex gap-1 md:hidden">
         {(["games", "playoff"] as const).map((t) => (
-          <button key={t} role="tab" type="button" aria-selected={tab === t} onClick={() => setTab(t)}
+          <button key={t} id={`lab-tab-${t}`} role="tab" type="button" aria-controls={`lab-panel-${t}`} aria-selected={tab === t} onClick={() => setTab(t)}
             className={`press h-9 flex-1 rounded-full text-sm font-bold ${tab === t ? "bg-navy text-white" : "bg-mist text-navy"}`}>
             {t === "games" ? "Games" : "Playoff"}
           </button>
@@ -157,11 +196,11 @@ export function Lab({ initial, games, names, teams, paged }: Props) {
       </div>
 
       <div className="mt-4 grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className={tab === "games" ? "" : "hidden md:block"}>
-          <Games games={games} picked={locks.games} name={name} teams={teams} onPick={(g, w) => pick("games", g, w)} />
+        <div id="lab-panel-games" role="tabpanel" aria-labelledby="lab-tab-games" className={tab === "games" ? "" : "hidden md:block"}>
+          <Games games={games} picked={locks.games} name={name} teams={teams} onPick={pickGame} />
         </div>
-        <div className={tab === "playoff" ? "" : "hidden md:block"}>
-          <Playoff view={view} picked={locks.bracket} name={name} paged={pagedSet} onPick={(g, w) => pick("bracket", g, w)} />
+        <div id="lab-panel-playoff" role="tabpanel" aria-labelledby="lab-tab-playoff" className={tab === "playoff" ? "" : "hidden md:block"}>
+          <Playoff view={view} picked={locks.bracket} name={name} paged={pagedSet} onPick={(g, w) => view.playoff && pickBracket(view.playoff.bracket, g, w)} />
         </div>
       </div>
     </main>
@@ -238,12 +277,16 @@ function PickButton({ label, odds, on, off, onClick }: { label: string; odds?: s
   );
 }
 
+/** A team's name, linked to its page when it has one. */
+function LabTeam({ id, name, paged }: { id: number; name: (id: number) => string; paged: Set<number> }) {
+  return paged.has(id) ? <Link href={`/team/${id}`} className="font-bold text-navy hover:underline">{name(id)}</Link> : <span className="font-bold text-navy">{name(id)}</span>;
+}
+
 function Playoff({ view, picked, name, paged, onPick }: {
   view: LabView; picked: Record<number, number>; name: (id: number) => string; paged: Set<number>;
   onPick: (gameIndex: number, winner: number) => void;
 }) {
-  const TeamName = ({ id }: { id: number }) =>
-    paged.has(id) ? <Link href={`/team/${id}`} className="font-bold text-navy hover:underline">{name(id)}</Link> : <span className="font-bold text-navy">{name(id)}</span>;
+  const TeamName = ({ id }: { id: number }) => <LabTeam id={id} name={name} paged={paged} />;
   const p = view.playoff;
   return (
     <div className="space-y-8">

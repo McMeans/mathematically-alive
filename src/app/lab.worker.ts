@@ -1,7 +1,7 @@
 // The Season Lab's simulations and link codec, off the main thread (the codec needs the whole season, which only
 // this worker loads). Each pick runs twice: a quick pass for numbers right away, then the full run. A newer pick
 // skips the full run of an older one.
-import { decodeLabLocks, decodeLocks, encodeLabLocks, seasonLab, simulateNational, type LabLocks, type NationalResult, type Season, type SeasonLab } from "@/core";
+import { decodeLabLocks, decodeLocks, encodeLabLocks, seasonLab, type LabLocks, type NationalResult, type Season, type SeasonLab } from "@/core";
 import { ITERATIONS, QUICK_ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
 import data from "./data/season.json";
 
@@ -17,15 +17,10 @@ export type LabResponse =
 
 const season = data as Season;
 const base = { iterations: ITERATIONS, seed: SEED, conferences: SUPPORTED_CONFERENCES };
-// The latest run at each size: the next pick copies the title races its changed picks don't touch.
+// The latest run at each size (none until the first pick: a visit without picks simulates nothing here): the next pick copies the title races its changed picks don't touch.
 let quick: NationalResult | undefined;
 let full: NationalResult | undefined;
 let newest = 0;
-
-setTimeout(() => {
-  quick ??= simulateNational(season, { ...base, iterations: QUICK_ITERATIONS });
-  setTimeout(() => { full ??= simulateNational(season, base); }, 0);
-}, 0);
 
 function run(locks: LabLocks, iterations: number, reuse: NationalResult | undefined) {
   const { national, ...view } = seasonLab(season, { ...base, iterations, locks, reuse });
