@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import type { BracketGame, BracketSide, LabConference, LabFill, LabLocks } from "@/core";
+import type { BracketGame, BracketSide, LabBigGame, LabConference, LabFill, LabLocks } from "@/core";
 import type { LabRequest, LabResponse, LabView } from "@/app/lab.worker";
 import { ShareButton } from "@/app/explorer/Share";
 
@@ -55,6 +55,7 @@ function useLab(initial: LabView) {
     clearTimeout(timer.current);
     const id = ++latest.current;
     if (count(next) === 0) {
+      worker.current?.postMessage({ kind: "reset", id } satisfies LabRequest);
       setView(initial);
       setRefining(false);
       setFailed(false);
@@ -221,6 +222,17 @@ export function Lab({ initial, games, names, teams, paged }: Props) {
         </span>
       </div>
       {note && <p role="status" className="mt-2 rounded-md bg-mist px-3 py-2 text-sm text-ink-soft">{note}</p>}
+      {view.changes && (view.changes.headline || view.changes.movers.length > 0) && (
+        <section aria-labelledby="lab-changes" className="mt-3 rounded-lg border border-ink-muted/25 px-3 py-2">
+          <h2 id="lab-changes" className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Last change</h2>
+          {view.changes.headline && <p className="mt-1 text-sm font-semibold text-navy">{view.changes.headline}</p>}
+          {view.changes.movers.length > 0 && (
+            <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-ink-soft">
+              {view.changes.movers.map((m) => <li key={m.teamId} className={m.after > m.before ? "text-turf" : "text-red-700"}>{m.text}</li>)}
+            </ul>
+          )}
+        </section>
+      )}
 
       <div role="tablist" aria-label="Season Lab" className="mt-4 flex gap-1 md:hidden">
         {TABS.map((t) => (
@@ -233,7 +245,7 @@ export function Lab({ initial, games, names, teams, paged }: Props) {
 
       <div className="mt-4 grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div id="lab-panel-games" {...panel("games")} className={tab === "games" ? "" : "hidden md:block"}>
-          <Games games={games} picked={locks.games} name={name} teams={teams} onPick={pickGame} open={view.open} onFill={fill} />
+          <Games games={games} picked={locks.games} name={name} teams={teams} onPick={pickGame} open={view.open} onFill={fill} big={view.bigGames} />
         </div>
         <div className="space-y-8">
           <div id="lab-panel-conferences" {...panel("conferences")} className={tab === "conferences" ? "" : "hidden md:block"}>
@@ -248,16 +260,20 @@ export function Lab({ initial, games, names, teams, paged }: Props) {
   );
 }
 
-function Games({ games, picked, name, teams, onPick, open, onFill }: {
+function Games({ games, picked, name, teams, onPick, open, onFill, big }: {
   games: LabGame[]; picked: Record<number, number>; name: (id: number) => string;
   teams: { id: number; name: string }[]; onPick: (gameId: number, winner: number) => void;
   /** Games neither final nor picked. */
   open: number; onFill: (how: LabFill) => void;
+  /** The open games that move the field most. */
+  big: LabBigGame[];
 }) {
   const [team, setTeam] = useState<number | null>(null);
+  const [bigOnly, setBigOnly] = useState(false);
+  const swing = new Map(big.map((g) => [g.gameId, g.text]));
   const [conference, setConference] = useState<string | null>(null);
   const conferences = useMemo(() => [...new Set(games.flatMap((g) => g.conferences))].sort(), [games]);
-  const shown = games.filter((g) => (team === null || g.homeId === team || g.awayId === team) && (conference === null || g.conferences.includes(conference)));
+  const shown = games.filter((g) => (!bigOnly || swing.has(g.id)) && (team === null || g.homeId === team || g.awayId === team) && (conference === null || g.conferences.includes(conference)));
   const weeks = shown.reduce<Map<number, Map<string, LabGame[]>>>((acc, g) => {
     const w = acc.get(g.week) ?? acc.set(g.week, new Map()).get(g.week)!;
     (w.get(g.group) ?? w.set(g.group, []).get(g.group)!).push(g);
@@ -284,6 +300,10 @@ function Games({ games, picked, name, teams, onPick, open, onFill }: {
             {conferences.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
+        {big.length > 0 && (
+          <button type="button" aria-pressed={bigOnly} onClick={() => setBigOnly((b) => !b)} title="The open games that move the playoff field most"
+            className={`press h-8 rounded-full border px-3 text-xs font-bold ${bigOnly ? "border-navy bg-navy text-white" : "border-ink-muted/40 text-navy hover:bg-mist"}`}>Big games</button>
+        )}
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
         <button type="button" disabled={open === 0} onClick={() => onFill("favorites")}
@@ -291,7 +311,7 @@ function Games({ games, picked, name, teams, onPick, open, onFill }: {
         <button type="button" disabled={open === 0} onClick={() => onFill({ seed: Math.floor(Math.random() * 2 ** 31) })}
           className="press h-8 rounded-full border border-ink-muted/40 px-3 text-xs font-bold text-navy hover:bg-mist disabled:opacity-40">Fill the rest</button>
       </div>
-      {shown.length === 0 && <p className="mt-3 text-sm text-ink-muted">No games left for this filter.</p>}
+      {shown.length === 0 && <p className="mt-3 text-sm text-ink-muted">{bigOnly && big.length === 0 ? "No open game moves the field much." : "No games left for this filter."}</p>}
       {[...weeks].map(([week, groups]) => (
         <div key={week} className="mt-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Week {week}</h3>
@@ -300,10 +320,13 @@ function Games({ games, picked, name, teams, onPick, open, onFill }: {
               <h4 className="text-xs font-semibold text-ink-soft">{group}</h4>
               <ul className="mt-1 space-y-1">
                 {list.map((g) => (
-                  <li key={g.id} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 rounded-md bg-mist p-1 text-sm">
-                    <PickButton label={name(g.awayId)} odds={g.awayOdds} on={picked[g.id] === g.awayId} off={picked[g.id] === g.homeId} onClick={() => onPick(g.id, g.awayId)} />
-                    <span className="px-1 text-xs text-ink-muted">{g.neutral ? "vs" : "at"}</span>
-                    <PickButton label={name(g.homeId)} odds={g.homeOdds} on={picked[g.id] === g.homeId} off={picked[g.id] === g.awayId} onClick={() => onPick(g.id, g.homeId)} />
+                  <li key={g.id} className="rounded-md bg-mist p-1 text-sm">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1">
+                      <PickButton label={name(g.awayId)} odds={g.awayOdds} on={picked[g.id] === g.awayId} off={picked[g.id] === g.homeId} onClick={() => onPick(g.id, g.awayId)} />
+                      <span className="px-1 text-xs text-ink-muted">{g.neutral ? "vs" : "at"}</span>
+                      <PickButton label={name(g.homeId)} odds={g.homeOdds} on={picked[g.id] === g.homeId} off={picked[g.id] === g.awayId} onClick={() => onPick(g.id, g.homeId)} />
+                    </div>
+                    {swing.has(g.id) && <p className="px-2 pt-0.5 text-xs text-ink-muted">{swing.get(g.id)}</p>}
                   </li>
                 ))}
               </ul>
@@ -409,7 +432,8 @@ function Playoff({ view, picked, name, paged, onPick }: {
         <ol className="mt-2 divide-y divide-ink-muted/15 rounded-lg bg-mist">
           {view.ranking.map((r) => (
             <li key={r.teamId} className="flex items-baseline justify-between gap-3 px-3 py-1.5 text-sm">
-              <span><span className="mr-2 inline-block w-5 text-right text-ink-muted">{r.rank}</span><LabTeam id={r.teamId} name={name} paged={paged} /></span>
+              <span className="min-w-0"><span className="mr-2 inline-block w-5 text-right text-ink-muted">{r.rank}</span><LabTeam id={r.teamId} name={name} paged={paged} />
+                <span className="block pl-7 text-xs text-ink-muted">{r.reason}</span></span>
               <span className="text-right text-xs text-ink-soft">{r.text}</span>
             </li>
           ))}
