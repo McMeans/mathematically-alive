@@ -143,6 +143,26 @@ describe("market-adjusted ratings", () => {
     expect(unlined(hurt)).toBeLessThan(unlined(base));
   });
 
+  it("moves a home team by half its line's gap from SP+", () => {
+    // SP+: Alpha by 12.5 at home. Line: Alpha by 2.5. Gap 10, so Alpha is 5 weaker: Beta's 2.5-point favorite at Alpha.
+    const hurt = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games, ratings, lines: [{ id: 20, lines: [{ spread: -2.5 }] }] });
+    expect(unlined(hurt)).toBeCloseTo(winProbability(2.5), 10);
+  });
+
+  it("moves an away team the same way when it's the side the line rates weaker", () => {
+    // SP+: Alpha by 7.5 at Gamma. Line: Alpha by 1.5. Alpha is 3 weaker, so a 0.5-point underdog at home to Beta.
+    const away = [game({ id: 20, homeId: GAMMA, awayId: ALPHA, week: 1 }), games[1]];
+    const s = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games: away, ratings, lines: [{ id: 20, lines: [{ spread: 1.5 }] }] });
+    expect(unlined(s)).toBeCloseTo(winProbability(0.5), 10);
+  });
+
+  it("gives no home edge at a neutral site when comparing a line with SP+", () => {
+    // Neutral site: SP+ says Alpha by 10, and so does the line, so nothing moves.
+    const neutral = [game({ id: 20, homeId: ALPHA, awayId: GAMMA, week: 1, neutralSite: true }), games[1]];
+    const s = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games: neutral, ratings, lines: [{ id: 20, lines: [{ spread: -10 }] }] });
+    expect(unlined(s)).toBeCloseTo(winProbability(-2.5), 10);
+  });
+
   it("a line that agrees with SP+ leaves the odds alone", () => {
     const base = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games, ratings, lines: [] });
     const same = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games, ratings, lines: [{ id: 20, lines: [{ spread: -12.5 }] }] });
