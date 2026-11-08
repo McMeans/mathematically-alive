@@ -59,6 +59,9 @@ describe("season lab: ranking reasons and big games", () => {
     }
     // The top team's record lifts it above the listed average.
     expect(base.ranking[0].reason).toContain("strong record");
+    // Rating and schedule lift some teams.
+    expect(base.ranking.some((r) => r.reason.includes("strong team rating"))).toBe(true);
+    expect(base.ranking.some((r) => r.reason.includes("tough schedule"))).toBe(true);
     // A likely power-conference champion in the list says so.
     expect(base.ranking.some((r) => /(SEC|Big Ten|Big 12|ACC) title in \d+%/.test(r.reason))).toBe(true);
     const top = base.national.teams[0].profile;
@@ -74,6 +77,10 @@ describe("season lab: ranking reasons and big games", () => {
       if (k > 0) expect(g.spots).toBeLessThanOrEqual(base.bigGames[k - 1].spots);
       expect(g.text).toBe(`Swings about ${g.spots.toFixed(1)} ${g.spots.toFixed(1) === "1.0" ? "spot" : "spots"} in the field`);
       expect(season.games.find((x) => x.id === g.gameId)!.completed).toBe(false);
+      // Neither side wins it more than 90% of the time.
+      const home = base.national.swings.find((x) => x.gameId === g.gameId)!.home;
+      expect(home).toBeGreaterThanOrEqual(0.1);
+      expect(home).toBeLessThanOrEqual(0.9);
     }
     expect(upset.bigGames.some((g) => g.gameId === big.id)).toBe(false);
     expect(upset.national.swings.find((s) => s.gameId === big.id)!.spots).toBe(0);

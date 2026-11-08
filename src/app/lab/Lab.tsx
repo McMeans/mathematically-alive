@@ -270,7 +270,7 @@ function Games({ games, picked, name, teams, onPick, open, onFill, big }: {
 }) {
   const [team, setTeam] = useState<number | null>(null);
   const [bigOnly, setBigOnly] = useState(false);
-  const swing = new Map(big.map((g) => [g.gameId, g.text]));
+  const swing = useMemo(() => new Map(big.map((g) => [g.gameId, g.text])), [big]);
   const [conference, setConference] = useState<string | null>(null);
   const conferences = useMemo(() => [...new Set(games.flatMap((g) => g.conferences))].sort(), [games]);
   const shown = games.filter((g) => (!bigOnly || swing.has(g.id)) && (team === null || g.homeId === team || g.awayId === team) && (conference === null || g.conferences.includes(conference)));
