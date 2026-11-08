@@ -26,7 +26,7 @@ export type LabOptions = {
   /** Conferences whose title games are simulated. Each needs tiebreak rules for the season. */
   conferences: readonly string[];
   /**
-   * The picks. Ones the simulation would ignore are left out and not counted: a title pick for a conference not in
+   * The picks. Ones the simulation would ignore are left out and not counted: a pick on a game already final, a title pick for a conference not in
    * `conferences` or whose title game is final, and a playoff pick on a game already final.
    */
   locks?: Partial<LabLocks>;
@@ -119,8 +119,10 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
   // is final, and a playoff pick on a game already final.
   const given = filled(opts.locks);
   const finals = finalBracketGames(season);
+  const unplayed = new Set(season.games.filter((g) => !g.completed).map((g) => g.id));
   const locks: LabLocks = {
-    games: given.games,
+    // A pick on a game already final is ignored by the simulation, so it counts nowhere.
+    games: Object.fromEntries(Object.entries(given.games).filter(([id]) => unplayed.has(Number(id)))),
     titles: Object.fromEntries(Object.entries(given.titles).filter(([c]) => opts.conferences.includes(c) && !titleFinal(season, c))),
     bracket: Object.fromEntries(Object.entries(given.bracket).filter(([k]) => !finals.has(Number(k)))),
   };
@@ -207,8 +209,8 @@ export function fillLabLocks(season: Season, locks: Partial<LabLocks>, how: LabF
   for (const g of season.games) {
     if (g.completed || g.titleGame || games[g.id] !== undefined) continue;
     const p = gameWinProbability(season, g);
-    const u = how === "favorites" ? 0.5 : mulberry32(mix(how.seed, 0, FILL_SALT + g.id))();
-    games[g.id] = how === "favorites" ? (p >= 0.5 ? g.homeId : g.awayId) : u < p ? g.homeId : g.awayId;
+    const homeWins = how === "favorites" ? p >= 0.5 : mulberry32(mix(how.seed, 0, FILL_SALT + g.id))() < p;
+    games[g.id] = homeWins ? g.homeId : g.awayId;
   }
   return { ...out, games };
 }

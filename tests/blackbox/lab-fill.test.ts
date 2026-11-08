@@ -85,6 +85,15 @@ describe("season lab: conference standings with picks", () => {
   const s = mac();
   const opts = { iterations: 20, seed: 1, conferences: ["Mid-American"] };
 
+  it("a pick on a game already final is ignored in the standings, the matchup and the pick count", () => {
+    // A link from before A beat X, picking X: the real result stands.
+    const final = s.games.find((g) => g.homeId === s.id("A") && g.awayId === s.id("X"))!;
+    const lab = seasonLab(s, { ...opts, locks: { games: { [final.id]: s.id("X"), [s.last.id]: s.id("A") } } });
+    expect(lab.picks).toBe(1);
+    expect(lab.conferences[0].standings.map((r) => r.text)).toEqual(["4-0", "3-1", "1-2", "1-3", "0-3"]);
+    expect(lab.conferences[0].matchup!.teams).toEqual([s.id("L"), s.id("A")]);
+  });
+
   it("picking the last game in a made-up conference names the title game, settled by record", () => {
     expect(seasonLab(s, opts).conferences[0].matchup).toBeNull();
     const c = seasonLab(s, { ...opts, locks: { games: { [s.last.id]: s.id("A") } } }).conferences[0];
