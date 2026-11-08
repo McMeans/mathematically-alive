@@ -44,4 +44,8 @@ describe("shareable what-ifs", () => {
   it("a pick written with a leading zero isn't a real pick, so every link that loads is the one it shows", () => {
     expect(decodeLocks("0401-1.402-04", games)).toEqual({});
   });
+
+  it("spaces around a pick, as from a hand-typed or wrapped link, are ignored", () => {
+    expect(decodeLocks(" 401-1 . 402-4", games)).toEqual({ 401: 1, 402: 4 });
+  });
 });
