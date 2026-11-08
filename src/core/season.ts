@@ -1,6 +1,8 @@
 // The season data model every other part of the core works on, plus the
 // conversion from raw CollegeFootballData (CFBD) responses into it.
 
+import { HOME_FIELD } from "./odds";
+
 export type Classification = "fbs" | "fcs" | "other";
 
 /** How CFBD names the FBS independents' "conference". An FBS team with no conference at all counts as one too. */
@@ -17,6 +19,11 @@ export type Team = {
   altColor: string | null;
   /** SP+ rating in points per game above average, when published. */
   rating: number | null;
+  /**
+   * Points added to the rating for game odds only (not tiebreak stand-ins or the committee model): how far the team's
+   * latest betting lines sit from SP+, which catches injuries and form SP+ hasn't. Absent when there's no such gap.
+   */
+  marketShift?: number;
   /**
    * Barred from the postseason this season (an NCAA or conference penalty): it can't play in its conference's title
    * game or the playoff, though its games count for everyone else. Set from POSTSEASON_BANS; absent otherwise.
@@ -233,12 +240,46 @@ export function seasonFromCfbd(raw: CfbdSnapshot): Season {
     games.push(game);
   }
 
+  marketAdjust(teams, games);
   markTitleGames(raw.year, teams, games, named);
   games.push(...projectedFlexGames(raw.year, teams, games));
   games.sort((a, b) => a.start.localeCompare(b.start) || a.id - b.id);
   playoffGames.sort((a, b) => a.start.localeCompare(b.start) || a.id - b.id);
   const teamList = [...teams.values()].sort((a, b) => a.name.localeCompare(b.name));
   return { year: raw.year, fetchedAt: raw.fetchedAt, teams: teamList, games, playoffGames, committeeRankings: committeeRankings(raw.rankings ?? []) };
+}
+
+// How many of a team's latest lined games, and how much of their average gap from SP+, move its rating, and the
+// largest move allowed. A line already prices in injuries and form SP+ hasn't caught up with (a starting QB out);
+// games without a line are only rated by SP+, so this carries the market's view to them. Half the gap, because each
+// game's gap belongs to two teams and a few lines are noisy.
+const MARKET_GAMES = 3;
+const MARKET_WEIGHT = 0.5;
+const MARKET_CAP = 7;
+
+/** Set each rated FBS team's marketShift toward what its latest betting lines imply. */
+function marketAdjust(teams: Map<number, Team>, games: readonly Game[]): void {
+  const gaps = new Map<number, number[]>();
+  const lined = games.filter((g) => g.spread !== null).sort((a, b) => Date.parse(b.start) - Date.parse(a.start) || b.id - a.id);
+  for (const g of lined) {
+    const home = teams.get(g.homeId)?.rating;
+    const away = teams.get(g.awayId)?.rating;
+    if (home == null || away == null) continue;
+    const model = -(home - away) - (g.neutralSite ? 0 : HOME_FIELD);
+    const gap = (g.spread as number) - model; // > 0: the market rates home weaker than SP+ does
+    for (const [id, sign] of [[g.homeId, -1], [g.awayId, 1]] as const) {
+      const list = gaps.get(id) ?? [];
+      if (list.length < MARKET_GAMES) list.push(sign * gap);
+      gaps.set(id, list);
+    }
+  }
+  for (const [id, list] of gaps) {
+    const t = teams.get(id);
+    if (!t || t.rating == null || t.classification !== "fbs" || list.length === 0) continue;
+    const mean = list.reduce((a, b) => a + b, 0) / list.length;
+    const shift = Math.max(-MARKET_CAP, Math.min(MARKET_CAP, MARKET_WEIGHT * mean));
+    if (shift !== 0) t.marketShift = shift;
+  }
 }
 
 /** A College Football Playoff game: CFBD's `playoff.competition` is "cfp", or (before that field) its note says so. */

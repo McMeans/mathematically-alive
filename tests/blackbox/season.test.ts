@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { seasonFromCfbd, teamRecord, type CfbdGame, type CfbdSnapshot } from "@/core";
+import { gameWinProbability, seasonFromCfbd, teamRecord, winProbability, type CfbdGame, type CfbdSnapshot } from "@/core";
 
 // A tiny made-up conference: three FBS teams plus an FCS opponent that only
 // appears in a game row.
@@ -118,5 +118,99 @@ describe("teamRecord", () => {
     const raw = snapshot();
     const season = seasonFromCfbd({ ...raw, games: raw.games.filter((g) => g.id === 13) });
     expect(teamRecord(season, BETA)).toEqual({ wins: 0, losses: 0, conferenceWins: 0, conferenceLosses: 0 });
+  });
+});
+
+describe("market-adjusted ratings", () => {
+  // Alpha and Beta rate equal by SP+, so SP+ makes Alpha a 2.5-point home favorite over Beta.
+  const teams: CfbdSnapshot["teams"] = [
+    { id: ALPHA, school: "Alpha", conference: "Test", classification: "fbs" },
+    { id: BETA, school: "Beta", conference: "Test", classification: "fbs" },
+    { id: GAMMA, school: "Gamma", conference: "Test", classification: "fbs" },
+  ];
+  const ratings = [{ team: "Alpha", rating: 10 }, { team: "Beta", rating: 10 }, { team: "Gamma", rating: 0 }];
+  const games = [
+    game({ id: 20, homeId: ALPHA, awayId: GAMMA, week: 1 }),
+    game({ id: 21, homeId: ALPHA, awayId: BETA, week: 2, startDate: "2026-09-12T16:00:00.000Z" }),
+  ];
+  const unlined = (season: ReturnType<typeof seasonFromCfbd>) =>
+    gameWinProbability(season, season.games.find((g) => g.id === 21)!);
+
+  it("a line weaker than SP+ lowers a team's odds in its games without a line", () => {
+    // SP+ says Alpha by 12.5 over Gamma; the market says only 2.5 (say, its QB is out).
+    const base = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games, ratings, lines: [] });
+    const hurt = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games, ratings, lines: [{ id: 20, lines: [{ spread: -2.5 }] }] });
+    expect(unlined(hurt)).toBeLessThan(unlined(base));
+  });
+
+  it("moves a home team by half its line's gap from SP+", () => {
+    // SP+: Alpha by 12.5 at home. Line: Alpha by 2.5. Gap 10, so Alpha is 5 weaker: Beta's 2.5-point favorite at Alpha.
+    const hurt = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games, ratings, lines: [{ id: 20, lines: [{ spread: -2.5 }] }] });
+    expect(unlined(hurt)).toBeCloseTo(winProbability(2.5), 10);
+  });
+
+  it("moves an away team the same way when it's the side the line rates weaker", () => {
+    // SP+: Alpha by 7.5 at Gamma. Line: Alpha by 1.5. Alpha is 3 weaker, so a 0.5-point underdog at home to Beta.
+    const away = [game({ id: 20, homeId: GAMMA, awayId: ALPHA, week: 1 }), games[1]];
+    const s = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games: away, ratings, lines: [{ id: 20, lines: [{ spread: 1.5 }] }] });
+    expect(unlined(s)).toBeCloseTo(winProbability(0.5), 10);
+  });
+
+  it("gives no home edge at a neutral site when comparing a line with SP+", () => {
+    // Neutral site: SP+ says Alpha by 10, and so does the line, so nothing moves.
+    const neutral = [game({ id: 20, homeId: ALPHA, awayId: GAMMA, week: 1, neutralSite: true }), games[1]];
+    const s = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games: neutral, ratings, lines: [{ id: 20, lines: [{ spread: -10 }] }] });
+    expect(unlined(s)).toBeCloseTo(winProbability(-2.5), 10);
+  });
+
+  it("orders games by real time, not by how their dates are written", () => {
+    // Game 40 reads latest as text (20:00 at +05:00) but is the earliest (15:00 UTC), so its far-off line drops out.
+    const more = [
+      game({ id: 40, homeId: ALPHA, awayId: GAMMA, startDate: "2026-09-04T20:00:00+05:00" }),
+      game({ id: 41, homeId: ALPHA, awayId: GAMMA, startDate: "2026-09-04T16:00:00.000Z" }),
+      game({ id: 42, homeId: ALPHA, awayId: GAMMA, startDate: "2026-09-04T17:00:00.000Z" }),
+      game({ id: 43, homeId: ALPHA, awayId: GAMMA, startDate: "2026-09-04T18:00:00.000Z" }),
+      games[1],
+    ];
+    const lines = [{ id: 40, lines: [{ spread: 20 }] }, ...[41, 42, 43].map((id) => ({ id, lines: [{ spread: -12.5 }] }))];
+    const s = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games: more, ratings, lines });
+    expect(unlined(s)).toBeCloseTo(winProbability(-2.5), 10);
+  });
+
+  it("a line that agrees with SP+ leaves the odds alone", () => {
+    const base = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games, ratings, lines: [] });
+    const same = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games, ratings, lines: [{ id: 20, lines: [{ spread: -12.5 }] }] });
+    expect(unlined(same)).toBeCloseTo(unlined(base), 10);
+  });
+
+  it("an absurd line moves a team's strength by at most 7 points", () => {
+    const wild = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games, ratings, lines: [{ id: 20, lines: [{ spread: 80 }] }] });
+    // Alpha (10, at most 7 weaker) at home against Beta (10, its lines say nothing): no worse than a 4.5-point underdog.
+    expect(unlined(wild)).toBeCloseTo(winProbability(4.5), 10);
+  });
+
+  it("leaves the published SP+ rating alone, so tiebreak stand-ins and the committee model still use SP+", () => {
+    const hurt = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games, ratings, lines: [{ id: 20, lines: [{ spread: -2.5 }] }] });
+    expect(hurt.teams.find((t) => t.id === ALPHA)!.rating).toBe(10);
+  });
+
+  it("only uses a team's three latest lined games", () => {
+    // Three recent lines agree with SP+; an older one said Alpha was far weaker. The old one shouldn't count.
+    const more = [
+      game({ id: 30, homeId: ALPHA, awayId: GAMMA, week: 1, startDate: "2026-08-29T16:00:00.000Z" }),
+      game({ id: 31, homeId: ALPHA, awayId: GAMMA, week: 1, startDate: "2026-09-01T16:00:00.000Z" }),
+      game({ id: 32, homeId: ALPHA, awayId: GAMMA, week: 1, startDate: "2026-09-03T16:00:00.000Z" }),
+      game({ id: 33, homeId: ALPHA, awayId: GAMMA, week: 1, startDate: "2026-09-04T16:00:00.000Z" }),
+      games[1],
+    ];
+    const lines = [{ id: 30, lines: [{ spread: 20 }] }, ...[31, 32, 33].map((id) => ({ id, lines: [{ spread: -12.5 }] }))];
+    const s = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games: more, ratings, lines });
+    expect(unlined(s)).toBeCloseTo(winProbability(-2.5), 10);
+  });
+
+  it("a game with its own line still uses that line", () => {
+    const lined = [...games.slice(0, 1), { ...games[1] }];
+    const s = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games: lined, ratings, lines: [{ id: 20, lines: [{ spread: 20 }] }, { id: 21, lines: [{ spread: -3 }] }] });
+    expect(gameWinProbability(s, s.games.find((g) => g.id === 21)!)).toBeCloseTo(winProbability(-3), 10);
   });
 });
