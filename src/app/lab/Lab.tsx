@@ -128,7 +128,7 @@ function useLab(initial: LabView) {
   function fill(how: LabFill) {
     clearTimeout(timer.current);
     setRefining(true);
-    worker.current?.postMessage({ kind: "fill", id: ++latest.current, locks, how } satisfies LabRequest);
+    worker.current?.postMessage({ kind: "fill", id: ++latest.current, locks: current.current, how } satisfies LabRequest);
   }
   /** Pick a conference's title-game winner; picking the current one clears it. */
   function pickTitle(conference: string, winner: number) {

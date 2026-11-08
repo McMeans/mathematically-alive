@@ -38,6 +38,9 @@ describe("season lab: filling the rest", () => {
     // Every open game is picked, and the pick already made stays.
     expect(Object.keys(a.games)).toHaveLength(open.length);
     expect(a.games[open[0].id]).toBe(open[0].awayId);
+    // A pick on a game since gone final is dropped.
+    const final = season.games.find((g) => g.completed)!;
+    expect(fillLabLocks(season, { games: { [final.id]: final.homeId } }, "favorites").games[final.id]).toBeUndefined();
   });
 
   it("favourites win every open game when asked", () => {

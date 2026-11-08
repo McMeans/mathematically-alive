@@ -206,15 +206,17 @@ export type LabFill = "favorites" | { seed: number };
 const FILL_SALT = 1 << 24;
 
 /**
- * The picks plus a pick for every regular-season game neither final nor picked, title games aside (the standings
+ * The picks (less any on a game since gone final) plus a pick for every regular-season game neither final nor picked, title games aside (the standings
  * decide those). Existing picks stay. A seeded fill draws each game at its model odds; the same seed and picks give
  * the same season.
  */
 export function fillLabLocks(season: Season, locks: Partial<LabLocks>, how: LabFill): LabLocks {
   const out = filled(locks);
-  const games = { ...out.games };
+  // Picks on games since gone final are dropped, as seasonLab drops them.
+  const games: Record<number, number> = {};
   for (const g of season.games) {
-    if (g.completed || g.titleGame || games[g.id] !== undefined) continue;
+    if (g.completed || g.titleGame) continue;
+    if (out.games[g.id] !== undefined) { games[g.id] = out.games[g.id]; continue; }
     const p = gameWinProbability(season, g);
     const homeWins = how === "favorites" ? p >= 0.5 : mulberry32(mix(how.seed, 0, FILL_SALT + g.id))() < p;
     games[g.id] = homeWins ? g.homeId : g.awayId;
