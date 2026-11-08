@@ -33,11 +33,10 @@ let shown: SeasonLab | undefined;
 function run(locks: LabLocks, iterations: number, reuse: NationalResult | undefined) {
   return seasonLab(season, { ...base, iterations, locks, reuse });
 }
-function strip(lab: SeasonLab, changes: LabChanges | null): LabView {
-  const { national, ...view } = lab;
-  void national;
-  return { ...view, changes };
-}
+const strip = (lab: SeasonLab, changes: LabChanges | null): LabView => ({
+  summary: lab.summary, picks: lab.picks, open: lab.open, playoff: lab.playoff, conferences: lab.conferences,
+  ranking: lab.ranking, bigGames: lab.bigGames, changes,
+});
 
 self.onmessage = async (e: MessageEvent<LabRequest>) => {
   const req = e.data;
