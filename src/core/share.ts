@@ -23,7 +23,7 @@ export function decodeLocks(text: string | null | undefined, games: readonly (Pi
   if (!text) return locks;
   const byId = new Map(games.map((g) => [g.id, g]));
   for (const part of text.split(".")) {
-    const m = /^(\d+)-(\d+)$/.exec(part.trim());
+    const m = /^([1-9]\d{0,14})-([1-9]\d{0,14})$/.exec(part.trim()); // canonical ids only: no leading zeros
     if (!m) continue;
     const game = byId.get(Number(m[1]));
     const winner = Number(m[2]);

@@ -40,4 +40,8 @@ describe("shareable what-ifs", () => {
   it("a list of only unplayed games can leave out whether each was played", () => {
     expect(decodeLocks("401-2", [{ id: 401, homeId: 1, awayId: 2 }])).toEqual({ 401: 2 });
   });
+
+  it("a pick written with a leading zero isn't a real pick, so every link that loads is the one it shows", () => {
+    expect(decodeLocks("0401-1.402-04", games)).toEqual({});
+  });
 });

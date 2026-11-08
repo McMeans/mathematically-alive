@@ -78,7 +78,7 @@ function useWhatIf<R>(initial: R, conference: string | null, teamId: number, ope
       window.history.replaceState(window.history.state, "", url);
     }
     return () => w.terminate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load: the worker and a shared link's picks
   }, []);
 
   function update(next: Locks) {
