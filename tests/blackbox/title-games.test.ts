@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  committeeRanking, conferenceStandings, decodeLabLocks, encodeLabLocks, formatChampion, seasonFromCfbd, seasonOutlook, simulateNational, teamPath, teamRecord,
+  committeeRanking, conferenceStandings, decodeLabLocks, encodeLabLocks, formatChampion, seasonFromCfbd, seasonLab, seasonOutlook, simulateNational, teamPath, teamRecord,
   type CfbdGame, type CfbdSnapshot, type Game, type Season,
 } from "@/core";
 
@@ -216,6 +216,13 @@ describe("a listed title game decides who plays (2025 data under the 2026 rules)
     expect(out.locks).toEqual({ games: {}, titles: {}, bracket: {} });
     expect([out.settled, out.dropped]).toEqual([2, 0]);
     expect(out.note).toBe("2 picks were settled by real results.");
+  });
+
+  it("the Lab leaves out, and doesn't count, picks on a final title game or a final playoff game", () => {
+    const s = seasonFromCfbd(as2026(raw));
+    const lab = seasonLab(s, { iterations: 20, seed: 4, conferences: ["ACC", "Big 12", "Big Ten", "SEC"], locks: { titles: { ACC: id(s, "Virginia") }, bracket: { 0: id(s, "Duke") } } });
+    expect(lab.picks).toBe(0);
+    expect(lab.conferences.find((c) => c.conference === "ACC")!.picked).toBeNull();
   });
 
   it("the real 2025 title games, played, decide every champion", () => {

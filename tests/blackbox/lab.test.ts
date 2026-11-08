@@ -68,11 +68,24 @@ describe("season lab: picks", () => {
     expect(none.national.teams).toEqual(free.national.teams);
   });
 
-  it("refuses a title pick for a conference that isn't simulated or a team outside it", () => {
+  it("refuses a title pick for a team outside the conference, or a bracket game that doesn't exist", () => {
     const mac = season.teams.find((t) => t.conference === "Mid-American")!.id;
-    expect(() => seasonLab(season, { ...base, locks: { titles: { "Mid-American": mac } } })).toThrow(/isn't simulated/);
     expect(() => seasonLab(season, { ...base, locks: { titles: { SEC: mac } } })).toThrow(/not in SEC/);
     expect(() => seasonLab(season, { ...base, locks: { bracket: { 99: mac } } })).toThrow(/bracket game 99/);
+  });
+});
+
+describe("season lab: picks it would ignore", () => {
+  it("a title pick for a conference that isn't simulated is left out and not counted", () => {
+    const mac = season.teams.find((t) => t.conference === "Mid-American")!.id;
+    const lab = seasonLab(season, { ...base, locks: { titles: { "Mid-American": mac } }, reuse: free.national });
+    expect([lab.picks, lab.summary]).toEqual([0, "No picks yet · 300 simulated seasons"]);
+  });
+
+  it("a kind of pick passed as undefined reads as none", () => {
+    const lab = seasonLab(season, { ...base, locks: { games: undefined, titles: undefined, bracket: undefined }, reuse: free.national });
+    expect(lab.picks).toBe(0);
+    expect(decodeLabLocks(season, encodeLabLocks(season, { titles: undefined })).locks).toEqual({ games: {}, titles: {}, bracket: {} });
   });
 });
 

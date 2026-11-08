@@ -23,6 +23,10 @@ export type LabOptions = {
   seed: number;
   /** Conferences whose title games are simulated. Each needs tiebreak rules for the season. */
   conferences: readonly string[];
+  /**
+   * The picks. Ones the simulation would ignore are left out and not counted: a title pick for a conference not in
+   * `conferences` or whose title game is final, and a playoff pick on a game already final.
+   */
   locks?: Partial<LabLocks>;
   /** The no-picks run (or any earlier run of the same season, seed and iterations), to reuse what it can. */
   reuse?: NationalResult;
@@ -73,10 +77,20 @@ export type SeasonLab = {
 };
 
 const empty = (): LabLocks => ({ games: {}, titles: {}, bracket: {} });
+/** Picks with every kind present, even when the caller passed one as undefined. */
+const filled = (l: Partial<LabLocks> | undefined): LabLocks => ({ games: l?.games ?? {}, titles: l?.titles ?? {}, bracket: l?.bracket ?? {} });
 
 /** Run the Lab: the national simulation with every pick, and what the page shows. */
 export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
-  const locks = { ...empty(), ...opts.locks };
+  // Picks the simulation would ignore don't count: a title pick for a conference not simulated or whose title game
+  // is final, and a playoff pick on a game already final.
+  const given = filled(opts.locks);
+  const finals = finalBracketGames(season);
+  const locks: LabLocks = {
+    games: given.games,
+    titles: Object.fromEntries(Object.entries(given.titles).filter(([c]) => opts.conferences.includes(c) && !titleFinal(season, c))),
+    bracket: Object.fromEntries(Object.entries(given.bracket).filter(([k]) => !finals.has(Number(k)))),
+  };
   const national = simulateNational(season, {
     iterations: opts.iterations, seed: opts.seed, conferences: opts.conferences,
     locks: locks.games, titleLocks: locks.titles, bracketLocks: locks.bracket, reuse: opts.reuse,
@@ -121,7 +135,7 @@ const conferencesOf = (season: Season): string[] =>
 
 /** Picks as a short URL-safe string. Throws for a game pick on a game the season doesn't have, or a team not in it. */
 export function encodeLabLocks(season: Season, locks: Partial<LabLocks>): string {
-  const { games, titles, bracket } = { ...empty(), ...locks };
+  const { games, titles, bracket } = filled(locks);
   const out: number[] = [];
   const put = (v: number) => {
     let x = v;
@@ -205,7 +219,7 @@ export function decodeLabLocks(season: Season, text: string): DecodedLabLocks {
       const t = season.teams.find((x) => x.id === team);
       if (c === undefined || t?.conference !== c) { dropped++; continue; }
       let final: boolean;
-      try { final = titleRace(season, c).game?.completed === true; } catch { dropped++; continue; } // no title-game rules
+      try { final = titleFinal(season, c); } catch { dropped++; continue; } // no title-game rules
       if (final) settled++;
       else locks.titles[c] = team;
     }
@@ -225,6 +239,9 @@ export function decodeLabLocks(season: Season, text: string): DecodedLabLocks {
   }
   return done();
 }
+
+/** Whether the conference's title game is final in the data. Throws for a conference with no title-game rules. */
+const titleFinal = (season: Season, conference: string): boolean => titleRace(season, conference).game?.completed === true;
 
 /** Bracket game indexes already final: the announced field's games, walked as the real results fill the bracket. */
 function finalBracketGames(season: Season): Set<number> {
