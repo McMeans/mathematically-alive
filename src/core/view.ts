@@ -18,7 +18,8 @@ export type FieldSpot = {
   bye: number;
   champion: number;
   /**
-   * "In 92% · seed 3 in 31%"; once the field is announced, "National title 23%", "Beat Ohio State 24-14 in the
+   * "In 92% · seed 3 in 31%"; once the field is announced, "National title 23%", "First-round bye · national title
+   * 31%" (before its first game), "Beat Ohio State 24-14 in the
    * quarterfinal · national title 41%", "Lost to Miami 24-14 in the quarterfinal" or "Won the national title, 27-21
    * over Miami".
    */
@@ -113,9 +114,11 @@ function announcedView(
     const run = p?.run ?? null;
     const odds = `national title ${formatFine(p?.champion ?? 0)}`;
     const tail = run?.text.includes(": ") ? run.text.slice(run.text.indexOf(": ") + 2) : "";
-    const said = tail === "" ? "" : tail[0].toUpperCase() + tail.slice(1);
+    const bye = T === 12 && k < 4;
+    // Before its first game, a bye team's run says so: "First-round bye · national title 23%".
+    const said = tail !== "" ? tail[0].toUpperCase() + tail.slice(1) : run?.state === "in" && bye ? "First-round bye" : "";
     const text = run?.state === "in" ? (said ? `${said} · ${odds}` : odds[0].toUpperCase() + odds.slice(1)) : said;
-    return { seed: k + 1, teamId: id, field: 1, atSeed: 1, bye: T === 12 && k < 4 ? 1 : 0, champion: p?.champion ?? 0, text };
+    return { seed: k + 1, teamId: id, field: 1, atSeed: 1, bye: bye ? 1 : 0, champion: p?.champion ?? 0, text };
   });
   // The bracket as played: each game's two teams once the games feeding it are final, its result once it is.
   const name = (id: number) => season?.teams.find((t) => t.id === id)?.name ?? `Team ${id}`;

@@ -157,7 +157,9 @@ describe("the playoff in progress", () => {
     const run = (n: string) => nat.teams.find((t) => t.teamId === id(n))!.playoff!.run;
     expect(run("Georgia")?.text).toBe("Seed 3 in the playoff, with a first-round bye");
     expect(run("Oregon")?.text).toBe("Seed 5 in the playoff");
-    expect(nationalView(nat, { season: s })!.field[2].text).toMatch(/^National title \d+%$/);
+    const field = nationalView(nat, { season: s })!.field;
+    expect(field[2].text).toMatch(/^First-round bye · national title \d+%$/);
+    expect(field[4].text).toMatch(/^National title \d+%$/);
   });
 });
 
