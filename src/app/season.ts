@@ -1,5 +1,5 @@
 // Server-side season data and the base (no what-if) computation, shared by pages.
-import { INDEPENDENTS, explore, seasonLab, exploreIndependent, independentOutlook, seasonOutlook, simulateNational, simulateSeason, type Season } from "@/core";
+import { INDEPENDENTS, explore, exploreIndependent, independentOutlook, seasonLab, seasonOutlook, simulateNational, simulateSeason, type Season } from "@/core";
 import data from "./data/season.json";
 
 import { ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
@@ -55,7 +55,6 @@ const dayFormat = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York
 const lastPlayed = Math.max(...season.games.filter((g) => g.completed).map((g) => Date.parse(g.start)).filter((t) => !Number.isNaN(t)));
 /** "Through Oct 31": the day of the latest final game, Eastern time; the fetch time when no game is final. */
 export const through = Number.isFinite(lastPlayed) ? `Through ${dayFormat.format(new Date(lastPlayed))}` : asOf;
-
 
 /** The Season Lab with no picks, from the base national run. */
 export const baseLab = seasonLab(season, { iterations: ITERATIONS, seed: SEED, conferences: SUPPORTED_CONFERENCES, reuse: baseNational });
