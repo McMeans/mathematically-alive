@@ -3,7 +3,7 @@
 // and a power-conference title, with weights fitted to past committee rankings (scripts/fit-committee.ts, on the
 // fixtures scripts/fetch-cfp.ts makes). Higher scores rank higher.
 import { COMMITTEE_WEIGHTS } from "./committee-weights";
-import { isArmyNavy, isFlexGame, type Game, type Season, type Team } from "./season";
+import { findTitleGame, type Game, type Season, type Team } from "./season";
 
 /** What the score weighs. `champion` is 1 for a power-conference champion, else 0. */
 export type CommitteeFeatures = {
@@ -51,28 +51,14 @@ export const committeeScore = (f: CommitteeFeatures, w: CommitteeWeights = COMMI
   w.wins * f.wins + w.losses * f.losses + w.rating * f.rating + w.strength * f.strength + w.champion * f.champion;
 
 /**
- * The conference's title game in the data, as an index into `season.games`, or -1. Among games between two members
- * in the latest week that has any (once earlier weeks have some): the only one, or else the only one at a neutral
- * site (a regular-season game postponed into title week, like Cal-Stanford in 2018, is at home). CFBD's conference
- * flag can't tell: title games are conference games before 2025, non-conference games from 2025. Meant for power
- * conferences, whose last regular week has several home games between members, and the American, whose Army-Navy
- * (two members, the week after the title game) is left out. The Pac-12's flex games (week 13, the week before its
- * title game) are left out too: data listing only some of them could otherwise leave one alone in the latest week.
+ * The conference's title game in the data, as an index into `season.games`, or -1: the game `seasonFromCfbd` marked
+ * (`Game.titleGame`), or, in a season built some other way with none marked, the one `findTitleGame` finds.
  */
 export function titleGameIndex(season: Season, ids: ReadonlySet<number>): number {
-  const byId = new Map(season.teams.map((t) => [t.id, t]));
-  const between = season.games.flatMap((g, i) => {
-    const h = byId.get(g.homeId);
-    const a = byId.get(g.awayId);
-    const late = isArmyNavy(h?.name, a?.name) || isFlexGame(season.year, g.week, h?.conference, a?.conference);
-    return ids.has(g.homeId) && ids.has(g.awayId) && !late ? [i] : [];
-  });
-  const last = Math.max(...between.map((i) => season.games[i].week));
-  const inLast = between.filter((i) => season.games[i].week === last);
-  if (inLast.length === between.length) return -1;
-  if (inLast.length === 1) return inLast[0];
-  const neutral = inLast.filter((i) => season.games[i].neutralSite);
-  return neutral.length === 1 ? neutral[0] : -1;
+  const marked = season.games.findIndex((g) => g.titleGame === true && ids.has(g.homeId) && ids.has(g.awayId));
+  if (marked >= 0) return marked;
+  if (season.games.some((g) => g.titleGame === true)) return -1;
+  return findTitleGame(season.year, new Map(season.teams.map((t) => [t.id, t])), season.games, ids);
 }
 
 const winnerOf = (g: Game): number => (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId);

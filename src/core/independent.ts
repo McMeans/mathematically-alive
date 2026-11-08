@@ -31,7 +31,7 @@ export type IndependentOutlook = {
   playoff: number;
   /** Its full playoff odds: field, bye, seeds, rounds, national title. */
   cfp: NationalPlayoff;
-  /** How it gets in, in a sentence without its period. */
+  /** How it gets in, in a sentence without its period; once the field is announced, its seed and playoff so far (`PlayoffRun.text`). */
   route: string;
   /** Barred from the postseason this season (`Team.postseasonBan`). */
   postseasonBan: boolean;
@@ -104,6 +104,7 @@ export function independentOutlook(season: Season, opts: IndependentOptions, sha
       playoff: odds.get(t.id)!.field,
       cfp: odds.get(t.id)!,
       route: t.postseasonBan ? BARRED
+        : odds.get(t.id)!.run ? odds.get(t.id)!.run!.text
         : autoBid && t.name === "Notre Dame" ? "No conference to win: gets in with a top-12 finish in the final ranking (an automatic bid), else at large"
         : "No conference to win: gets in at large",
       postseasonBan: t.postseasonBan === true,

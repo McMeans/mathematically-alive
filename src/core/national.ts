@@ -10,9 +10,10 @@
 // game's draw and what-if runs stay paired with the base run.
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { powerConferences, teamRating, titleGameIndex } from "./committee";
-import { bracketGames, championsNeeded, fieldPicker, findFormat } from "./playoff";
+import { announcedField, bracketGames, championsNeeded, fieldPicker, findFormat, playoffRun, type AnnouncedField, type PlayoffRun } from "./playoff";
 import { isArmyNavy, type Game, type Season } from "./season";
 import { COMMITTEE_SALT, HOME_FIELD, PLAYOFF_SALT, mix, neutralOdds, simulateSeason, tiebreakDraw, titleRoll, type SimResult } from "./sim";
+import { pairKey } from "./steps";
 import { championshipFromData, conferenceData, type ConferenceData } from "./tiebreak";
 
 export type NationalOptions = {
@@ -67,6 +68,8 @@ export type NationalPlayoff = {
   final: number;
   /** Wins the national title. */
   champion: number;
+  /** Once the committee has announced the field (`announcedField`): its seed and its playoff so far. Null before. */
+  run: PlayoffRun | null;
 };
 
 /** One simulated season after stages 2 and 3. Valid only during the forEachIteration callback. */
@@ -92,6 +95,12 @@ export type NationalResult = {
    * a season with no format.
    */
   playoff: boolean;
+  /**
+   * The field the committee announced, once the data has it (`announcedField`): every simulated season uses it, and
+   * the playoff games already final decide their games in the bracket. Null before (the field is simulated), and
+   * when the playoff isn't simulated.
+   */
+  announced: AnnouncedField | null;
   /** Every FBS team, the stand-in's average order (best mean rank first). */
   teams: NationalTeam[];
   /**
@@ -192,7 +201,10 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const format = findFormat(season.year);
   const needs = format ? championsNeeded(format) : "all";
   const playoff = needs === "none" || (needs === "power" && [...power].every((c) => conferences.includes(c)));
-  const pick = playoff ? fieldPicker(season) : () => [];
+  const announced = playoff ? announcedField(season) : null;
+  const pick = !playoff ? () => [] : announced ? () => announced.seeds : fieldPicker(season);
+  // Playoff games already final, by their two teams: they decide their games in the bracket.
+  const finals = new Map((announced ? season.playoffGames ?? [] : []).filter((g) => g.completed).map((g) => [pairKey(g.homeId, g.awayId), g]));
   const T = format?.teams ?? 12;
   const bracket = bracketGames(T);
   const odds = neutralOdds(season);
@@ -422,7 +434,9 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       const a = x >= 0 ? field[x] : slot[~x];
       const b = y >= 0 ? field[y] : slot[~y];
       const u = (mix(seed, it, PLAYOFF_SALT + g) + 0.5) / 4294967296;
-      const win = u < odds(a, b, teams.shift(a), teams.shift(b), hosted ? HOME_FIELD : 0) ? a : b;
+      const real = finals.get(pairKey(a, b));
+      const win = real ? (real.homePoints! > real.awayPoints! ? real.homeId : real.awayId)
+        : u < odds(a, b, teams.shift(a), teams.shift(b), hosted ? HOME_FIELD : 0) ? a : b;
       slot[g] = win;
       // Rounds reached: a first-round win is a quarterfinal (byes were counted with the seeds); semifinals and the
       // final count both teams.
@@ -445,6 +459,7 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       semifinal: reached[1][k] / n,
       final: reached[2][k] / n,
       champion: reached[3][k] / n,
+      run: announced ? playoffRun(season, announced.seeds, fbsIds[k]) : null,
     };
   };
   const simulatedTeams = new Set(races.flatMap((r) => [...r.data.ids]));
@@ -486,6 +501,7 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
     iterations: n,
     conferences,
     playoff,
+    announced,
     teams: teamsOut,
     games: own.map((o) => ({
       gameId: games[o.i].id, fieldIfWin: o.field[0] / n, fieldIfLose: o.field[1] / n,

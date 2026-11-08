@@ -26,6 +26,8 @@ export function provenStatus(
 ): ProvenStatus {
   if (pool && pool.left <= 0) return "open";
   const data = conferenceData(season, conference);
+  // The title game in the data decides: its two teams are in, everyone else is out.
+  if (data.decided) return data.decided.homeId === teamId || data.decided.awayId === teamId ? "clinched" : "eliminated";
   /** One check, with `budget` nodes or what's left in the pool if less; what it uses comes out of the pool. */
   const run = (f: (check: { left: number }) => boolean): boolean => {
     const check = { left: pool ? Math.min(budget, pool.left) : budget };

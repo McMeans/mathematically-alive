@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { formatRecord, formatSideOdds, formatTitleOdds, type Impact, type IndependentGame, type IndependentOutlook, type SeasonWeek, type TeamOutlook } from "@/core";
+import { formatChampion, formatPlayoff, formatRecord, formatTitleOdds, type Impact, type IndependentGame, type IndependentOutlook, type SeasonWeek, type TeamOutlook } from "@/core";
 import type { Locks, TeamInfo } from "./Explorer";
 import { Beta, IndependentDetail, PlayoffDetail, playoffText } from "./Panels";
 import { useConference } from "./conference";
@@ -176,7 +176,6 @@ function byOdds(names: Record<number, string>) {
   return (a: TeamOutlook, b: TeamOutlook) => key(b) - key(a) || names[a.teamId].localeCompare(names[b.teamId]);
 }
 
-const sideOdds = (p: number, o: TeamOutlook) => formatSideOdds(p, o.status);
 const titleOdds = (o: TeamOutlook) => formatTitleOdds(o.titleGame, o.status);
 
 // In / Out on the navy own-game card, light enough to read there.
@@ -323,8 +322,9 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
             {has && <p className="text-xs text-ink-muted">Today {titleOdds(today)}</p>}
           </div>
           <div className="flex flex-col gap-1 border-t border-navy/10 pt-2 text-sm text-ink-soft">
-            <p className="flex justify-between">{labels.champion}<span className="font-bold text-navy">{sideOdds(me.champion, me)}</span></p>
-            <p className="flex justify-between"><span className="flex items-center gap-1">{labels.playoff}<Beta /></span><span className="font-bold text-navy">{playoffText(me, sideOdds(me.playoff, me), labels)}</span></p>
+            <p className="flex justify-between">{labels.champion}<span className="font-bold text-navy">{formatChampion(me)}</span></p>
+            {me.titleResult && <p className="text-right text-xs text-ink-muted">{me.titleResult.text}</p>}
+            <p className="flex justify-between"><span className="flex items-center gap-1">{labels.playoff}<Beta /></span><span className="font-bold text-navy">{playoffText(me, formatPlayoff(me.playoff, me.cfp, me.status), labels)}</span></p>
             <PlayoffDetail outlook={me} className="justify-end" />
           </div>
         </section>
@@ -432,7 +432,7 @@ export function IndependentWhatIf({ team, me, today, locks, games, teamId, onPic
   const picks = games.filter((g) => locks[g.gameId] !== undefined)
     .map((g) => ({ id: g.gameId, what: locks[g.gameId] === teamId ? `Beat ${g.opponent}` : `Lose to ${g.opponent}`, when: g.date }));
   const has = picks.length > 0;
-  const odds = (o: IndependentOutlook) => formatSideOdds(o.playoff, o.postseasonBan ? "eliminated" : "alive");
+  const odds = (o: IndependentOutlook) => formatPlayoff(o.playoff, o.cfp, o.postseasonBan ? "eliminated" : "alive");
   const verdict = odds(me);
   return (
     <div className="flex flex-col tall:min-h-0 tall:flex-1">
