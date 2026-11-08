@@ -75,7 +75,7 @@ stand-in's plain score, and it is labelled as the projection.
 - **Diff.** `labChanges(before, after)`: the biggest movers in field odds, seeds, title-game spots; the sentences
   for the change log.
 - **Ranking reasons.** From `CommitteeTeam` features: the one or two biggest contributions to the score, as words.
-- **Lock codec.** `encodeLocks`/`decodeLocks` live in core so tests can round-trip them.
+- **Lock codec.** `encodeLabLocks`/`decodeLabLocks` live in core so tests can round-trip them.
 
 No `Math.random()`; every draw stays hashed from the seed.
 

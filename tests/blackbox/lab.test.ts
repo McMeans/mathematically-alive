@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { decodeLocks, encodeLocks, seasonFromCfbd, seasonLab, type CfbdSnapshot, type Season } from "@/core";
+import { decodeLabLocks, encodeLabLocks, seasonFromCfbd, seasonLab, type CfbdSnapshot, type Season } from "@/core";
 
 // Every FBS game of 2026 through week 9, from fixtures/cfp-2026.json.
 const season = seasonFromCfbd((JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot }).snapshot);
@@ -82,50 +82,50 @@ describe("season lab: picks in a link", () => {
   const locks = { games: { [g1.id]: g1.awayId, [g2.id]: g2.homeId }, titles: { SEC: sec.teams[0].teamId }, bracket: { 10: free.playoff!.field[0].teamId } };
 
   it("round-trips every kind of pick through a short URL-safe string", () => {
-    const text = encodeLocks(season, locks);
+    const text = encodeLabLocks(season, locks);
     expect(text).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(text.length).toBeLessThan(40);
-    expect(decodeLocks(season, text)).toEqual({ locks, settled: 0, dropped: 0, note: "" });
+    expect(decodeLabLocks(season, text)).toEqual({ locks, settled: 0, dropped: 0, note: "" });
   });
 
   it("no picks round-trip to no picks, and an empty string reads as none", () => {
-    expect(decodeLocks(season, encodeLocks(season, {})).locks).toEqual({ games: {}, titles: {}, bracket: {} });
-    expect(decodeLocks(season, "")).toEqual({ locks: { games: {}, titles: {}, bracket: {} }, settled: 0, dropped: 0, note: "" });
+    expect(decodeLabLocks(season, encodeLabLocks(season, {})).locks).toEqual({ games: {}, titles: {}, bracket: {} });
+    expect(decodeLabLocks(season, "")).toEqual({ locks: { games: {}, titles: {}, bracket: {} }, settled: 0, dropped: 0, note: "" });
   });
 
   it("a pick on a game that has since gone final is dropped and reported", () => {
-    const text = encodeLocks(season, { games: { [g1.id]: g1.homeId, [g2.id]: g2.awayId } });
+    const text = encodeLabLocks(season, { games: { [g1.id]: g1.homeId, [g2.id]: g2.awayId } });
     const later: Season = { ...season, games: season.games.map((g) => (g.id === g1.id ? { ...g, completed: true, homePoints: 10, awayPoints: 7 } : g)) };
-    const out = decodeLocks(later, text);
+    const out = decodeLabLocks(later, text);
     expect(out.locks.games).toEqual({ [g2.id]: g2.awayId });
     expect(out.settled).toBe(1);
     expect(out.note).toBe("1 pick was settled by real results.");
   });
 
   it("picks that no longer fit the season are left out, and garbage never throws", () => {
-    const text = encodeLocks(season, locks);
+    const text = encodeLabLocks(season, locks);
     const smaller: Season = { ...season, games: season.games.filter((g) => g.id !== g1.id) };
-    const out = decodeLocks(smaller, text);
+    const out = decodeLabLocks(smaller, text);
     expect(out.dropped).toBe(1);
     expect(out.locks.games).toEqual({ [g2.id]: g2.homeId });
     expect(out.note).toBe("1 pick no longer fits the season and was left out.");
-    for (const junk of ["!!!!", "A", "AQ", "Ag", "_____w", text + "AA"]) expect(() => decodeLocks(season, junk)).not.toThrow();
-    expect(decodeLocks(season, "!!!!").dropped).toBe(1);
-    expect(decodeLocks(season, "Ag").dropped).toBe(1); // version 2
-    expect(decodeLocks(season, text.slice(0, 4)).dropped).toBe(1); // cut off
+    for (const junk of ["!!!!", "A", "AQ", "Ag", "_____w", text + "AA"]) expect(() => decodeLabLocks(season, junk)).not.toThrow();
+    expect(decodeLabLocks(season, "!!!!").dropped).toBe(1);
+    expect(decodeLabLocks(season, "Ag").dropped).toBe(1); // version 2
+    expect(decodeLabLocks(season, text.slice(0, 4)).dropped).toBe(1); // cut off
   });
 
   it("a title pick for a conference with no title game is left out", () => {
     const ind = season.teams.find((t) => t.conference === "FBS Independents");
     if (!ind) return;
-    const out = decodeLocks(season, encodeLocks(season, { titles: { "FBS Independents": ind.id } }));
+    const out = decodeLabLocks(season, encodeLabLocks(season, { titles: { "FBS Independents": ind.id } }));
     expect(out.locks.titles).toEqual({});
     expect(out.dropped).toBe(1);
   });
 
   it("refuses to encode a pick for a game or team the season doesn't have", () => {
-    expect(() => encodeLocks(season, { games: { 1: 2 } })).toThrow(/unknown game 1/);
-    expect(() => encodeLocks(season, { games: { [g1.id]: -5 } })).toThrow(/not in game/);
-    expect(() => encodeLocks(season, { titles: { Nowhere: 1 } })).toThrow(/isn't a conference/);
+    expect(() => encodeLabLocks(season, { games: { 1: 2 } })).toThrow(/unknown game 1/);
+    expect(() => encodeLabLocks(season, { games: { [g1.id]: -5 } })).toThrow(/not in game/);
+    expect(() => encodeLabLocks(season, { titles: { Nowhere: 1 } })).toThrow(/isn't a conference/);
   });
 });

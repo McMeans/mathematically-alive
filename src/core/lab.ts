@@ -119,7 +119,7 @@ const conferencesOf = (season: Season): string[] =>
   [...new Set(season.teams.flatMap((t) => (t.conference ? [t.conference] : [])))].sort();
 
 /** Picks as a short URL-safe string. Throws for a game pick on a game the season doesn't have, or a team not in it. */
-export function encodeLocks(season: Season, locks: Partial<LabLocks>): string {
+export function encodeLabLocks(season: Season, locks: Partial<LabLocks>): string {
   const { games, titles, bracket } = { ...empty(), ...locks };
   const out: number[] = [];
   const put = (v: number) => {
@@ -154,7 +154,7 @@ export function encodeLocks(season: Season, locks: Partial<LabLocks>): string {
   return toBase64Url(out);
 }
 
-export type DecodedLocks = {
+export type DecodedLabLocks = {
   locks: LabLocks;
   /** Picks dropped because the real game has since gone final. */
   settled: number;
@@ -164,12 +164,12 @@ export type DecodedLocks = {
   note: string;
 };
 
-/** Read picks back from `encodeLocks`. Never throws: anything that no longer fits the season is dropped and counted. */
-export function decodeLocks(season: Season, text: string): DecodedLocks {
+/** Read picks back from `encodeLabLocks`. Never throws: anything that no longer fits the season is dropped and counted. */
+export function decodeLabLocks(season: Season, text: string): DecodedLabLocks {
   const locks = empty();
   let settled = 0;
   let dropped = 0;
-  const done = (): DecodedLocks => ({ locks, settled, dropped, note: dropNote(settled, dropped) });
+  const done = (): DecodedLabLocks => ({ locks, settled, dropped, note: dropNote(settled, dropped) });
   const bytes = fromBase64Url(text);
   if (bytes === null) return (dropped = text === "" ? 0 : 1), done();
   let p = 0;
