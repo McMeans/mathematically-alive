@@ -45,3 +45,5 @@ export { nationalView, playoffSignals } from "./view";
 export { INDEPENDENTS, exploreIndependent, independentOutlook } from "./independent";
 export type { IndependentExploration, IndependentGame, IndependentOptions, IndependentOutlook } from "./independent";
 export type { BracketGame, BracketSide, BubbleTeam, FieldSpot, NationalView, PlayoffSignal } from "./view";
+export { decodeLocks, encodeLocks } from "./share";
+export type { Locks } from "./share";
