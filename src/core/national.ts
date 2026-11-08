@@ -22,6 +22,16 @@ export type NationalOptions = {
   seed: number;
   /** Forced results: game id -> id of the team that wins it. */
   locks?: Record<number, number>;
+  /**
+   * Forced title-game winners: conference -> the team that wins its title game, in the seasons that team plays in it.
+   * A title game already final in the data keeps its real result. Each conference must be simulated, each team a member.
+   */
+  titleLocks?: Record<string, number>;
+  /**
+   * Forced playoff winners: bracket game index (`NationalView.bracket`) -> the team that wins it, in the seasons that
+   * team plays in it. A playoff game already final keeps its real result.
+   */
+  bracketLocks?: Record<number, number>;
   /** Conferences whose title games are simulated. Each needs tiebreak rules for the season. */
   conferences: readonly string[];
   /**
@@ -115,17 +125,21 @@ export type NationalResult = {
 };
 
 /** What a later run needs to reuse a run's title games (NationalOptions.reuse). */
-type Reusable = { season: Season; seed: number; iterations: number; conferences: readonly string[]; locks: Record<number, number>; titles: Int32Array; rankings: Uint16Array; focus: boolean };
+type Reusable = {
+  season: Season; seed: number; iterations: number; conferences: readonly string[]; locks: Record<number, number>;
+  titleLocks: Record<string, number>; bracketLocks: Record<number, number>; titles: Int32Array; rankings: Uint16Array; focus: boolean };
 const reusable = new WeakMap<NationalResult, Reusable>();
 
 /** Whether an earlier run is this one: same season, seed, iterations, conferences (any order) and locks, and no focus team. */
 function sameRun(season: Season, opts: NationalOptions, conferences: readonly string[], r: Reusable | undefined): boolean {
   if (!r || r.season !== season || r.seed !== opts.seed || r.iterations !== opts.iterations || r.focus) return false;
   if ([...r.conferences].sort().join() !== [...conferences].sort().join()) return false;
-  const locks = opts.locks ?? {};
-  const keys = new Set([...Object.keys(locks), ...Object.keys(r.locks)]);
-  return [...keys].every((k) => locks[Number(k)] === r.locks[Number(k)]);
+  return sameKeys(opts.locks ?? {}, r.locks) && sameKeys(opts.titleLocks ?? {}, r.titleLocks) && sameKeys(opts.bracketLocks ?? {}, r.bracketLocks);
 }
+
+/** Whether two lock maps force the same results. */
+const sameKeys = (x: Record<string | number, number>, y: Record<string | number, number>): boolean =>
+  [...new Set([...Object.keys(x), ...Object.keys(y)])].every((k) => x[k] === y[k]);
 
 /** Per race, where to copy the earlier run's title games from (its titles at (iteration * stride + at) * 3), or null to play them. */
 function reusedTitles(season: Season, opts: NationalOptions, n: number, races: TitleRace[]): ({ titles: Int32Array; stride: number; at: number } | null)[] {
@@ -141,9 +155,10 @@ function reusedTitles(season: Season, opts: NationalOptions, n: number, races: T
     touched.add(g.homeId);
     touched.add(g.awayId);
   }
+  const titleLocks = opts.titleLocks ?? {};
   return races.map((race) => {
     const at = r.conferences.indexOf(race.conference);
-    return at < 0 || [...touched].some((id) => race.data.ids.has(id)) ? null : { titles: r.titles, stride: r.conferences.length, at };
+    return at < 0 || titleLocks[race.conference] !== r.titleLocks[race.conference] || [...touched].some((id) => race.data.ids.has(id)) ? null : { titles: r.titles, stride: r.conferences.length, at };
   });
 }
 
@@ -171,8 +186,9 @@ const gameBetween = (race: TitleRace, a: number, b: number): Game | null => {
 
 /**
  * Stage 2 for one conference in one simulated season: [seed 1, seed 2, champion]. The rules pick the teams. When
- * the data has the title game between those two, its result (final, locked or simulated) decides; otherwise a
- * neutral-site game at the season's simulated ratings. Not part of the public API.
+ * the data has the title game between those two and it is final, its result decides. Otherwise a forced winner
+ * (`locked`) in the game wins it; then the data's game (locked or simulated) decides, or else a neutral-site game at
+ * the season's simulated ratings. Not part of the public API.
  */
 export function playTitleGame(
   race: TitleRace,
@@ -181,9 +197,12 @@ export function playTitleGame(
   winnerOf: (game: Game) => number,
   rank: (teamId: number) => number,
   shift: (teamId: number) => number,
+  locked?: number,
 ): [number, number, number] {
   const [a, b] = championshipFromData(race.data, winnerOf, { draw: tiebreakDraw(seed, iteration, race.conference), rank });
   const g = gameBetween(race, a, b);
+  if (g?.completed) return [a, b, winnerOf(g)];
+  if (locked === a || locked === b) return [a, b, locked];
   if (g) return [a, b, winnerOf(g)];
   return [a, b, titleRoll(seed, iteration, race.conference) < race.odds(a, b, shift(a), shift(b)) ? a : b];
 }
@@ -195,6 +214,13 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   // Nothing differs from the earlier run (no focus team asked for): it is this run.
   if (opts.reuse && opts.teamId === undefined && sameRun(season, opts, conferences, reusable.get(opts.reuse))) return opts.reuse;
   const races = conferences.map((c) => titleRace(season, c));
+  const titleLocks = opts.titleLocks ?? {};
+  for (const [c, id] of Object.entries(titleLocks)) {
+    const race = races.find((r) => r.conference === c);
+    if (!race) throw new Error(`${c}'s title game isn't simulated, so it can't be locked`);
+    if (!race.data.ids.has(id)) throw new Error(`team ${id} is not in ${c}`);
+  }
+  const bracketLocks = opts.bracketLocks ?? {};
   const sim = shared ?? simulateSeason(season, { iterations, seed, locks: opts.locks });
   const n = sim.iterations;
   const C = races.length;
@@ -208,6 +234,10 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const finals = new Map((announced ? season.playoffGames ?? [] : []).filter((g) => g.completed).map((g) => [pairKey(g.homeId, g.awayId), g]));
   const T = format?.teams ?? 12;
   const bracket = bracketGames(T);
+  for (const k of Object.keys(bracketLocks)) {
+    const g = Number(k);
+    if (!Number.isInteger(g) || g < 0 || g >= bracket.length) throw new Error(`bracket game ${k} doesn't exist`);
+  }
   const odds = neutralOdds(season);
 
   const byId = new Map(season.teams.map((t) => [t.id, t]));
@@ -337,7 +367,7 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
     for (let c = 0; c < C; c++) {
       const from = copied[c];
       const at = from ? (it * from.stride + from.at) * 3 : 0;
-      const [a, b, ch] = from ? [from.titles[at], from.titles[at + 1], from.titles[at + 2]] : playTitleGame(races[c], seed, it, winnerOf, teams.rank, teams.shift);
+      const [a, b, ch] = from ? [from.titles[at], from.titles[at + 1], from.titles[at + 2]] : playTitleGame(races[c], seed, it, winnerOf, teams.rank, teams.shift, titleLocks[races[c].conference]);
       titles.set([a, b, ch], (it * C + c) * 3);
       inTitle.set(a, inTitle.get(a)! + 1);
       inTitle.set(b, inTitle.get(b)! + 1);
@@ -398,7 +428,7 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       swap(wi, -1, 1);
       swap(oi, 1, -1);
       const replayed = touched.map((c) => {
-        const r = playTitleGame(races[c], seed, it, flipped, (id) => teams.rankIf(id, o.i), teams.shift);
+        const r = playTitleGame(races[c], seed, it, flipped, (id) => teams.rankIf(id, o.i), teams.shift, titleLocks[races[c].conference]);
         creditTitle(c, r[0], r[1], r[2]);
         changed.push(r[0], r[1]);
         return r;
@@ -436,7 +466,9 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       const b = y >= 0 ? field[y] : slot[~y];
       const u = (mix(seed, it, PLAYOFF_SALT + g) + 0.5) / 4294967296;
       const real = finals.get(pairKey(a, b));
+      const forced = bracketLocks[g];
       const win = real ? (real.homePoints! > real.awayPoints! ? real.homeId : real.awayId)
+        : forced === a || forced === b ? forced
         : u < odds(a, b, teams.shift(a), teams.shift(b), hosted ? HOME_FIELD : 0) ? a : b;
       slot[g] = win;
       // Rounds reached: a first-round win is a quarterfinal (byes were counted with the seeds); semifinals and the
@@ -520,6 +552,7 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       }
     },
   };
-  reusable.set(result, { season, seed, iterations: n, conferences, locks: { ...(opts.locks ?? {}) }, titles, rankings, focus: opts.teamId !== undefined });
+  reusable.set(result, { season, seed, iterations: n, conferences, locks: { ...(opts.locks ?? {}) },
+    titleLocks: { ...titleLocks }, bracketLocks: { ...bracketLocks }, titles, rankings, focus: opts.teamId !== undefined });
   return result;
 }

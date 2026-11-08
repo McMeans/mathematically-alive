@@ -29,6 +29,8 @@ export { seasonOutlook } from "./outlook";
 export type { OutlookOptions, SeasonOutlook, TeamOutlook } from "./outlook";
 export { conferenceName, conferenceShort, formatChampion, formatChance, formatFine, formatOdds, formatPlayoff, formatRecord, formatSideOdds, formatTitleOdds, mustWinConference, oddsLabels, playoffDetail, playoffRoute, teamPath } from "./paths";
 export { explore } from "./explore";
+export { decodeLabLocks, encodeLabLocks, seasonLab } from "./lab";
+export type { DecodedLabLocks, LabConference, LabLocks, LabOptions, LabRanked, LabTitleTeam, SeasonLab } from "./lab";
 export type { Exploration } from "./explore";
 export type { KeyGame, OddsLabels, PathOptions, PathStatus, TeamPath } from "./paths";
 export { pathTree } from "./tree";

@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  committeeRanking, conferenceStandings, formatChampion, seasonFromCfbd, seasonOutlook, simulateNational, teamPath, teamRecord,
+  committeeRanking, conferenceStandings, decodeLabLocks, encodeLabLocks, formatChampion, seasonFromCfbd, seasonLab, seasonOutlook, simulateNational, teamPath, teamRecord,
   type CfbdGame, type CfbdSnapshot, type Game, type Season,
 } from "@/core";
 
@@ -196,6 +196,33 @@ describe("a listed title game decides who plays (2025 data under the 2026 rules)
     expect(path("Miami")).toBe("Miami won the ACC title game, 24-17 over Duke.");
     expect(path("Duke")).toBe("Duke lost the ACC title game to Miami, 24-17.");
     expect(path("Virginia")).toBe("Virginia didn't make the ACC title game: Miami beat Duke 24-17.");
+  });
+
+  it("a title-game pick wins an unplayed title game, but never a final one", () => {
+    const conferences = ["ACC", "Big 12", "Big Ten", "SEC"];
+    const champions = (s: Season) => {
+      const seen = new Set<number>();
+      simulateNational(s, { iterations: 100, seed: 3, conferences, titleLocks: { ACC: id(s, "Duke") } }).forEachIteration((_, x) => seen.add(x.champion("ACC")));
+      return [...seen].map((t) => named(s, t));
+    };
+    expect(champions(swapped(false))).toEqual(["Duke"]);
+    expect(champions(swapped(true))).toEqual(["Miami"]);
+  });
+
+  it("a link's picks on title and playoff games already final are dropped as settled", () => {
+    const s = seasonFromCfbd(as2026(raw));
+    const text = encodeLabLocks(s, { titles: { ACC: id(s, "Virginia") }, bracket: { 0: id(s, "Duke") } });
+    const out = decodeLabLocks(s, text);
+    expect(out.locks).toEqual({ games: {}, titles: {}, bracket: {} });
+    expect([out.settled, out.dropped]).toEqual([2, 0]);
+    expect(out.note).toBe("2 picks were settled by real results.");
+  });
+
+  it("the Lab leaves out, and doesn't count, picks on a final title game or a final playoff game", () => {
+    const s = seasonFromCfbd(as2026(raw));
+    const lab = seasonLab(s, { iterations: 20, seed: 4, conferences: ["ACC", "Big 12", "Big Ten", "SEC"], locks: { titles: { ACC: id(s, "Virginia") }, bracket: { 0: id(s, "Duke") } } });
+    expect(lab.picks).toBe(0);
+    expect(lab.conferences.find((c) => c.conference === "ACC")!.picked).toBeNull();
   });
 
   it("the real 2025 title games, played, decide every champion", () => {
