@@ -1,5 +1,5 @@
 // Server-side season data and the base (no what-if) computation, shared by pages.
-import { INDEPENDENTS, explore, exploreIndependent, independentOutlook, nationalView, seasonOutlook, simulateNational, simulateSeason, type Season } from "@/core";
+import { INDEPENDENTS, explore, seasonLab, exploreIndependent, independentOutlook, nationalView, seasonOutlook, simulateNational, simulateSeason, type Season } from "@/core";
 import data from "./data/season.json";
 
 import { ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
@@ -58,3 +58,6 @@ export const through = Number.isFinite(lastPlayed) ? `Through ${dayFormat.format
 
 /** The projected playoff field, bracket and bubble from the base national run; null when the season has no playoff run. */
 export const baseNationalView = nationalView(baseNational, { season });
+
+/** The Season Lab with no picks, from the base national run. */
+export const baseLab = seasonLab(season, { iterations: ITERATIONS, seed: SEED, conferences: SUPPORTED_CONFERENCES, reuse: baseNational });
