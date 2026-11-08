@@ -260,7 +260,7 @@ const MARKET_CAP = 7;
 /** Set each rated FBS team's marketShift toward what its latest betting lines imply. */
 function marketAdjust(teams: Map<number, Team>, games: readonly Game[]): void {
   const gaps = new Map<number, number[]>();
-  const lined = games.filter((g) => g.spread !== null).sort((a, b) => b.start.localeCompare(a.start) || b.id - a.id);
+  const lined = games.filter((g) => g.spread !== null).sort((a, b) => Date.parse(b.start) - Date.parse(a.start) || b.id - a.id);
   for (const g of lined) {
     const home = teams.get(g.homeId)?.rating;
     const away = teams.get(g.awayId)?.rating;

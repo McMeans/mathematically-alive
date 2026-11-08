@@ -163,6 +163,20 @@ describe("market-adjusted ratings", () => {
     expect(unlined(s)).toBeCloseTo(winProbability(-2.5), 10);
   });
 
+  it("orders games by real time, not by how their dates are written", () => {
+    // Game 40 reads latest as text (20:00 at +05:00) but is the earliest (15:00 UTC), so its far-off line drops out.
+    const more = [
+      game({ id: 40, homeId: ALPHA, awayId: GAMMA, startDate: "2026-09-04T20:00:00+05:00" }),
+      game({ id: 41, homeId: ALPHA, awayId: GAMMA, startDate: "2026-09-04T16:00:00.000Z" }),
+      game({ id: 42, homeId: ALPHA, awayId: GAMMA, startDate: "2026-09-04T17:00:00.000Z" }),
+      game({ id: 43, homeId: ALPHA, awayId: GAMMA, startDate: "2026-09-04T18:00:00.000Z" }),
+      games[1],
+    ];
+    const lines = [{ id: 40, lines: [{ spread: 20 }] }, ...[41, 42, 43].map((id) => ({ id, lines: [{ spread: -12.5 }] }))];
+    const s = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games: more, ratings, lines });
+    expect(unlined(s)).toBeCloseTo(winProbability(-2.5), 10);
+  });
+
   it("a line that agrees with SP+ leaves the odds alone", () => {
     const base = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games, ratings, lines: [] });
     const same = seasonFromCfbd({ year: 2026, fetchedAt: "x", teams, games, ratings, lines: [{ id: 20, lines: [{ spread: -12.5 }] }] });

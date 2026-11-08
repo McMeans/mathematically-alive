@@ -12,7 +12,8 @@ import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { powerConferences, teamRating, titleGameIndex } from "./committee";
 import { announcedField, bracketGames, championsNeeded, fieldPicker, findFormat, playoffRun, type AnnouncedField, type PlayoffRun } from "./playoff";
 import { isArmyNavy, type Game, type Season } from "./season";
-import { COMMITTEE_SALT, HOME_FIELD, PLAYOFF_SALT, mix, neutralOdds, simulateSeason, tiebreakDraw, titleRoll, type SimResult } from "./sim";
+import { HOME_FIELD } from "./odds";
+import { COMMITTEE_SALT, PLAYOFF_SALT, mix, neutralOdds, simulateSeason, tiebreakDraw, titleRoll, type SimResult } from "./sim";
 import { pairKey } from "./steps";
 import { championshipFromData, conferenceData, type ConferenceData } from "./tiebreak";
 
