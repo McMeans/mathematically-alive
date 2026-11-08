@@ -1,7 +1,7 @@
 // The Season Lab's simulations and link codec, off the main thread (the codec needs the whole season, which only
 // this worker loads). Each pick runs twice: a quick pass for numbers right away, then the full run. A newer pick
 // skips the full run of an older one.
-import { decodeLabLocks, decodeLocks, encodeLabLocks, seasonLab, type LabLocks, type NationalResult, type Season, type SeasonLab } from "@/core";
+import { decodeLabLocks, decodeLocks, encodeLabLocks, fillLabLocks, seasonLab, type LabFill, type LabLocks, type NationalResult, type Season, type SeasonLab } from "@/core";
 import { ITERATIONS, QUICK_ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
 import data from "./data/season.json";
 
@@ -9,10 +9,13 @@ export type LabView = Omit<SeasonLab, "national">;
 export type LabRequest =
   | { kind: "run"; id: number; locks: LabLocks }
   /** A link's picks: the Lab's own (`picks`), or a team page's game picks (`games`). */
-  | { kind: "open"; id: number; picks: string | null; games: string | null };
+  | { kind: "open"; id: number; picks: string | null; games: string | null }
+  /** Pick every open game: favourites, or one season drawn from a seed. */
+  | { kind: "fill"; id: number; locks: LabLocks; how: LabFill };
 export type LabResponse =
   | { kind: "result"; id: number; final: boolean; view: LabView; code: string }
   | { kind: "opened"; id: number; locks: LabLocks; note: string }
+  | { kind: "filled"; id: number; locks: LabLocks }
   | { kind: "error"; id: number };
 
 const season = data as Season;
@@ -36,6 +39,10 @@ self.onmessage = async (e: MessageEvent<LabRequest>) => {
       const games = decodeLocks(req.games, season.games.filter((g) => !g.completed));
       const locks = { ...lab.locks, games: { ...lab.locks.games, ...games } };
       self.postMessage({ kind: "opened", id: req.id, locks, note: lab.note } satisfies LabResponse);
+      return;
+    }
+    if (req.kind === "fill") {
+      self.postMessage({ kind: "filled", id: req.id, locks: fillLabLocks(season, req.locks, req.how) } satisfies LabResponse);
       return;
     }
     const code = encodeLabLocks(season, req.locks);

@@ -4,8 +4,10 @@
 import { simulateNational, titleRace, type NationalResult } from "./national";
 import { conferenceName, formatFine, formatSideOdds } from "./paths";
 import { announcedField, bracketGames, findFormat } from "./playoff";
-import type { Season } from "./season";
+import type { Game, Season } from "./season";
+import { gameWinProbability, mix, mulberry32 } from "./sim";
 import { pairKey } from "./steps";
+import { conferenceData, decidedTitleGame } from "./tiebreak";
 import { nationalView, type NationalView } from "./view";
 
 /** Every pick in the Lab. */
@@ -43,6 +45,31 @@ export type LabTitleTeam = {
   text: string;
 };
 
+export type LabStanding = {
+  teamId: number;
+  /** Conference record from final and picked games. */
+  wins: number;
+  losses: number;
+  /** Conference games neither final nor picked. */
+  open: number;
+  /** "6-2", or "5-2 · 1 open". */
+  text: string;
+};
+
+export type LabTitleMatchup = {
+  /** [seed 1, seed 2]. */
+  teams: [number, number];
+  /**
+   * True when the results alone settle it. False when a step the picks can't settle decides it (the ranking
+   * stand-in, a coin toss, scoring margin): the teams shown are this run's guess, and the odds stay simulated.
+   */
+  exact: boolean;
+  /** The tiebreak steps that told tied teams apart; empty when records alone decided. */
+  steps: string[];
+  /** "Duke vs. Virginia, decided by tiebreak: head-to-head." */
+  text: string;
+};
+
 export type LabConference = {
   conference: string;
   /** Display name: "MAC", "SEC". */
@@ -51,6 +78,10 @@ export type LabConference = {
   picked: number | null;
   /** Members with any chance of playing in the title game, likeliest first. */
   teams: LabTitleTeam[];
+  /** Every member, best record with picks first (ties by fewer losses, then team id; not the tiebreak). */
+  standings: LabStanding[];
+  /** The title game once every game its rules count is final or picked; null before. */
+  matchup: LabTitleMatchup | null;
 };
 
 export type LabRanked = {
@@ -66,6 +97,8 @@ export type SeasonLab = {
   national: NationalResult;
   /** How many picks are in effect. */
   picks: number;
+  /** Regular-season games neither final nor picked. 0: every game is set ("Every game picked" in the summary). */
+  open: number;
   /** "3 picks · 20,000 simulated seasons", or "No picks yet · 20,000 simulated seasons". */
   summary: string;
   /** The field and bracket; null when the season's playoff isn't simulated. */
@@ -97,6 +130,10 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
   });
   const picks = Object.keys(locks.games).length + Object.keys(locks.titles).length + Object.keys(locks.bracket).length;
   const seasons = `${national.iterations.toLocaleString("en-US")} simulated seasons`;
+  const names = new Map(season.teams.map((t) => [t.id, t.name]));
+  const set = (g: Game) => locks.games[g.id] !== undefined;
+  const winnerOf = (g: Game): number => locks.games[g.id] ?? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId);
+  const open = season.games.filter((g) => !g.completed && !g.titleGame && !set(g)).length;
   const conferences = national.conferences.map((conference): LabConference => ({
     conference,
     name: conferenceName(conference),
@@ -108,6 +145,7 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
         teamId: t.teamId, titleGame: t.titleGame!, champion: t.champion!,
         text: `Title game ${formatSideOdds(t.titleGame!, "alive")} · champion ${formatSideOdds(t.champion!, "alive")}`,
       })),
+    ...standingsWithPicks(season, conference, set, winnerOf, names),
   }));
   const ranking = national.teams.slice(0, opts.top ?? 25).map((t, k) => ({
     rank: k + 1, teamId: t.teamId, meanRank: t.meanRank,
@@ -116,11 +154,63 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
   return {
     national,
     picks,
-    summary: `${picks === 0 ? "No picks yet" : picks === 1 ? "1 pick" : `${picks} picks`} · ${seasons}`,
+    open,
+    summary: `${picks === 0 ? "No picks yet" : picks === 1 ? "1 pick" : `${picks} picks`}${open === 0 && picks > 0 ? " · every game picked" : ""} · ${seasons}`,
     playoff: nationalView(national, { season }),
     conferences,
     ranking,
   };
+}
+
+/** Steps whose answer picks can't settle: the ranking stand-in, a coin toss, and scoring margin (picks have no score). */
+const UNSETTLED = new Set(["ranking", "draw", "scoring margin"]);
+
+function standingsWithPicks(
+  season: Season, conference: string, set: (g: Game) => boolean, winnerOf: (g: Game) => number, names: Map<number, string>,
+): Pick<LabConference, "standings" | "matchup"> {
+  const data = conferenceData(season, conference);
+  const rows = new Map([...data.ids].map((id) => [id, { teamId: id, wins: 0, losses: 0, open: 0, text: "" }]));
+  for (const g of data.games) {
+    if (!g.completed && !set(g)) { rows.get(g.homeId)!.open++; rows.get(g.awayId)!.open++; continue; }
+    const w = winnerOf(g);
+    rows.get(w)!.wins++;
+    rows.get(w === g.homeId ? g.awayId : g.homeId)!.losses++;
+  }
+  const standings = [...rows.values()]
+    .map((r) => ({ ...r, text: `${r.wins}-${r.losses}${r.open > 0 ? ` · ${r.open} open` : ""}` }))
+    .sort((a, b) => b.wins * (a.wins + a.losses) - a.wins * (b.wins + b.losses) || b.wins - a.wins || a.losses - b.losses || a.teamId - b.teamId);
+  // The draw is never used for an exact matchup (it marks the matchup inexact), so any fixed stream will do.
+  const decided = decidedTitleGame(data, set, winnerOf, { draw: () => 0 });
+  if (!decided) return { standings, matchup: null };
+  const exact = !decided.steps.some((s) => UNSETTLED.has(s));
+  const vs = `${names.get(decided.teams[0])} vs. ${names.get(decided.teams[1])}`;
+  const how = decided.steps.length === 0 ? "decided by record" : `decided by tiebreak: ${decided.steps.join(", then ")}`;
+  const text = exact
+    ? `${vs}, ${how}.`
+    : `Comes down to the ${decided.steps.filter((s) => UNSETTLED.has(s)).join(" and ")} tiebreak, which picks can't settle. The odds below are simulated.`;
+  return { standings, matchup: { teams: decided.teams, exact, steps: decided.steps, text } };
+}
+
+/** How `fillLabLocks` picks the open games: the favourite always wins, or one season drawn from a seed. */
+export type LabFill = "favorites" | { seed: number };
+
+const FILL_SALT = 1 << 24;
+
+/**
+ * The picks plus a pick for every regular-season game neither final nor picked, title games aside (the standings
+ * decide those). Existing picks stay. A seeded fill draws each game at its model odds; the same seed and picks give
+ * the same season.
+ */
+export function fillLabLocks(season: Season, locks: Partial<LabLocks>, how: LabFill): LabLocks {
+  const out = filled(locks);
+  const games = { ...out.games };
+  for (const g of season.games) {
+    if (g.completed || g.titleGame || games[g.id] !== undefined) continue;
+    const p = gameWinProbability(season, g);
+    const u = how === "favorites" ? 0.5 : mulberry32(mix(how.seed, 0, FILL_SALT + g.id))();
+    games[g.id] = how === "favorites" ? (p >= 0.5 ? g.homeId : g.awayId) : u < p ? g.homeId : g.awayId;
+  }
+  return { ...out, games };
 }
 
 // --- Lock codec: picks as a short URL-safe string. ---------------------------------------------------------------

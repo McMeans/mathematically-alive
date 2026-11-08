@@ -1,6 +1,6 @@
 # Plan: Season Lab
 
-Status: phases 1–2 shipped (core; `/lab` page, which replaced `/national`), November 2026. Each phase is one PR (core and app may split), following `CLAUDE.md`: black-box
+Status: phases 1–3 shipped (core; `/lab` page, which replaced `/national`; Conferences tab and fills), November 2026. Each phase is one PR (core and app may split), following `CLAUDE.md`: black-box
 tests in the same change, the coverage gate, the `pr-review` skill. Read with `SPEC.md` and `docs/plan-national.md`.
 
 ## Goal
@@ -57,6 +57,11 @@ Team pages get an "Open in Season Lab" link that carries their locks over.
 | Odds | Some games unpicked, no fill | `simulateNational` with locks | Odds everywhere |
 | Filled | After "Fill the rest" | One season drawn from the seed on top of the locks | One outcome, exact |
 | Complete | Every game picked | No simulation needed | One outcome, exact |
+
+As built (phase 3): "Fill the rest" and "Favorites win the rest" turn every open game into a pick
+(`fillLabLocks`), so a filled season is a Complete one and travels in the link as picks (no fill seed). The odds
+run still plays title games, the ranking's noise and the bracket, so those stay odds until picked; a conference's
+title game is exact once its games are set and no step the picks can't settle (ranking, draw, scoring margin) decides it.
 
 Filled and Complete need a new core entry point (below). Committee noise is left out there: the ranking is the
 stand-in's plain score, and it is labelled as the projection.

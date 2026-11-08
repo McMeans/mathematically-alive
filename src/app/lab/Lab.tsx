@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import type { BracketGame, BracketSide, LabLocks } from "@/core";
+import type { BracketGame, BracketSide, LabConference, LabFill, LabLocks } from "@/core";
 import type { LabRequest, LabResponse, LabView } from "@/app/lab.worker";
 import { ShareButton } from "@/app/explorer/Share";
 
@@ -83,6 +83,11 @@ function useLab(initial: LabView) {
         run(next);
         return;
       }
+      if (r.kind === "filled") {
+        // Only the latest request's fill: a pick made while it was on its way wins.
+        if (r.id === latest.current) update(r.locks);
+        return;
+      }
       if (r.id !== latest.current) return; // a newer pick is on its way
       if (r.kind === "result") {
         setView(r.view);
@@ -111,11 +116,26 @@ function useLab(initial: LabView) {
   }, []);
 
   function update(next: LabLocks) {
-    setHistory((h) => [...h.slice(-49), locks]);
+    // The picks before this change, from the ref: a fill arrives in the worker handler, which sees only the first render.
+    const prev = current.current;
+    setHistory((h) => [...h.slice(-49), prev]);
     current.current = next;
     setLocks(next);
     setNote("");
     run(next);
+  }
+  /** Pick every open game, through the worker (it has the season). */
+  function fill(how: LabFill) {
+    clearTimeout(timer.current);
+    setRefining(true);
+    worker.current?.postMessage({ kind: "fill", id: ++latest.current, locks, how } satisfies LabRequest);
+  }
+  /** Pick a conference's title-game winner; picking the current one clears it. */
+  function pickTitle(conference: string, winner: number) {
+    const titles = { ...locks.titles };
+    if (titles[conference] === winner) delete titles[conference];
+    else titles[conference] = winner;
+    update({ ...locks, titles });
   }
   function undo() {
     const prev = history.at(-1);
@@ -158,9 +178,11 @@ function useLab(initial: LabView) {
     update({ ...locks, bracket: picks });
   }
   const status = failed ? "Couldn’t update. Showing the last result." : refining ? "Refining…" : "";
-  return { locks, view, status, note, canUndo: history.length > 0, pickGame, pickBracket, undo, reset: () => update(none()) };
+  return { locks, view, status, note, canUndo: history.length > 0, pickGame, pickTitle, pickBracket, fill, undo, reset: () => update(none()) };
 }
 
+type Tab = "games" | "conferences" | "playoff";
+const TABS: { id: Tab; label: string }[] = [{ id: "games", label: "Games" }, { id: "conferences", label: "Conferences" }, { id: "playoff", label: "Playoff" }];
 const WIDE = "(min-width: 768px)";
 /** Whether both panels show side by side (Tailwind's `md`), so the tabs are hidden. False on the server. */
 function useWide() {
@@ -172,11 +194,11 @@ function useWide() {
 }
 
 export function Lab({ initial, games, names, teams, paged }: Props) {
-  const { locks, view, status, note, canUndo, pickGame, pickBracket, undo, reset } = useLab(initial);
-  const [tab, setTab] = useState<"games" | "playoff">("games");
+  const { locks, view, status, note, canUndo, pickGame, pickTitle, pickBracket, fill, undo, reset } = useLab(initial);
+  const [tab, setTab] = useState<Tab>("games");
   // Side by side there are no tabs, so the panels aren't tab panels.
   const wide = useWide();
-  const panel = (t: "games" | "playoff") => (wide ? {} : { role: "tabpanel", "aria-labelledby": `lab-tab-${t}` });
+  const panel = (t: Tab) => (wide ? {} : { role: "tabpanel", "aria-labelledby": `lab-tab-${t}` });
   const pagedSet = useMemo(() => new Set(paged), [paged]);
   const name = (id: number) => names[id] ?? `Team ${id}`;
   const picks = count(locks);
@@ -201,29 +223,36 @@ export function Lab({ initial, games, names, teams, paged }: Props) {
       {note && <p role="status" className="mt-2 rounded-md bg-mist px-3 py-2 text-sm text-ink-soft">{note}</p>}
 
       <div role="tablist" aria-label="Season Lab" className="mt-4 flex gap-1 md:hidden">
-        {(["games", "playoff"] as const).map((t) => (
-          <button key={t} id={`lab-tab-${t}`} role="tab" type="button" aria-controls={`lab-panel-${t}`} aria-selected={tab === t} onClick={() => setTab(t)}
-            className={`press h-9 flex-1 rounded-full text-sm font-bold ${tab === t ? "bg-navy text-white" : "bg-mist text-navy"}`}>
-            {t === "games" ? "Games" : "Playoff"}
+        {TABS.map((t) => (
+          <button key={t.id} id={`lab-tab-${t.id}`} role="tab" type="button" aria-controls={`lab-panel-${t.id}`} aria-selected={tab === t.id} onClick={() => setTab(t.id)}
+            className={`press h-9 flex-1 rounded-full text-sm font-bold ${tab === t.id ? "bg-navy text-white" : "bg-mist text-navy"}`}>
+            {t.label}
           </button>
         ))}
       </div>
 
       <div className="mt-4 grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div id="lab-panel-games" {...panel("games")} className={tab === "games" ? "" : "hidden md:block"}>
-          <Games games={games} picked={locks.games} name={name} teams={teams} onPick={pickGame} />
+          <Games games={games} picked={locks.games} name={name} teams={teams} onPick={pickGame} open={view.open} onFill={fill} />
         </div>
-        <div id="lab-panel-playoff" {...panel("playoff")} className={tab === "playoff" ? "" : "hidden md:block"}>
-          <Playoff view={view} picked={locks.bracket} name={name} paged={pagedSet} onPick={(g, w) => view.playoff && pickBracket(view.playoff.bracket, g, w)} />
+        <div className="space-y-8">
+          <div id="lab-panel-conferences" {...panel("conferences")} className={tab === "conferences" ? "" : "hidden md:block"}>
+            <Conferences conferences={view.conferences} name={name} paged={pagedSet} onPick={pickTitle} />
+          </div>
+          <div id="lab-panel-playoff" {...panel("playoff")} className={tab === "playoff" ? "" : "hidden md:block"}>
+            <Playoff view={view} picked={locks.bracket} name={name} paged={pagedSet} onPick={(g, w) => view.playoff && pickBracket(view.playoff.bracket, g, w)} />
+          </div>
         </div>
       </div>
     </main>
   );
 }
 
-function Games({ games, picked, name, teams, onPick }: {
+function Games({ games, picked, name, teams, onPick, open, onFill }: {
   games: LabGame[]; picked: Record<number, number>; name: (id: number) => string;
   teams: { id: number; name: string }[]; onPick: (gameId: number, winner: number) => void;
+  /** Games neither final nor picked. */
+  open: number; onFill: (how: LabFill) => void;
 }) {
   const [team, setTeam] = useState<number | null>(null);
   const [conference, setConference] = useState<string | null>(null);
@@ -255,6 +284,12 @@ function Games({ games, picked, name, teams, onPick }: {
             {conferences.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" disabled={open === 0} onClick={() => onFill("favorites")}
+          className="press h-8 rounded-full border border-ink-muted/40 px-3 text-xs font-bold text-navy hover:bg-mist disabled:opacity-40">Favorites win the rest</button>
+        <button type="button" disabled={open === 0} onClick={() => onFill({ seed: Math.floor(Math.random() * 2 ** 31) })}
+          className="press h-8 rounded-full border border-ink-muted/40 px-3 text-xs font-bold text-navy hover:bg-mist disabled:opacity-40">Fill the rest</button>
       </div>
       {shown.length === 0 && <p className="mt-3 text-sm text-ink-muted">No games left for this filter.</p>}
       {[...weeks].map(([week, groups]) => (
@@ -288,6 +323,45 @@ function PickButton({ label, odds, on, off, onClick }: { label: string; odds?: s
       <span className="truncate font-semibold">{label}</span>
       {odds && !on && !off && <span className="shrink-0 text-xs text-ink-muted">{odds}</span>}
     </button>
+  );
+}
+
+/** Each conference's standings with picks, and its title game: the race's odds, or the decided matchup (pickable). */
+function Conferences({ conferences, name, paged, onPick }: {
+  conferences: LabConference[]; name: (id: number) => string; paged: Set<number>;
+  onPick: (conference: string, winner: number) => void;
+}) {
+  return (
+    <section aria-labelledby="lab-conferences" className="space-y-6">
+      <h2 id="lab-conferences" className="font-display text-lg font-bold">Conference title races</h2>
+      {conferences.map((c) => {
+        const odds = new Map(c.teams.map((t) => [t.teamId, t.text]));
+        const m = c.matchup;
+        return (
+          <div key={c.conference}>
+            <h3 className="text-sm font-bold text-navy">{c.name}</h3>
+            {m && <>
+              <p className="mt-1 text-sm text-ink-soft">{m.text}</p>
+              {m.exact && (
+                <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 rounded-md bg-mist p-1 text-sm">
+                  <PickButton label={name(m.teams[0])} on={c.picked === m.teams[0]} off={c.picked === m.teams[1]} onClick={() => onPick(c.conference, m.teams[0])} />
+                  <span className="px-1 text-xs text-ink-muted">vs</span>
+                  <PickButton label={name(m.teams[1])} on={c.picked === m.teams[1]} off={c.picked === m.teams[0]} onClick={() => onPick(c.conference, m.teams[1])} />
+                </div>
+              )}
+            </>}
+            <ol className="mt-2 divide-y divide-ink-muted/15 rounded-lg bg-mist">
+              {c.standings.map((s) => (
+                <li key={s.teamId} className="flex items-baseline justify-between gap-3 px-3 py-1.5 text-sm">
+                  <span className="min-w-0"><LabTeam id={s.teamId} name={name} paged={paged} /> <span className="text-ink-soft">{s.text}</span></span>
+                  {odds.has(s.teamId) && <span className="text-right text-xs text-ink-soft">{odds.get(s.teamId)}</span>}
+                </li>
+              ))}
+            </ol>
+          </div>
+        );
+      })}
+    </section>
   );
 }
 
