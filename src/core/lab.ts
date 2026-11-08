@@ -3,8 +3,9 @@
 // the bracket. Picks travel in a URL, so the codec lives here too. All wording comes from here.
 import { simulateNational, titleRace, type NationalResult } from "./national";
 import { conferenceName, formatFine, formatSideOdds } from "./paths";
-import { bracketGames, findFormat } from "./playoff";
+import { announcedField, bracketGames, findFormat } from "./playoff";
 import type { Season } from "./season";
+import { pairKey } from "./steps";
 import { nationalView, type NationalView } from "./view";
 
 /** Every pick in the Lab. */
@@ -209,10 +210,12 @@ export function decodeLabLocks(season: Season, text: string): DecodedLabLocks {
       else locks.titles[c] = team;
     }
     const size = bracketGames(findFormat(season.year)?.teams ?? 12).length;
+    const finals = finalBracketGames(season);
     for (let n = get(); n > 0; n--) {
       const k = get();
       const team = get();
       if (k >= size || !season.teams.some((x) => x.id === team)) dropped++;
+      else if (finals.has(k)) settled++;
       else locks.bracket[k] = team;
     }
     if (p !== bytes.length) dropped++;
@@ -221,6 +224,24 @@ export function decodeLabLocks(season: Season, text: string): DecodedLabLocks {
     dropped++;
   }
   return done();
+}
+
+/** Bracket game indexes already final: the announced field's games, walked as the real results fill the bracket. */
+function finalBracketGames(season: Season): Set<number> {
+  const out = new Set<number>();
+  const field = announcedField(season);
+  const format = findFormat(season.year);
+  if (!field || !format) return out;
+  const finals = new Map((season.playoffGames ?? []).filter((g) => g.completed).map((g) => [pairKey(g.homeId, g.awayId), g]));
+  const winners: (number | null)[] = [];
+  bracketGames(format.teams).forEach(([x, y], k) => {
+    const a = x >= 0 ? field.seeds[x] : winners[~x];
+    const b = y >= 0 ? field.seeds[y] : winners[~y];
+    const real = a != null && b != null ? finals.get(pairKey(a, b)) : undefined;
+    winners.push(real ? (real.homePoints! > real.awayPoints! ? real.homeId : real.awayId) : null);
+    if (real) out.add(k);
+  });
+  return out;
 }
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);

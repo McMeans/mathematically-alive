@@ -117,6 +117,7 @@ describe("season lab: picks in a link", () => {
 
   it("a title pick for a conference with no title game is left out", () => {
     const ind = season.teams.find((t) => t.conference === "FBS Independents");
+    expect(ind).toBeDefined();
     if (!ind) return;
     const out = decodeLabLocks(season, encodeLabLocks(season, { titles: { "FBS Independents": ind.id } }));
     expect(out.locks.titles).toEqual({});
