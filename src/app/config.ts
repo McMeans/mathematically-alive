@@ -4,3 +4,5 @@
 export const SUPPORTED_CONFERENCES: readonly string[] = ["ACC", "Big 12", "SEC", "Big Ten", "Mid-American", "Conference USA", "Mountain West", "American Athletic", "Pac-12", "Sun Belt"];
 export const SEED = 2026;
 export const ITERATIONS = 20000;
+/** The Season Lab's first pass after a pick: numbers fast, refined by a full run. */
+export const QUICK_ITERATIONS = 2000;

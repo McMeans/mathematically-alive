@@ -1,6 +1,6 @@
 # Plan: Season Lab
 
-Status: proposed, November 2026. Each phase is one PR (core and app may split), following `CLAUDE.md`: black-box
+Status: phases 1–2 shipped (core; `/lab` page, which replaced `/national`), November 2026. Each phase is one PR (core and app may split), following `CLAUDE.md`: black-box
 tests in the same change, the coverage gate, the `pr-review` skill. Read with `SPEC.md` and `docs/plan-national.md`.
 
 ## Goal

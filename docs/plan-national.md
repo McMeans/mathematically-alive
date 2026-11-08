@@ -119,7 +119,7 @@ covers it and what-ifs rerun only what a lock touches.
 
 ## Phase 5: playoff UI
 
-Status: team-page odds done (field, bye, title, paired Win/Lose CFP columns, "Must win" from the field rules; timings in `SPEC.md`). National view (`/national`: projected field, bracket, bubble, from `nationalView`) and the results-elsewhere list (`playoffSignals`, on each team page) done. Measured: `pnpm build` about 104 s (was 108 s); one team's cold `explore` (Georgia, 20,000 iterations, no reuse) about 4.7 s on this machine, the signal pass a small part of it.
+Status: team-page odds done (field, bye, title, paired Win/Lose CFP columns, "Must win" from the field rules; timings in `SPEC.md`). National view (`/national`: projected field, bracket, bubble, from `nationalView`; since replaced by the Season Lab, `/lab`, which `/national` redirects to) and the results-elsewhere list (`playoffSignals`, on each team page) done. Measured: `pnpm build` about 104 s (was 108 s); one team's cold `explore` (Georgia, 20,000 iterations, no reuse) about 4.7 s on this machine, the signal pass a small part of it.
 
 - Team page: playoff odds from the national run (in, seed, bye, title), "Must win <conference>" from the field
   rules, Beta tag and modelled wording.

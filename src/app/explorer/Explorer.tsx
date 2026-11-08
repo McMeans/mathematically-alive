@@ -40,6 +40,8 @@ type Common = {
 };
 
 export const NAVY = "#14213D";
+/** The Season Lab, carrying this page's picks over. */
+const labHref = (locks: Locks) => (Object.keys(locks).length > 0 ? `/lab?games=${encodeLocks(locks)}` : "/lab");
 export const pct = (p: number | null) => (p === null ? "—" : formatOdds(p));
 
 /**
@@ -143,6 +145,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
       {...common}
       record={formatRecord(me.record, conference)}
       hasLocks={Object.keys(locks).length > 0}
+      lab={labHref(locks)}
       onReset={reset}
       busy={busy}
       failed={failed}
@@ -188,6 +191,7 @@ export function IndependentExplorer({ initial, ...common }: Common & { initial: 
       {...common}
       record={formatRecord(me.record, common.conference)}
       hasLocks={Object.keys(locks).length > 0}
+      lab={labHref(locks)}
       onReset={() => update({})}
       busy={busy}
       failed={failed}
@@ -215,10 +219,12 @@ export function IndependentExplorer({ initial, ...common }: Common & { initial: 
   );
 }
 
-function Frame({ teamId, conference, teams, conferences, names, asOf, through, record, hasLocks, onReset, busy, failed, status, tiles, main, aside }: Common & {
+function Frame({ teamId, conference, teams, conferences, names, asOf, through, record, hasLocks, lab, onReset, busy, failed, status, tiles, main, aside }: Common & {
   /** The team's record as the picker shows it. */
   record: string;
   hasLocks: boolean;
+  /** The Season Lab link, carrying the picks. */
+  lab: string;
   onReset: () => void;
   busy: boolean;
   failed: boolean;
@@ -294,7 +300,7 @@ function Frame({ teamId, conference, teams, conferences, names, asOf, through, r
               <h1 className="font-display text-lg font-bold tracking-tight sm:text-xl">Mathematically Alive</h1>
             </div>
             <div className="flex items-center gap-3">
-              <Link href="/national" className="text-sm font-bold text-navy underline-offset-2 hover:underline">Playoff field</Link>
+              <Link href={lab} className="text-sm font-bold text-navy underline-offset-2 hover:underline">Season Lab</Link>
               <span className="rounded-full bg-navy px-3 py-1 text-sm font-bold text-white">{conferenceName(conference)}</span>
               <span title={asOf} className="hidden text-sm text-ink-muted sm:inline">
                 {through}
