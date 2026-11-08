@@ -1,10 +1,10 @@
 "use client";
-import { ShareButton } from "./Share";
 import { useState } from "react";
 import { formatChampion, formatPlayoff, formatRecord, formatTitleOdds, type Impact, type IndependentGame, type IndependentOutlook, type SeasonWeek, type TeamOutlook } from "@/core";
 import type { Locks, TeamInfo } from "./Explorer";
 import { Beta, IndependentDetail, PlayoffDetail, playoffText } from "./Panels";
 import { useConference } from "./conference";
+import { ShareButton } from "./Share";
 
 type PickState = "picked" | "likely" | "open";
 

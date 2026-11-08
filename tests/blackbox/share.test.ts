@@ -32,4 +32,12 @@ describe("shareable what-ifs", () => {
     // 300 is already played, 999 isn't on the schedule, 5 isn't in game 402, "x" isn't a pick.
     expect(decodeLocks("401-2.300-1.999-1.402-5.x.402", games)).toEqual({ 401: 2 });
   });
+
+  it("a game picked twice in one link keeps its last pick", () => {
+    expect(decodeLocks("401-1.401-2", games)).toEqual({ 401: 2 });
+  });
+
+  it("a list of only unplayed games can leave out whether each was played", () => {
+    expect(decodeLocks("401-2", [{ id: 401, homeId: 1, awayId: 2 }])).toEqual({ 401: 2 });
+  });
 });

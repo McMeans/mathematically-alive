@@ -15,9 +15,10 @@ export function encodeLocks(locks: Locks): string {
 
 /**
  * Link text back to locks. A link can be old or hand-edited, so a pick is kept only when its game is in the season,
- * not yet played, and the winner is one of its two teams. Anything else is dropped, never guessed.
+ * not yet played, and the winner is one of its two teams. Anything else is dropped, never guessed. `completed` may be
+ * left off a list holding only unplayed games. A game picked twice keeps its last pick.
  */
-export function decodeLocks(text: string | null | undefined, games: readonly Pick<Game, "id" | "homeId" | "awayId" | "completed">[]): Locks {
+export function decodeLocks(text: string | null | undefined, games: readonly (Pick<Game, "id" | "homeId" | "awayId"> & { completed?: boolean })[]): Locks {
   const locks: Locks = {};
   if (!text) return locks;
   const byId = new Map(games.map((g) => [g.id, g]));

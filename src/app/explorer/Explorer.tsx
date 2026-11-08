@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   conferenceName, decodeLocks, encodeLocks, formatOdds, formatRecord,
-  type IndependentGame, type IndependentOutlook, type PathTree, type PlayoffSignal, type TeamOutlook, type TeamPath,
+  type IndependentGame, type IndependentOutlook, type Locks, type PathTree, type PlayoffSignal, type TeamOutlook, type TeamPath,
 } from "@/core";
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
 import { Logo } from "@/app/Logo";
@@ -21,9 +21,9 @@ export type ListRow = { teamId: number; record: string; odds: string; key: numbe
 export type ConferenceList = { conference: string; teams: TeamInfo[]; rows: ListRow[] };
 export type Result = { outlook: TeamOutlook[]; path: TeamPath; tree: PathTree; playoffGames: PlayoffSignal[] };
 export type IndependentResult = { outlook: IndependentOutlook[]; games: IndependentGame[]; playoffGames: PlayoffSignal[] };
-export type Locks = Record<number, number>;
+export type { Locks };
 /** A game still to play, so a shared link's picks can be checked against it. */
-export type OpenGame = { id: number; homeId: number; awayId: number; completed: boolean };
+export type OpenGame = { id: number; homeId: number; awayId: number };
 
 /** What every team page shares: the header, the team picker and the frame around the page's own columns. */
 type Common = {
