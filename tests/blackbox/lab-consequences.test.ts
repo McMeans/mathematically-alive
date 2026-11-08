@@ -50,7 +50,13 @@ describe("season lab: what a pick changed", () => {
 
 describe("season lab: ranking reasons and big games", () => {
   it("every ranked team carries its average record and what lifts it", () => {
-    for (const r of base.ranking) expect(r.reason).toMatch(/^About \d+-\d+( · .+)?$/);
+    for (const r of base.ranking) {
+      expect(r.reason).toMatch(/^About \d+-\d+( · .+)?$/);
+      // The record adds up to the team's average games played, rounded.
+      const [w, l] = r.reason.slice(6).split(" ")[0].split("-").map(Number);
+      const p = base.national.teams.find((t) => t.teamId === r.teamId)!.profile;
+      expect(w + l).toBe(Math.round(p.wins + p.losses));
+    }
     // The top team's record lifts it above the listed average.
     expect(base.ranking[0].reason).toContain("strong record");
     // A likely power-conference champion in the list says so.

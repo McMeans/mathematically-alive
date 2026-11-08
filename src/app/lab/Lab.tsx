@@ -228,7 +228,7 @@ export function Lab({ initial, games, names, teams, paged }: Props) {
           {view.changes.headline && <p className="mt-1 text-sm font-semibold text-navy">{view.changes.headline}</p>}
           {view.changes.movers.length > 0 && (
             <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-ink-soft">
-              {view.changes.movers.map((m) => <li key={m.teamId} className={m.after > m.before ? "text-turf" : "text-red-700"}>{m.text}</li>)}
+              {view.changes.movers.map((m) => <li key={m.teamId}>{m.text}</li>)}
             </ul>
           )}
         </section>
@@ -300,7 +300,7 @@ function Games({ games, picked, name, teams, onPick, open, onFill, big }: {
             {conferences.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
-        {big.length > 0 && (
+        {(big.length > 0 || bigOnly) && (
           <button type="button" aria-pressed={bigOnly} onClick={() => setBigOnly((b) => !b)} title="The open games that move the playoff field most"
             className={`press h-8 rounded-full border px-3 text-xs font-bold ${bigOnly ? "border-navy bg-navy text-white" : "border-ink-muted/40 text-navy hover:bg-mist"}`}>Big games</button>
         )}

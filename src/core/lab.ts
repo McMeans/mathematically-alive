@@ -211,7 +211,9 @@ function rankReason(t: Ranked, listed: readonly Ranked[]): string {
     { lift: W.strength * (p.strength - avg((x) => x.profile.strength)), words: "tough schedule" },
     { lift: W.champion * (p.champion - avg((x) => x.profile.champion)), words: `${t.conference ? conferenceShort(t.conference) : "conference"} title in ${formatOdds(p.champion)}` },
   ].filter((x) => x.lift > 0).sort((a, b) => b.lift - a.lift).slice(0, 2);
-  const head = `About ${Math.round(p.wins)}-${Math.round(p.losses)}`;
+  // Round the wins, then take the losses from the games played, so the record adds up to a real season.
+  const wins = Math.round(p.wins);
+  const head = `About ${wins}-${Math.max(0, Math.round(p.wins + p.losses) - wins)}`;
   return parts.length === 0 ? head : `${head} · ${parts.map((x) => x.words).join(", ")}`;
 }
 
