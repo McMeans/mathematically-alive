@@ -1,6 +1,8 @@
 // The season data model every other part of the core works on, plus the
 // conversion from raw CollegeFootballData (CFBD) responses into it.
 
+import { HOME_FIELD } from "./odds";
+
 export type Classification = "fbs" | "fcs" | "other";
 
 /** How CFBD names the FBS independents' "conference". An FBS team with no conference at all counts as one too. */
@@ -254,8 +256,6 @@ export function seasonFromCfbd(raw: CfbdSnapshot): Season {
 const MARKET_GAMES = 3;
 const MARKET_WEIGHT = 0.5;
 const MARKET_CAP = 7;
-// sim.ts's HOME_FIELD; repeated, since sim imports this file.
-const MARKET_HOME_FIELD = 2.5;
 
 /** Set each rated FBS team's marketShift toward what its latest betting lines imply. */
 function marketAdjust(teams: Map<number, Team>, games: readonly Game[]): void {
@@ -265,7 +265,7 @@ function marketAdjust(teams: Map<number, Team>, games: readonly Game[]): void {
     const home = teams.get(g.homeId)?.rating;
     const away = teams.get(g.awayId)?.rating;
     if (home == null || away == null) continue;
-    const model = -(home - away) - (g.neutralSite ? 0 : MARKET_HOME_FIELD);
+    const model = -(home - away) - (g.neutralSite ? 0 : HOME_FIELD);
     const gap = (g.spread as number) - model; // > 0: the market rates home weaker than SP+ does
     for (const [id, sign] of [[g.homeId, -1], [g.awayId, 1]] as const) {
       const list = gaps.get(id) ?? [];

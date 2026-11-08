@@ -235,3 +235,27 @@ describe("championship participants input checks", () => {
     expect(() => championshipParticipants(season, "ACC", () => 99, { draw: () => 0.5 })).toThrow(/not in game/);
   });
 });
+
+describe("market shift in the title game", () => {
+  // An ACC whose regular season is over: 30 and 31 (equal SP+) are in the title game, which isn't in the data yet,
+  // so it's played on a neutral field from the teams' strengths.
+  function finished(shift30?: number): Season {
+    nextId = 200;
+    const games = [
+      game(30, 32, true, 30), game(30, 33, true, 30), game(31, 32, true, 31), game(31, 33, true, 31), game(32, 33, true, 32),
+    ];
+    const teams = [30, 31, 32, 33].map((id) => ({ ...team(id, "ACC"), rating: 10, ...(id === 30 && shift30 !== undefined ? { marketShift: shift30 } : {}) }));
+    return { year: 2026, fetchedAt: "", teams, games };
+  }
+  const champ = (s: Season, id: number) =>
+    seasonOutlook(s, { conference: "ACC", iterations: 4000, seed: 7 }).teams.find((t) => t.teamId === id)!.champion;
+
+  it("a team its betting lines rate weaker is less likely to win a title game without a line", () => {
+    expect(champ(finished(), 30)).toBeGreaterThan(0.4);
+    expect(champ(finished(-7), 30)).toBeLessThan(champ(finished(), 30) - 0.1);
+  });
+
+  it("a team its betting lines rate stronger is more likely to win it", () => {
+    expect(champ(finished(7), 30)).toBeGreaterThan(champ(finished(), 30) + 0.1);
+  });
+});

@@ -2,6 +2,9 @@
 // in points. Roughly 15-16 historically.
 export const MARGIN_SD = 15.5;
 
+// Points of home-field edge when a game has no line (none at a neutral site).
+export const HOME_FIELD = 2.5;
+
 /**
  * Chance the home side wins given a point spread from the home side's view
  * (negative = home favored, e.g. -7). Assumes margins are normal around the line.

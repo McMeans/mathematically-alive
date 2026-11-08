@@ -1,9 +1,9 @@
 // Monte Carlo season simulator. Plays out every unplayed game many times and
 // records the outcomes compactly so standings/tiebreaker code can replay them.
-import { MARGIN_SD, normalCdf, winProbability } from "./odds";
+import { HOME_FIELD, MARGIN_SD, normalCdf, winProbability } from "./odds";
 import { isArmyNavy, isFlexGame, type Game, type Season, type Team } from "./season";
 
-export const HOME_FIELD = 2.5;
+export { HOME_FIELD };
 const MISSING_RATING_OTHER = -10;
 // Ratings are estimates. Each simulated season shifts every team's rating by a
 // normal draw with this SD (points), shared by all its games, so a team that is
