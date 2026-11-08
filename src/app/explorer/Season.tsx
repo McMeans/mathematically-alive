@@ -1,4 +1,5 @@
 "use client";
+import { ShareButton } from "./Share";
 import { useState } from "react";
 import { formatChampion, formatPlayoff, formatRecord, formatTitleOdds, type Impact, type IndependentGame, type IndependentOutlook, type SeasonWeek, type TeamOutlook } from "@/core";
 import type { Locks, TeamInfo } from "./Explorer";
@@ -307,9 +308,12 @@ export function WhatIf({ team, me, outlook, today, locks, weeks, names, teamId, 
             </p>
           </div>
           {has && (
-            <button type="button" onClick={onReset} className="press flex h-8 shrink-0 animate-rise items-center gap-1.5 rounded-full border border-ink-muted/40 bg-white px-3 text-xs font-bold text-navy hover:bg-mist">
-              <span aria-hidden>↺</span> Reset
-            </button>
+            <div className="flex shrink-0 gap-2">
+              <ShareButton small />
+              <button type="button" onClick={onReset} className="press flex h-8 shrink-0 animate-rise items-center gap-1.5 rounded-full border border-ink-muted/40 bg-white px-3 text-xs font-bold text-navy hover:bg-mist">
+                <span aria-hidden>↺</span> Reset
+              </button>
+            </div>
           )}
         </div>
 
@@ -445,9 +449,12 @@ export function IndependentWhatIf({ team, me, today, locks, games, teamId, onPic
             </p>
           </div>
           {has && (
-            <button type="button" onClick={onReset} className="press flex h-8 shrink-0 animate-rise items-center gap-1.5 rounded-full border border-ink-muted/40 bg-white px-3 text-xs font-bold text-navy hover:bg-mist">
-              <span aria-hidden>↺</span> Reset
-            </button>
+            <div className="flex shrink-0 gap-2">
+              <ShareButton small />
+              <button type="button" onClick={onReset} className="press flex h-8 shrink-0 animate-rise items-center gap-1.5 rounded-full border border-ink-muted/40 bg-white px-3 text-xs font-bold text-navy hover:bg-mist">
+                <span aria-hidden>↺</span> Reset
+              </button>
+            </div>
           )}
         </div>
 

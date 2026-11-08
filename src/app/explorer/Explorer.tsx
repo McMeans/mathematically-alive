@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  conferenceName, formatOdds, formatRecord,
+  conferenceName, decodeLocks, encodeLocks, formatOdds, formatRecord,
   type IndependentGame, type IndependentOutlook, type PathTree, type PlayoffSignal, type TeamOutlook, type TeamPath,
 } from "@/core";
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
@@ -11,6 +11,7 @@ import { WayCard } from "./WayIn";
 import { IndependentGames, IndependentWhatIf, SeasonWeeks, WhatIf } from "./Season";
 import { IndependentTiles, PlayoffElsewhere, StatTiles, TeamList } from "./Panels";
 import { ConferenceProvider } from "./conference";
+import { ShareButton } from "./Share";
 
 export type GameInfo = { id: number; homeId: number; awayId: number; week: number; start: string };
 export type TeamInfo = { id: number; name: string; color: string | null; altColor: string | null };
@@ -21,6 +22,8 @@ export type ConferenceList = { conference: string; teams: TeamInfo[]; rows: List
 export type Result = { outlook: TeamOutlook[]; path: TeamPath; tree: PathTree; playoffGames: PlayoffSignal[] };
 export type IndependentResult = { outlook: IndependentOutlook[]; games: IndependentGame[]; playoffGames: PlayoffSignal[] };
 export type Locks = Record<number, number>;
+/** A game still to play, so a shared link's picks can be checked against it. */
+export type OpenGame = { id: number; homeId: number; awayId: number; completed: boolean };
 
 /** What every team page shares: the header, the team picker and the frame around the page's own columns. */
 type Common = {
@@ -32,6 +35,8 @@ type Common = {
   asOf: string;
   /** "Through Oct 31", shown in the header; `asOf` is its tooltip. */
   through: string;
+  /** Every game left in the season, to check the picks in a shared link. */
+  openGames: OpenGame[];
 };
 
 export const NAVY = "#14213D";
@@ -41,7 +46,7 @@ export const pct = (p: number | null) => (p === null ? "—" : formatOdds(p));
  * Picks and the what-if worker. `conference` null: an independent's page. `read` takes the worker's answer for this
  * kind of page (null for the other kind, which can't happen).
  */
-function useWhatIf<R>(initial: R, conference: string | null, teamId: number, read: (r: SimResponse) => R | null) {
+function useWhatIf<R>(initial: R, conference: string | null, teamId: number, openGames: OpenGame[], read: (r: SimResponse) => R | null) {
   const [locks, setLocks] = useState<Locks>({});
   const [result, setResult] = useState<R>(initial);
   const [busy, setBusy] = useState(false);
@@ -62,11 +67,21 @@ function useWhatIf<R>(initial: R, conference: string | null, teamId: number, rea
       setFailed(true);
     };
     worker.current = w;
+    // A shared link's picks ("?picks=401-12.402-30") load as the starting what-if.
+    const shared = decodeLocks(new URLSearchParams(window.location.search).get("picks"), openGames);
+    if (Object.keys(shared).length > 0) update(shared);
     return () => w.terminate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load
   }, []);
 
   function update(next: Locks) {
     setLocks(next);
+    // Keep the address bar a link to these picks, without adding history entries.
+    const url = new URL(window.location.href);
+    const text = encodeLocks(next);
+    if (text) url.searchParams.set("picks", text);
+    else url.searchParams.delete("picks");
+    window.history.replaceState(window.history.state, "", url);
     if (Object.keys(next).length === 0) {
       latest.current++; // drop any pending result
       setResult(initial);
@@ -93,7 +108,7 @@ function useWhatIf<R>(initial: R, conference: string | null, teamId: number, rea
 /** A conference team's page. */
 export function Explorer({ initial, ...common }: Common & { initial: Result }) {
   const { teamId, conference, teams } = common;
-  const { locks, result, busy, failed, status, update, pick } = useWhatIf<Result>(initial, conference, teamId, (r) =>
+  const { locks, result, busy, failed, status, update, pick } = useWhatIf<Result>(initial, conference, teamId, common.openGames, (r) =>
     r.independent ? null : { outlook: r.outlook, path: r.path, tree: r.tree, playoffGames: r.playoffGames });
   // The likeliest-way-in picks currently locked by the button (they stay locked while the live tree changes).
   const [wayPicks, setWayPicks] = useState<{ gameId: number; winner: number }[] | null>(null);
@@ -157,7 +172,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
 /** An FBS independent's page: no conference, so no title game; its own games and the playoff. */
 export function IndependentExplorer({ initial, ...common }: Common & { initial: IndependentResult }) {
   const { teamId, teams } = common;
-  const { locks, result, busy, failed, status, update, pick } = useWhatIf<IndependentResult>(initial, null, teamId, (r) =>
+  const { locks, result, busy, failed, status, update, pick } = useWhatIf<IndependentResult>(initial, null, teamId, common.openGames, (r) =>
     r.independent ? { outlook: r.outlook, games: r.games, playoffGames: r.playoffGames } : null);
   const me = result.outlook.find((o) => o.teamId === teamId)!;
   const team = teams.find((t) => t.id === teamId)!;
@@ -299,8 +314,9 @@ function Frame({ teamId, conference, teams, conferences, names, asOf, through, r
                   <span className="hidden text-xs font-normal text-ink-muted sm:inline">Change team</span>
                   <span aria-hidden className={`text-ink-muted transition-transform duration-200 ${sheet ? "rotate-180" : ""}`}>▾</span>
                 </button>
+                {hasLocks && <ShareButton className="md:hidden" />}
                 {hasLocks && (
-                  // On phones Reset rides in the pinned bar; wider screens have it in the summary column.
+                  // On phones Share and Reset ride in the pinned bar; wider screens have them in the summary column.
                   <button type="button" onClick={onReset} className="press flex min-h-10 shrink-0 animate-rise items-center gap-1.5 rounded-full border border-ink-muted/40 bg-white px-3 text-sm font-bold text-navy hover:bg-mist md:hidden">
                     <span aria-hidden>↺</span> Reset
                   </button>
