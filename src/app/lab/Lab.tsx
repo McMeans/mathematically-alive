@@ -300,7 +300,6 @@ function Playoff({ view, picked, name, paged, onPick }: {
   view: LabView; picked: Record<number, number>; name: (id: number) => string; paged: Set<number>;
   onPick: (gameIndex: number, winner: number) => void;
 }) {
-  const TeamName = ({ id }: { id: number }) => <LabTeam id={id} name={name} paged={paged} />;
   const p = view.playoff;
   return (
     <div className="space-y-8">
@@ -311,7 +310,7 @@ function Playoff({ view, picked, name, paged, onPick }: {
           <ol className="mt-2 divide-y divide-ink-muted/15 rounded-lg bg-mist">
             {p.field.map((s) => (
               <li key={s.teamId} className="flex items-baseline justify-between gap-3 px-3 py-2 text-sm">
-                <span><span className="mr-2 inline-block w-5 text-right text-ink-muted">{s.seed}</span><TeamName id={s.teamId} /></span>
+                <span><span className="mr-2 inline-block w-5 text-right text-ink-muted">{s.seed}</span><LabTeam id={s.teamId} name={name} paged={paged} /></span>
                 <span className="text-right text-ink-soft">{s.text}</span>
               </li>
             ))}
@@ -321,7 +320,7 @@ function Playoff({ view, picked, name, paged, onPick }: {
             <ul className="mt-1 divide-y divide-ink-muted/15 rounded-lg border border-ink-muted/25">
               {p.bubble.map((b) => (
                 <li key={b.teamId} className="flex items-baseline justify-between gap-3 px-3 py-2 text-sm">
-                  <TeamName id={b.teamId} />
+                  <LabTeam id={b.teamId} name={name} paged={paged} />
                   <span className="text-right text-ink-soft">{b.text}</span>
                 </li>
               ))}
@@ -336,7 +335,7 @@ function Playoff({ view, picked, name, paged, onPick }: {
         <ol className="mt-2 divide-y divide-ink-muted/15 rounded-lg bg-mist">
           {view.ranking.map((r) => (
             <li key={r.teamId} className="flex items-baseline justify-between gap-3 px-3 py-1.5 text-sm">
-              <span><span className="mr-2 inline-block w-5 text-right text-ink-muted">{r.rank}</span><TeamName id={r.teamId} /></span>
+              <span><span className="mr-2 inline-block w-5 text-right text-ink-muted">{r.rank}</span><LabTeam id={r.teamId} name={name} paged={paged} /></span>
               <span className="text-right text-xs text-ink-soft">{r.text}</span>
             </li>
           ))}
