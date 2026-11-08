@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { BracketGame, BracketSide, LabLocks } from "@/core";
 import type { LabRequest, LabResponse, LabView } from "@/app/lab.worker";
 import { ShareButton } from "@/app/explorer/Share";
@@ -121,6 +121,7 @@ function useLab(initial: LabView) {
     const prev = history.at(-1);
     if (!prev) return;
     setHistory((h) => h.slice(0, -1));
+    setNote("");
     current.current = prev;
     setLocks(prev);
     run(prev);
@@ -160,9 +161,22 @@ function useLab(initial: LabView) {
   return { locks, view, status, note, canUndo: history.length > 0, pickGame, pickBracket, undo, reset: () => update(none()) };
 }
 
+const WIDE = "(min-width: 768px)";
+/** Whether both panels show side by side (Tailwind's `md`), so the tabs are hidden. False on the server. */
+function useWide() {
+  return useSyncExternalStore(
+    (on) => { const m = window.matchMedia(WIDE); m.addEventListener("change", on); return () => m.removeEventListener("change", on); },
+    () => window.matchMedia(WIDE).matches,
+    () => false,
+  );
+}
+
 export function Lab({ initial, games, names, teams, paged }: Props) {
   const { locks, view, status, note, canUndo, pickGame, pickBracket, undo, reset } = useLab(initial);
   const [tab, setTab] = useState<"games" | "playoff">("games");
+  // Side by side there are no tabs, so the panels aren't tab panels.
+  const wide = useWide();
+  const panel = (t: "games" | "playoff") => (wide ? {} : { role: "tabpanel", "aria-labelledby": `lab-tab-${t}` });
   const pagedSet = useMemo(() => new Set(paged), [paged]);
   const name = (id: number) => names[id] ?? `Team ${id}`;
   const picks = count(locks);
@@ -196,10 +210,10 @@ export function Lab({ initial, games, names, teams, paged }: Props) {
       </div>
 
       <div className="mt-4 grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div id="lab-panel-games" role="tabpanel" aria-labelledby="lab-tab-games" className={tab === "games" ? "" : "hidden md:block"}>
+        <div id="lab-panel-games" {...panel("games")} className={tab === "games" ? "" : "hidden md:block"}>
           <Games games={games} picked={locks.games} name={name} teams={teams} onPick={pickGame} />
         </div>
-        <div id="lab-panel-playoff" role="tabpanel" aria-labelledby="lab-tab-playoff" className={tab === "playoff" ? "" : "hidden md:block"}>
+        <div id="lab-panel-playoff" {...panel("playoff")} className={tab === "playoff" ? "" : "hidden md:block"}>
           <Playoff view={view} picked={locks.bracket} name={name} paged={pagedSet} onPick={(g, w) => view.playoff && pickBracket(view.playoff.bracket, g, w)} />
         </div>
       </div>
