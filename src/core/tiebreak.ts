@@ -176,6 +176,8 @@ type Outcome = { placed: number[] } | { drop: number };
 type PickOptions = TiebreakOptions & {
   /** False: skip steps that need non-conference results (the Big 12's total wins), leaving them to `rank`. */
   allGames?: boolean;
+  /** Collects the name of every step that told tied teams apart, in the order they ran. */
+  trace?: string[];
 };
 
 /**
@@ -188,6 +190,26 @@ export function championshipFromData(data: ConferenceData, winnerOf: (game: Game
   if (!g) return rulesPick(data, winnerOf, opts);
   const [a, b] = rulesPick(data, winnerOf, opts);
   return (a === g.homeId && b === g.awayId) || (a === g.awayId && b === g.homeId) ? [a, b] : [g.homeId, g.awayId];
+}
+
+export type DecidedTitleGame = {
+  /** [seed 1, seed 2]. */
+  teams: [number, number];
+  /** The tiebreak steps that told tied teams apart, first to last, each once; empty when records alone decided. */
+  steps: string[];
+};
+
+/**
+ * The title game's two teams when every result the rules look at is set by `winnerOf` (`set` says which games
+ * are), with the steps that decided: null while a game the rules count is still open. Not part of the public API.
+ */
+export function decidedTitleGame(data: ConferenceData, set: (game: Game) => boolean, winnerOf: (game: Game) => number, opts: TiebreakOptions): DecidedTitleGame | null {
+  const open = (g: Game) => !g.completed && !set(g);
+  if (data.games.some(open)) return null;
+  if (countsNonConference(data) && [...data.ids].some((id) => data.schedule.get(id)!.some((g) => !isTitleGame(data, g) && open(g)))) return null;
+  const trace: string[] = [];
+  const teams = championshipFromData(data, winnerOf, { ...opts, trace });
+  return { teams, steps: [...new Set(trace)] };
 }
 
 /** The two teams the rules pick, [seed 1, seed 2]. */
@@ -215,6 +237,7 @@ function rulesPick(data: ConferenceData, winnerOf: (game: Game) => number, opts:
       if (step === null) continue;
       const r = step.run(ids, ctx, spots);
       if (r === null) continue;
+      opts.trace?.push(step.name);
       if ("picked" in r) return { placed: r.picked };
       if ("drop" in r) return rules.drop === "retie" ? r : pick(ids.filter((id) => id !== r.drop), spots, 0, seeding);
       const { top } = r;
