@@ -52,10 +52,13 @@ export function ShareButton({ small = false, className = "" }: { small?: boolean
     <button
       type="button"
       onClick={share}
+      title={note || undefined}
       className={`press flex ${size} shrink-0 animate-rise items-center gap-1.5 rounded-full border border-ink-muted/40 bg-white px-3 font-bold text-navy hover:bg-mist ${className}`}
     >
-      <span aria-hidden>↗</span>
-      <span aria-live="polite">{note || (small ? "Share picks" : "Share")}</span>
+      {/* The label keeps its width (the phone bar is tight); only the icon shows the result, and screen readers hear it. */}
+      <span aria-hidden className="inline-block w-3 text-center">{note === "Link copied" ? "✓" : note ? "!" : "↗"}</span>
+      <span>{small ? "Share picks" : "Share"}</span>
+      <span aria-live="polite" className="sr-only">{note}</span>
     </button>
   );
 }
