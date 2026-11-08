@@ -6,6 +6,7 @@ import { bracketGames } from "./playoff";
 import type { Season } from "./season";
 import type { SimResult } from "./sim";
 import { OVERALL, isClear } from "./signal";
+import { pairKey } from "./steps";
 
 export type FieldSpot = {
   seed: number;
@@ -16,7 +17,11 @@ export type FieldSpot = {
   atSeed: number;
   bye: number;
   champion: number;
-  /** "In 92% · seed 3 in 31%" */
+  /**
+   * "In 92% · seed 3 in 31%"; once the field is announced, "National title 23%", "Beat Ohio State 24-14 in the
+   * quarterfinal · national title 41%", "Lost to Miami 24-14 in the quarterfinal" or "Won the national title, 27-21
+   * over Miami".
+   */
   text: string;
 };
 
@@ -29,29 +34,49 @@ export type BracketGame = {
   b: BracketSide;
   /** "At the higher seed" or "Neutral site". */
   site: string;
+  /** Once played (the announced field's real game): "Indiana 38, Alabama 3", the winner first. Null before. */
+  result: string | null;
 };
 
 export type BubbleTeam = { teamId: number; field: number; text: string };
 
 export type NationalView = {
   teams: 4 | 12;
-  /** The projected field, seed 1 first. */
+  /** Whether the field is the one the committee announced (`NationalResult.announced`), not a projection. */
+  announced: boolean;
+  /** "Projected playoff field", or "Playoff field" once announced. */
+  heading: string;
+  /** "Projected bracket", or "Bracket" once the field is announced. */
+  bracketHeading: string;
+  /** The projected field (the announced one once it is), seed 1 first. */
   field: FieldSpot[];
   bracket: BracketGame[];
-  /** The likeliest teams outside the projected field, best odds first. */
+  /** The likeliest teams outside the projected field, best odds first; empty once the field is announced. */
   bubble: BubbleTeam[];
-  /** "Projected from 20,000 simulated seasons." */
+  /** "Projected from 20,000 simulated seasons. …", or what the announced field's odds come from. */
   note: string;
 };
 
 /**
  * The projected field: the teams with the best field odds, as many as the format takes, ordered by their average
- * seed in the seasons they get in. Null when the national run has no playoff.
+ * seed in the seasons they get in. Once the committee has announced the field (`NationalResult.announced`), that
+ * field instead, each team's run so far, and the bracket's results from `opts.season`'s playoff games (needed for
+ * results and team names in them). Null when the
+ * national run has no playoff.
  */
-export function nationalView(national: NationalResult, opts: { bubble?: number } = {}): NationalView | null {
+export function nationalView(national: NationalResult, opts: { bubble?: number; season?: Season } = {}): NationalView | null {
   if (!national.playoff) return null;
-  const withOdds = national.teams.filter((t) => t.playoff !== null && t.playoff.field > 0);
   const T = national.teams.find((t) => t.playoff)!.playoff!.seeds.length as 4 | 12;
+  const games = bracketGames(T);
+  const roundOf = (g: number): BracketGame["round"] => {
+    if (g === games.length - 1) return "Final";
+    if (T === 4) return "Semifinal";
+    return g < 4 ? "First round" : g < 8 ? "Quarterfinal" : "Semifinal";
+  };
+  const iterations = national.iterations.toLocaleString("en-US");
+  if (national.announced) return announcedView(national, opts.season, T, games, roundOf, iterations);
+
+  const withOdds = national.teams.filter((t) => t.playoff !== null && t.playoff.field > 0);
   const byField = [...withOdds].sort((a, b) => b.playoff!.field - a.playoff!.field || a.teamId - b.teamId);
   const meanSeed = (p: NonNullable<(typeof withOdds)[number]["playoff"]>) =>
     p.seeds.reduce((s, x, k) => s + x * (k + 1), 0) / p.field;
@@ -66,17 +91,53 @@ export function nationalView(national: NationalResult, opts: { bubble?: number }
   const bubble = byField.slice(T, T + (opts.bubble ?? 6)).map((t) => ({
     teamId: t.teamId, field: t.playoff!.field, text: `In ${formatFine(t.playoff!.field)}`,
   }));
-  const games = bracketGames(T);
   const side = (x: number): BracketSide => (x >= 0 ? { teamId: field[x].teamId, seed: x + 1 } : { winnerOf: ~x });
-  const roundOf = (g: number): BracketGame["round"] => {
-    if (g === games.length - 1) return "Final";
-    if (T === 4) return "Semifinal";
-    return g < 4 ? "First round" : g < 8 ? "Quarterfinal" : "Semifinal";
-  };
   const bracket = games.map(([a, b, home], index) => ({
-    index, round: roundOf(index), a: side(a), b: side(b), site: home ? "At the higher seed" : "Neutral site",
+    index, round: roundOf(index), a: side(a), b: side(b), site: home ? "At the higher seed" : "Neutral site", result: null,
   }));
-  return { teams: T, field, bracket, bubble, note: `Projected from ${national.iterations.toLocaleString("en-US")} simulated seasons. Modelled odds, not a prediction of the committee.` };
+  return {
+    teams: T, announced: false, heading: "Projected playoff field", bracketHeading: "Projected bracket", field, bracket, bubble,
+    note: `Projected from ${iterations} simulated seasons. Modelled odds, not a prediction of the committee.`,
+  };
+}
+
+/** The announced field and its bracket, each game's result once played and each team's run so far. */
+function announcedView(
+  national: NationalResult, season: Season | undefined, T: 4 | 12, games: ReturnType<typeof bracketGames>,
+  roundOf: (g: number) => BracketGame["round"], iterations: string,
+): NationalView {
+  const seeds = national.announced!.seeds;
+  const byId = new Map(national.teams.map((t) => [t.teamId, t]));
+  const field: FieldSpot[] = seeds.map((id, k) => {
+    const p = byId.get(id)?.playoff ?? null;
+    const run = p?.run ?? null;
+    const odds = `national title ${formatFine(p?.champion ?? 0)}`;
+    const tail = run?.text.includes(": ") ? run.text.slice(run.text.indexOf(": ") + 2) : "";
+    const said = tail === "" ? "" : tail[0].toUpperCase() + tail.slice(1);
+    const text = run?.state === "in" ? (said ? `${said} · ${odds}` : odds[0].toUpperCase() + odds.slice(1)) : said;
+    return { seed: k + 1, teamId: id, field: 1, atSeed: 1, bye: T === 12 && k < 4 ? 1 : 0, champion: p?.champion ?? 0, text };
+  });
+  // The bracket as played: each game's two teams once the games feeding it are final, its result once it is.
+  const name = (id: number) => season?.teams.find((t) => t.id === id)?.name ?? `Team ${id}`;
+  const seedOf = new Map(seeds.map((id, k) => [id, k + 1]));
+  const finals = new Map((season?.playoffGames ?? []).filter((g) => g.completed).map((g) => [pairKey(g.homeId, g.awayId), g]));
+  const winners: (number | null)[] = [];
+  const bracket: BracketGame[] = games.map(([x, y, home], index) => {
+    const team = (v: number): number | null => (v >= 0 ? seeds[v] : winners[~v]);
+    const [a, b] = [team(x), team(y)];
+    const real = a !== null && b !== null ? finals.get(pairKey(a, b)) : undefined;
+    const winner = real ? (real.homePoints! > real.awayPoints! ? real.homeId : real.awayId) : null;
+    winners.push(winner);
+    const side = (id: number | null, v: number): BracketSide => (id !== null ? { teamId: id, seed: seedOf.get(id)! } : { winnerOf: ~v });
+    const result = real && winner !== null
+      ? `${name(winner)} ${Math.max(real.homePoints!, real.awayPoints!)}, ${name(winner === real.homeId ? real.awayId : real.homeId)} ${Math.min(real.homePoints!, real.awayPoints!)}`
+      : null;
+    return { index, round: roundOf(index), a: side(a, x), b: side(b, y), site: home ? "At the higher seed" : "Neutral site", result };
+  });
+  return {
+    teams: T, announced: true, heading: "Playoff field", bracketHeading: "Bracket", field, bracket, bubble: [],
+    note: `The field and seeds the committee announced, with the results so far. National-title odds from ${iterations} simulated playoffs: modelled, not a prediction.`,
+  };
 }
 
 export type PlayoffSignal = {

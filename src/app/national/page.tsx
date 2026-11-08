@@ -40,12 +40,12 @@ export default function NationalPage() {
       </header>
       <main className="mx-auto max-w-5xl p-4 md:p-6">
         <h1 className="flex items-center gap-2 font-display text-2xl font-bold">
-          Projected playoff field
+          {view.heading}
           <span className="rounded border border-ink-muted/50 px-1 text-[10px] font-semibold leading-4 text-ink-muted">Beta</span>
         </h1>
         <p className="mt-1 text-sm text-ink-muted">{view.note}</p>
 
-        <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,1fr)_280px]">
+        <div className={`mt-6 grid gap-6 ${view.bubble.length > 0 ? "md:grid-cols-[minmax(0,1fr)_280px]" : ""}`}>
           <section aria-labelledby="field">
             <h2 id="field" className="font-display text-lg font-bold">The field</h2>
             <ol className="mt-2 divide-y divide-ink-muted/15 rounded-lg bg-mist">
@@ -57,7 +57,7 @@ export default function NationalPage() {
               ))}
             </ol>
           </section>
-          <section aria-labelledby="bubble">
+          {view.bubble.length > 0 && <section aria-labelledby="bubble">
             <h2 id="bubble" className="font-display text-lg font-bold">On the bubble</h2>
             <ul className="mt-2 divide-y divide-ink-muted/15 rounded-lg border border-ink-muted/25">
               {view.bubble.map((b) => (
@@ -67,11 +67,11 @@ export default function NationalPage() {
                 </li>
               ))}
             </ul>
-          </section>
+          </section>}
         </div>
 
         <section aria-labelledby="bracket" className="mt-8">
-          <h2 id="bracket" className="font-display text-lg font-bold">Projected bracket</h2>
+          <h2 id="bracket" className="font-display text-lg font-bold">{view.bracketHeading}</h2>
           <div className="mt-2 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {Object.entries(rounds).map(([round, games]) => (
               <div key={round}>
@@ -82,6 +82,7 @@ export default function NationalPage() {
                       <p className="text-xs text-ink-muted">Game {g.index + 1} · {g.site}</p>
                       <p><Side side={g.a} /></p>
                       <p><Side side={g.b} /></p>
+                      {g.result && <p className="mt-1 text-xs font-semibold text-ink-soft">{g.result}</p>}
                     </li>
                   ))}
                 </ul>

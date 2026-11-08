@@ -13,6 +13,7 @@
 // Rules with a two-team procedure (`twoTeam`) use it whenever two teams are tied, including a bigger tie cut to two.
 
 import { countsNonConference as needsNonConference, tiebreakRules, type TiebreakRules } from "./rules";
+import { titleGameIndex } from "./committee";
 import type { Game, Season } from "./season";
 import { comparePct, isTitleGame, pairKey, winnerIn, type Context, type Members, type Row, type Step } from "./steps";
 
@@ -36,6 +37,12 @@ export type ConferenceData = Members & {
   rules: TiebreakRules;
   /** Members who can play in the title game: all but those barred from the postseason (`Team.postseasonBan`). */
   eligible: ReadonlySet<number>;
+  /**
+   * The title game the data marks (`Game.titleGame`), once every conference game is final: CFBD lists it when the matchup is set, so its
+   * two teams play, whatever the tiebreak would say (the real ranking or coin toss can differ from the stand-in's).
+   * Null before.
+   */
+  decided: Game | null;
 };
 
 /** Conferences whose tiebreak counts non-conference results (the Big 12's total-wins step). Not part of the public API. */
@@ -81,7 +88,10 @@ export function conferenceData(season: Season, conference: string): ConferenceDa
       if (![...eligible].some((id) => divisionOf.get(id) === d)) throw new Error(`${conference}'s ${d} division has no team eligible for the postseason`);
     }
   } else if (eligible.size < 2) throw new Error(`${conference} has fewer than two teams eligible for the postseason`);
-  return { ...data, rules, eligible, divisionOf };
+  // Only a title game the data marks (seasonFromCfbd), never one guessed in a season built some other way.
+  const i = titleGameIndex(season, data.ids);
+  const decided = i >= 0 && season.games[i].titleGame === true && data.games.every((g) => g.completed) ? season.games[i] : null;
+  return { ...data, rules, eligible, divisionOf, decided };
 }
 
 /** Each member's division. Throws when a member is in no division, or a listed school isn't a member. */
@@ -146,7 +156,7 @@ export function championshipParticipants(
   winnerOf: (game: Game) => number,
   opts: TiebreakOptions,
 ): [number, number] {
-  return championshipFromData(conferenceData(season, conference), winnerOf, opts);
+  return rulesPick(conferenceData(season, conference), winnerOf, opts);
 }
 
 const searchedSteps = new WeakMap<readonly Step[], readonly (Step | null)[]>();
@@ -163,15 +173,25 @@ const conferenceSteps = (list: readonly Step[]): readonly (Step | null)[] => {
 /** A tie's outcome: the teams placed, best seed first, or (rules with `drop: "retie"`) a team out of the race. */
 type Outcome = { placed: number[] } | { drop: number };
 
-/** Same as championshipParticipants with the per-conference data precomputed. Not part of the public API. */
-export function championshipFromData(
-  data: ConferenceData,
-  winnerOf: (game: Game) => number,
-  opts: TiebreakOptions & {
-    /** False: skip steps that need non-conference results (the Big 12's total wins), leaving them to `rank`. */
-    allGames?: boolean;
-  },
-): [number, number] {
+type PickOptions = TiebreakOptions & {
+  /** False: skip steps that need non-conference results (the Big 12's total wins), leaving them to `rank`. */
+  allGames?: boolean;
+};
+
+/**
+ * The title game's two teams, [seed 1, seed 2]: the data's title game once it decides (`ConferenceData.decided`),
+ * seeded as the rules seed them when they pick the same two (else the home team first); otherwise the rules' pick,
+ * as championshipParticipants. Not part of the public API.
+ */
+export function championshipFromData(data: ConferenceData, winnerOf: (game: Game) => number, opts: PickOptions): [number, number] {
+  const g = data.decided;
+  if (!g) return rulesPick(data, winnerOf, opts);
+  const [a, b] = rulesPick(data, winnerOf, opts);
+  return (a === g.homeId && b === g.awayId) || (a === g.awayId && b === g.homeId) ? [a, b] : [g.homeId, g.awayId];
+}
+
+/** The two teams the rules pick, [seed 1, seed 2]. */
+function rulesPick(data: ConferenceData, winnerOf: (game: Game) => number, opts: PickOptions): [number, number] {
   const { rules } = data;
   const table = rows(data, winnerOf);
   const ctx: Context = {

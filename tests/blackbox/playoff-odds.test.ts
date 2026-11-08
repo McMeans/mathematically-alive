@@ -100,7 +100,7 @@ describe("team page playoff odds from the national simulation", { timeout: 120_0
   it("a four-team field shows no bye row", () => {
     const me = sec.teams.find((t) => t.teamId === georgia)!;
     // A four-team season's odds: semifinal, final and title, no quarterfinal and no byes.
-    const fourTeam = { ...me, cfp: { field: 0.3, bye: 0, seeds: [0.1, 0.1, 0.05, 0.05], quarterfinal: null, semifinal: 0.3, final: 0.15, champion: 0.08 } };
+    const fourTeam = { ...me, cfp: { field: 0.3, bye: 0, seeds: [0.1, 0.1, 0.05, 0.05], quarterfinal: null, semifinal: 0.3, final: 0.15, champion: 0.08, run: null } };
     expect(playoffDetail(fourTeam)).toEqual([{ label: "National title", value: "8%" }]);
   });
 

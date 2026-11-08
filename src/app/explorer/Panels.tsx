@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useId, useState } from "react";
 import {
-  INDEPENDENTS, conferenceName, conferenceShort, formatChance, formatRecord, formatSideOdds, mustWinConference, playoffDetail, playoffRoute,
+  INDEPENDENTS, conferenceName, conferenceShort, formatChampion, formatChance, formatPlayoff, formatRecord, formatSideOdds, mustWinConference, playoffDetail, playoffRoute,
   type IndependentOutlook, type OddsLabels, type PlayoffSignal, type TeamOutlook, type TeamPath,
 } from "@/core";
 import { NAVY, pct, type ConferenceList, type GameInfo, type TeamInfo } from "./Explorer";
@@ -162,7 +162,7 @@ export function StatTiles({ outlook, ifWinOut, compact, condensed }: { outlook: 
   if (condensed)
     return (
       <dl className="flex animate-rise items-baseline justify-between gap-3 text-xs text-ink-muted">
-        {([[labels.titleGame, formatChance(outlook.titleGame, outlook.status), "text-navy", false], [labels.champion, pct(outlook.champion), "text-navy", false], [labels.playoff, playoffText(outlook, pct(outlook.playoff), labels), "text-navy", true]] as const).map(([label, value, tone, badge]) => (
+        {([[labels.titleGame, formatChance(outlook.titleGame, outlook.status), "text-navy", false], [labels.champion, formatChampion(outlook), "text-navy", false], [labels.playoff, playoffText(outlook, formatPlayoff(outlook.playoff, outlook.cfp, outlook.status), labels), "text-navy", true]] as const).map(([label, value, tone, badge]) => (
           <div key={label} className="flex items-baseline gap-1.5">
             <dt className="flex items-center gap-1">{label}{badge && <Beta />}</dt>
             <dd className={`font-display text-base font-bold ${tone}`}>{value}</dd>
@@ -173,8 +173,8 @@ export function StatTiles({ outlook, ifWinOut, compact, condensed }: { outlook: 
   return (
     <dl className={`grid gap-2 ${compact ? "grid-cols-3" : "grid-cols-2"}`}>
       <Tile label={labels.titleGame} value={formatChance(outlook.titleGame, outlook.status)} tone="text-navy" />
-      <Tile label={labels.champion} value={pct(outlook.champion)} tone="text-navy" />
-      <Tile label={labels.playoff} value={playoffText(outlook, pct(outlook.playoff), labels)} tone="text-navy" badge small={mustWinConference(outlook)} />
+      <Tile label={labels.champion} value={formatChampion(outlook)} tone="text-navy" />
+      <Tile label={labels.playoff} value={playoffText(outlook, formatPlayoff(outlook.playoff, outlook.cfp, outlook.status), labels)} tone="text-navy" badge small={mustWinConference(outlook)} />
       {!compact && <Tile label={labels.winOut} value={pct(ifWinOut)} tone="text-navy" />}
     </dl>
   );
@@ -260,7 +260,8 @@ export function PlayoffElsewhere({ games }: { games: PlayoffSignal[] }) {
 
 /** An independent's route in and its bye and national-title odds, under its playoff number. */
 export function IndependentDetail({ outlook, className = "" }: { outlook: IndependentOutlook; className?: string }) {
-  const rows = outlook.postseasonBan ? [] : [
+  // Once the field is announced: its seed and the national title as core words them.
+  const rows = outlook.postseasonBan ? [] : outlook.cfp.run ? playoffDetail(outlook) : [
     { label: "First-round bye", value: formatSideOdds(outlook.cfp.bye, "alive") },
     { label: "National title", value: formatSideOdds(outlook.cfp.champion, "alive") },
   ];
@@ -278,11 +279,14 @@ export function IndependentDetail({ outlook, className = "" }: { outlook: Indepe
 export function IndependentTiles({ outlook, condensed }: { outlook: IndependentOutlook; condensed?: boolean }) {
   const { labels } = useConference();
   const out = outlook.postseasonBan ? "eliminated" : "alive";
-  const tiles = [
-    [labels.playoff, formatSideOdds(outlook.playoff, out), true],
-    ["First-round bye", formatSideOdds(outlook.cfp.bye, out), false],
-    ["National title", formatSideOdds(outlook.cfp.champion, out), false],
-  ] as const;
+  const playoff = [labels.playoff, formatPlayoff(outlook.playoff, outlook.cfp, out), true] as const;
+  const tiles = outlook.cfp.run
+    ? [playoff, ...playoffDetail(outlook).map((r) => [r.label, r.value, false] as const)]
+    : [
+      playoff,
+      ["First-round bye", formatSideOdds(outlook.cfp.bye, out), false] as const,
+      ["National title", formatSideOdds(outlook.cfp.champion, out), false] as const,
+    ];
   if (condensed)
     return (
       <dl className="flex animate-rise items-baseline justify-between gap-3 text-xs text-ink-muted">

@@ -49,15 +49,15 @@ const MAX_SHRINK = 0.05;
 
 /**
  * Problems with a freshly fetched snapshot, before it replaces `previous` (the committed one, if any). It must have
- * teams and games, and no list (teams, games, lines, ratings) may shrink by more than 5% from the same season's
+ * teams and games, and no list (teams, games, lines, ratings, committee rankings) may shrink by more than 5% from the same season's
  * previous snapshot: a partial CFBD response would still pass `checkSnapshot` but quietly worsen every number.
  */
 export function checkFetch(next: CfbdSnapshot, previous: CfbdSnapshot | null): string[] {
   const errors: string[] = [];
   const same = previous !== null && previous.year === next.year;
-  for (const name of ["teams", "games", "lines", "ratings"] as const) {
-    const now = next[name].length;
-    const before = same ? previous[name].length : 0;
+  for (const name of ["teams", "games", "lines", "ratings", "rankings"] as const) {
+    const now = next[name]?.length ?? 0;
+    const before = same ? (previous[name]?.length ?? 0) : 0;
     if (now === 0 && (name === "teams" || name === "games")) errors.push(`CFBD returned no ${name} for ${next.year}.`);
     else if (now < before * (1 - MAX_SHRINK)) {
       errors.push(`CFBD returned ${now} ${name} for ${next.year}, down from ${before} in the previous snapshot.`);

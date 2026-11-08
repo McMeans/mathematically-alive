@@ -2,7 +2,7 @@
 // Odds are Monte Carlo counts over simulated seasons. "clinched" and "eliminated"
 // are mathematically proven (provenStatus checks every remaining combination);
 // odds of exactly 1 or 0 without a proof stay "open".
-import type { NationalResult } from "./national";
+import type { NationalPlayoff, NationalResult } from "./national";
 import type { TeamOutlook } from "./outlook";
 import { simulateSeason, tiebreakDraw, type SimResult } from "./sim";
 import { provenStatus } from "./proof";
@@ -143,7 +143,7 @@ export function oddsLabels(key: string): OddsLabels {
  * Never for a Group of Six team: its conference title is no automatic bid (see `playoffRoute`).
  */
 export function mustWinConference(o: TeamOutlook): boolean {
-  return !o.groupOfSix && o.playoff > 0 && o.atLarge === 0;
+  return !o.groupOfSix && o.playoff > 0 && o.atLarge === 0 && !o.cfp?.run;
 }
 
 /** Why a team barred from the postseason (`Team.postseasonBan`) shows Out everywhere. Not part of the public API. */
@@ -151,25 +151,71 @@ export const BARRED = "Barred from the postseason this season: no title game, no
 
 /**
  * How the team's playoff odds come about, when that needs saying: a team barred from the postseason can't get in;
- * a Group of Six team's way in is ranking above every other Group of Six team, whether or not it wins its
- * conference. Null otherwise.
+ * once the committee has announced the field, its seed and its playoff so far (`PlayoffRun.text`); before that, a
+ * Group of Six team's way in is ranking above every other Group of Six team, whether or not it wins its conference.
+ * Null otherwise.
  */
 export function playoffRoute(o: TeamOutlook): string | null {
   if (o.postseasonBan) return BARRED;
+  if (o.cfp?.run) return o.cfp.run.text;
   return o.groupOfSix ? "Gets in as the highest-ranked Group of Six team, conference champion or not" : null;
 }
 
 /**
  * The playoff odds past getting in, from the national simulation (EXPERIMENTAL): a first-round bye and the national
- * title, as label and display value. Empty when the odds are the estimate (no national run) or the team never
+ * title, as label and display value. Once the field is announced: its seed, and the national title as "Won", "Out"
+ * (not selected, or beaten) or its odds. Empty when the odds are the estimate (no national run) or the team never
  * makes the field.
  */
-export function playoffDetail(o: TeamOutlook): { label: string; value: string }[] {
+export function playoffDetail(o: { cfp: NationalPlayoff | null }): { label: string; value: string }[] {
+  const run = o.cfp?.run;
+  if (run) {
+    if (run.seed === null) return [];
+    const title = run.state === "champion" ? "Won" : run.state === "out" ? "Out" : formatSideOdds(o.cfp!.champion, "alive");
+    return [{ label: "Seed", value: String(run.seed) }, { label: "National title", value: title }];
+  }
   if (!o.cfp || o.cfp.field === 0) return [];
   const rows = [{ label: "National title", value: formatSideOdds(o.cfp.champion, "alive") }];
   // A four-team field has no byes.
   if (o.cfp.quarterfinal !== null) rows.unshift({ label: "First-round bye", value: formatSideOdds(o.cfp.bye, "alive") });
   return rows;
+}
+
+/**
+ * Playoff odds as shown: "In" or "Out" once the committee has announced the field; before, the odds, given the
+ * team's title-game status (`formatSideOdds`).
+ */
+export function formatPlayoff(p: number, cfp: NationalPlayoff | null, status: PathStatus): string {
+  if (cfp?.run) return cfp.run.seed === null ? "Out" : "In";
+  return formatSideOdds(p, status);
+}
+
+/** "27-20": a final score, the winner's points first. Not part of the public API. */
+export const finalScore = (g: Game): string => `${Math.max(g.homePoints!, g.awayPoints!)}-${Math.min(g.homePoints!, g.awayPoints!)}`;
+
+/** The winner of a final game. Not part of the public API. */
+export const winnerOfFinal = (g: Game): number => (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId);
+
+/**
+ * A team's result in its conference's title game once it is final: "Beat Virginia 27-20 in the ACC title game" or
+ * "Lost to Duke 27-20 in the ACC title game". Null until then, and for a team that didn't play in it. Not part of the
+ * public API: `TeamOutlook.titleResult` carries it.
+ */
+export function titleResult(season: Season, conference: string, game: Game | null, teamId: number): { won: boolean; text: string } | null {
+  if (!game || !game.completed || (game.homeId !== teamId && game.awayId !== teamId)) return null;
+  const other = game.homeId === teamId ? game.awayId : game.homeId;
+  const name = season.teams.find((t) => t.id === other)?.name ?? `Team ${other}`;
+  const won = winnerOfFinal(game) === teamId;
+  return { won, text: `${won ? "Beat" : "Lost to"} ${name} ${finalScore(game)} in the ${conferenceName(conference)} title game` };
+}
+
+/**
+ * Its chance to win the conference, as shown: "Won" or "Lost" once it has played the title game, otherwise the odds
+ * (`formatSideOdds`).
+ */
+export function formatChampion(o: Pick<TeamOutlook, "champion" | "status" | "titleResult">): string {
+  if (o.titleResult) return o.titleResult.won ? "Won" : "Lost";
+  return formatSideOdds(o.champion, o.status);
 }
 
 /** Whole-percent odds. "<1%" and ">99%" stand in for 0 or 100 when the true value isn't exact. */
@@ -268,7 +314,19 @@ export function teamPath(season: Season, opts: PathOptions, shared?: SimResult):
   let summary: string;
   const steps: string[] = [];
   const barred = season.teams.find((t) => t.id === teamId)?.postseasonBan === true;
-  if (barred) summary = `${team} is barred from the postseason this season, so it can't play in the ${conferenceName(conference)} title game.`;
+  const decided = data.decided;
+  const title = `${conferenceName(conference)} title game`;
+  if (decided) {
+    const [home, away] = [name(decided.homeId), name(decided.awayId)];
+    const plays = decided.homeId === teamId || decided.awayId === teamId;
+    const other = name(decided.homeId === teamId ? decided.awayId : decided.homeId);
+    if (decided.completed) {
+      const [w, l] = winnerOfFinal(decided) === decided.homeId ? [home, away] : [away, home];
+      summary = !plays ? `${team} didn't make the ${title}: ${w} beat ${l} ${finalScore(decided)}.`
+        : w === team ? `${team} won the ${title}, ${finalScore(decided)} over ${other}.`
+        : `${team} lost the ${title} to ${other}, ${finalScore(decided)}.`;
+    } else summary = plays ? `${team} plays ${other} in the ${title}, ${when(decided)}.` : `${team} didn't make the ${title}: ${home} and ${away} play for it.`;
+  } else if (barred) summary = `${team} is barred from the postseason this season, so it can't play in the ${conferenceName(conference)} title game.`;
   else if (status === "clinched") summary = `${team} is in the ${conferenceName(conference)} title game whatever happens.`;
   else if (status === "eliminated") summary = `${team} can't make the ${conferenceName(conference)} title game: no combination of remaining results gets it there.`;
   else if (ifWinOut !== null) summary = `Win out and ${team} makes the ${conferenceName(conference)} title game ${formatOdds(ifWinOut)} of the time.`;

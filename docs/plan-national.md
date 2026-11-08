@@ -153,6 +153,31 @@ Status: done.
 - Done: independents (Notre Dame, UConn): pages about the playoff alone (`exploreIndependent`), no title-game section.
 - Done: the team picker's tabs wrap, with short names, for every conference plus independents.
 
+## Phase 7: the postseason, from the data
+
+Status: done (one core + app PR). For the end of the 2026 season: conference championship weekend Dec. 4-5, the
+field announced Dec. 6, the first round Dec. 18-19, the final in January.
+
+- **Title games in the data.** `seasonFromCfbd` marks each title game (`Game.titleGame`) and makes it a non-conference
+  game, however CFBD flags it: CFBD's "<conference> Championship" note first, else the schedule (the latest week's
+  lone or lone neutral-site game between members), now with a game-count check so a last-week or postponed game is
+  never taken for a title game not yet listed. Checked against every conference's 2014-2025 title games, with and
+  without them in the data. Once every conference game is final, the listed title game decides who plays, whatever
+  the tiebreak stand-in says, everywhere (national pass, outlook, path, proofs).
+- **After the title games.** `TeamOutlook.titleResult`, `formatChampion` ("Won", "Lost") and the path summary show
+  the final result instead of odds.
+- **The real field.** Source: CFBD. Postseason games carry a `playoff` field (round, bracket slot, both seeds) once
+  their matchup is set; the selection-day committee ranking ("Playoff Committee Rankings", the first after the title
+  games) under the season's format fills any seeds the games don't name yet. `announcedField` gives the field; the
+  national pass uses it in every simulated season. The fetch is 5 calls (was 4): both season types for games and
+  lines, plus the rankings; a Sunday-evening refresh in December brings the field in the day it is announced.
+- **The bracket played out.** Final playoff games decide their bracket games; the rest are simulated from the real
+  bracket. Each team's `PlayoffRun` (seed, in/out/champion, a sentence) drives the team page's In/Out, seed and
+  national-title wording; the national view shows the announced field, each run and the results.
+- **Tested end to end** on the 2025 postseason (`fixtures/national-2025.json`, `pnpm fixture 2025 national`): every
+  title game found, the field from the bracket and from the ranking alone (both the committee's), the bracket played
+  out to Indiana, and the bracket in progress.
+
 ## Order and size
 
 | Phase | Ships as | Depends on |
@@ -163,6 +188,7 @@ Status: done.
 | 4. National simulation | core PRs (stages 2–3, then 4–5) | 1, 3 |
 | 5. Playoff UI | app PRs | 4 |
 | 6. Rest of FBS | one core + app PR per conference or two | 1, and 5 for G6 wording |
+| 7. Postseason from the data | core + app PR | 4, 5, 6 |
 
 ## Open questions for the user
 

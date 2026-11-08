@@ -57,4 +57,4 @@ const lastPlayed = Math.max(...season.games.filter((g) => g.completed).map((g) =
 export const through = Number.isFinite(lastPlayed) ? `Through ${dayFormat.format(new Date(lastPlayed))}` : asOf;
 
 /** The projected playoff field, bracket and bubble from the base national run; null when the season has no playoff run. */
-export const baseNationalView = nationalView(baseNational);
+export const baseNationalView = nationalView(baseNational, { season });

@@ -1,6 +1,6 @@
 // College Football Playoff formats per season (phase 4, stages 4 and 5): who gets in, how they are seeded, and the
 // bracket they play. Every format cites its source. A season with no format is an error.
-import { powerConferences } from "./committee";
+import { committeeRanking, powerConferences } from "./committee";
 import type { Season } from "./season";
 
 export type PlayoffFormat = {
@@ -152,4 +152,100 @@ export function bracketGames(teams: 4 | 12): readonly (readonly [number, number,
     [~4, ~7, false], [~5, ~6, false],
     [~8, ~9, false],
   ];
+}
+
+/** The field the committee announced, seed 1 first, and where it came from. */
+export type AnnouncedField = {
+  /** Team ids, seed 1 first. */
+  seeds: number[];
+  /**
+   * "bracket": every seed from CFBD's playoff games (their `playoff.homeSeed` and `awaySeed`). "ranking": some or all
+   * from the committee's selection-day ranking under the season's format (CFBD's /rankings), the bracket's seeds kept
+   * where it lists them: CFBD may list the first round before the quarterfinals, whose top four seeds have byes.
+   */
+  source: "bracket" | "ranking";
+};
+
+/**
+ * The playoff field the committee announced, once the data has it; null before (the field is then simulated). From
+ * CFBD's playoff games when they name every seed; otherwise from the committee's selection-day ranking (the first one
+ * released after every title game the format needs is final) under the season's format, with the champions the
+ * title games in the data crowned, the seeds the playoff games already name kept. Teams the ranking leaves out (it
+ * ranks 25) follow in the committee stand-in's order, so an unranked champion with an automatic bid is seeded last.
+ */
+export function announcedField(season: Season): AnnouncedField | null {
+  const format = findFormat(season.year);
+  if (!format) return null;
+  const T = format.teams;
+  const known = new Map<number, number>();
+  for (const g of season.playoffGames ?? []) {
+    if (g.homeSeed !== null && g.homeSeed >= 1 && g.homeSeed <= T) known.set(g.homeSeed, g.homeId);
+    if (g.awaySeed !== null && g.awaySeed >= 1 && g.awaySeed <= T) known.set(g.awaySeed, g.awayId);
+  }
+  const listed = Array.from({ length: T }, (_, s) => known.get(s + 1));
+  if (listed.every((id) => id !== undefined) && new Set(listed).size === T) return { seeds: listed as number[], source: "bracket" };
+
+  const fromRanking = rankingField(season, format);
+  if (!fromRanking) return null;
+  // The bracket's seeds win; the ranking's field fills the rest in its order.
+  const placed = new Set(listed.filter((id): id is number => id !== undefined));
+  const rest = fromRanking.filter((id) => !placed.has(id));
+  return { seeds: listed.map((id) => id ?? rest.shift()!), source: "ranking" };
+}
+
+/** The field the format picks from the committee's selection-day ranking and the data's title games; null without them. */
+function rankingField(season: Season, format: PlayoffFormat): number[] | null {
+  const titles = season.games.filter((g) => g.titleGame === true);
+  const conf = new Map(season.teams.map((t) => [t.id, t.conference]));
+  const needs = championsNeeded(format);
+  const power = powerConferences(season.year);
+  const counted = titles.filter((g) => needs === "all" || power.includes(conf.get(g.homeId) ?? ""));
+  if (needs === "power" && !power.every((c) => counted.some((g) => conf.get(g.homeId) === c))) return null;
+  if (titles.length === 0 || counted.some((g) => !g.completed)) return null;
+  const titleWeek = Math.max(...titles.map((g) => g.week));
+  const releases = (season.committeeRankings ?? []).filter((r) => r.postseason || r.week > titleWeek);
+  if (releases.length === 0) return null;
+  // The first ranking after the title games is selection day's.
+  const ranked = releases[0].teamIds;
+  const inRanking = new Set(ranked);
+  const ranking = [...ranked, ...committeeRanking(season).map((r) => r.teamId).filter((id) => !inRanking.has(id))];
+  const champions = needs === "none" ? [] : counted.map((g) => (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId));
+  return playoffField(season, ranking, champions);
+}
+
+/** A team's playoff once the field is announced. */
+export type PlayoffRun = {
+  /** Its seed; null when it wasn't selected. */
+  seed: number | null;
+  /** "in": selected and still playing; "out": not selected, or lost a playoff game; "champion": won the final. */
+  state: "in" | "out" | "champion";
+  /**
+   * "Seed 3 in the playoff, with a first-round bye", "Seed 10 in the playoff: beat Ohio State 24-14 in the
+   * quarterfinal", "Seed 2 in the playoff: lost to Miami 24-14 in the quarterfinal", "Seed 1 in the playoff: won the
+   * national title, 27-21 over Miami", or "Not selected for the playoff".
+   */
+  text: string;
+};
+
+const ROUND_NAMES: Record<string, string> = {
+  first_round: "first round", quarterfinal: "quarterfinal", semifinal: "semifinal", championship: "national title game",
+};
+
+/** A team's run through the announced field and the playoff games played so far. Not part of the public API. */
+export function playoffRun(season: Season, field: readonly number[], teamId: number): PlayoffRun {
+  const k = field.indexOf(teamId);
+  if (k < 0) return { seed: null, state: "out", text: "Not selected for the playoff" };
+  const seed = k + 1;
+  const head = `Seed ${seed} in the playoff`;
+  const played = (season.playoffGames ?? []).filter((g) => g.completed && (g.homeId === teamId || g.awayId === teamId));
+  const last = played[played.length - 1];
+  if (!last) return { seed, state: "in", text: field.length === 12 && seed <= 4 ? `${head}, with a first-round bye` : head };
+  const other = last.homeId === teamId ? last.awayId : last.homeId;
+  const name = season.teams.find((t) => t.id === other)?.name ?? `Team ${other}`;
+  const score = `${Math.max(last.homePoints!, last.awayPoints!)}-${Math.min(last.homePoints!, last.awayPoints!)}`;
+  const won = (last.homePoints! > last.awayPoints! ? last.homeId : last.awayId) === teamId;
+  const round = ROUND_NAMES[last.round] ?? "playoff";
+  if (!won) return { seed, state: "out", text: `${head}: lost to ${name} ${score} in the ${round}` };
+  if (last.round === "championship") return { seed, state: "champion", text: `${head}: won the national title, ${score} over ${name}` };
+  return { seed, state: "in", text: `${head}: beat ${name} ${score} in the ${round}` };
 }

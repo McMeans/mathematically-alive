@@ -1,5 +1,5 @@
 // Team-list rows, made on the server for every conference and the independents (no "use client": pages call these).
-import { INDEPENDENTS, formatChance, formatRecord, formatSideOdds, type IndependentOutlook, type TeamOutlook } from "@/core";
+import { INDEPENDENTS, formatChance, formatPlayoff, formatRecord, type IndependentOutlook, type TeamOutlook } from "@/core";
 import type { ListRow } from "./Explorer";
 
 /**
@@ -14,7 +14,11 @@ export const conferenceRows = (conference: string, outlook: TeamOutlook[]): List
 
 /** The independents for the team list, by playoff odds (they have no title game). */
 export const independentRows = (outlook: IndependentOutlook[]): ListRow[] =>
-  outlook.map((o) => ({
-    teamId: o.teamId, record: formatRecord(o.record, INDEPENDENTS), odds: formatSideOdds(o.playoff, o.postseasonBan ? "eliminated" : "alive"),
-    key: o.postseasonBan ? -1 : o.playoff, out: o.postseasonBan,
-  }));
+  outlook.map((o) => {
+    // Once the field is announced, In or Out.
+    const out = o.postseasonBan || o.cfp.run?.seed === null;
+    return {
+      teamId: o.teamId, record: formatRecord(o.record, INDEPENDENTS), odds: formatPlayoff(o.playoff, o.cfp, o.postseasonBan ? "eliminated" : "alive"),
+      key: out ? -1 : o.playoff, out,
+    };
+  });

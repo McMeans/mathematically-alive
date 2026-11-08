@@ -41,6 +41,30 @@ export type Game = {
   spread: number | null;
   /** A matchup the conference has projected but not confirmed, standing in until the data has the real game (the Pac-12's flex week). */
   projected?: boolean;
+  /**
+   * The conference's title game (see `seasonFromCfbd`). Never a conference game, whichever way CFBD flags it: it comes
+   * after the standings and every tiebreak.
+   */
+  titleGame?: boolean;
+};
+
+/**
+ * A College Football Playoff game as CFBD lists it once its matchup is set: its round and the seeds the committee gave
+ * its two teams (CFBD's `playoff` field on postseason games, from the 2024 season).
+ */
+export type PlayoffGame = Game & {
+  /** CFBD's round: "first_round", "quarterfinal", "semifinal" or "championship". */
+  round: string;
+  homeSeed: number | null;
+  awaySeed: number | null;
+};
+
+/** One College Football Playoff committee ranking: team ids best first. */
+export type CommitteeRelease = {
+  /** CFBD's week for it: the selection-day ranking comes the week after the title games. */
+  week: number;
+  postseason: boolean;
+  teamIds: number[];
 };
 
 export type Season = {
@@ -48,7 +72,12 @@ export type Season = {
   /** ISO 8601 time the source data was fetched. */
   fetchedAt: string;
   teams: Team[];
+  /** Regular-season games, the conference title games included. Bowls and playoff games are not here. */
   games: Game[];
+  /** Playoff games CFBD lists (the matchups are set once the field is announced); absent or empty before. */
+  playoffGames?: PlayoffGame[];
+  /** The committee's rankings so far, oldest first; absent when the data has none. */
+  committeeRankings?: CommitteeRelease[];
 };
 
 /** The CFBD fields we read. Responses carry more; extra fields are ignored. */
@@ -65,6 +94,12 @@ export type CfbdTeam = {
 export type CfbdGame = {
   id: number;
   week: number;
+  /** "regular" or "postseason"; rows without one are regular-season games. */
+  seasonType?: string | null;
+  /** CFBD's note on the game: "SEC Championship", "College Football Playoff First Round Game". */
+  notes?: string | null;
+  /** On playoff games (2024 on): the round and the two teams' seeds. */
+  playoff?: CfbdPlayoff | null;
   startDate: string;
   completed: boolean;
   neutralSite: boolean;
@@ -80,6 +115,26 @@ export type CfbdGame = {
   awayClassification?: string | null;
   awayPoints?: number | null;
 };
+
+export type CfbdPlayoff = {
+  /** "cfp" for the College Football Playoff. */
+  competition?: string | null;
+  round?: string | null;
+  bracketSlot?: string | null;
+  homeSeed?: number | null;
+  awaySeed?: number | null;
+};
+
+/** One week of CFBD's /rankings: every poll released that week. The committee's is "Playoff Committee Rankings". */
+export type CfbdPollWeek = {
+  season?: number;
+  seasonType?: string | null;
+  week: number;
+  polls: { poll: string; ranks: { rank: number; teamId: number; school?: string }[] }[];
+};
+
+/** The committee's poll in CFBD's /rankings. */
+export const COMMITTEE_POLL = "Playoff Committee Rankings";
 
 export type CfbdLines = {
   id: number;
@@ -98,6 +153,8 @@ export type CfbdSnapshot = {
   games: CfbdGame[];
   lines: CfbdLines[];
   ratings: CfbdRating[];
+  /** CFBD's /rankings weeks (only the committee's poll is read); absent in older snapshots. */
+  rankings?: CfbdPollWeek[];
 };
 
 /**
@@ -133,10 +190,17 @@ export function seasonFromCfbd(raw: CfbdSnapshot): Season {
   }
 
   const games: Game[] = [];
+  const playoffGames: PlayoffGame[] = [];
+  const named = new Set<number>();
   const seen = new Set<number>();
   for (const g of raw.games) {
     if (seen.has(g.id)) throw new Error(`duplicate game id ${g.id}`);
     seen.add(g.id);
+    // A matchup not set yet (a team to be decided) isn't a game we can use.
+    if (typeof g.homeId !== "number" || typeof g.awayId !== "number") continue;
+    const postseason = g.seasonType === "postseason";
+    // Bowls other than the playoff's don't matter here.
+    if (postseason && !isPlayoffRow(g)) continue;
 
     addOpponent(teams, g.homeId, g.homeTeam, g.homeConference, g.homeClassification);
     addOpponent(teams, g.awayId, g.awayTeam, g.awayConference, g.awayClassification);
@@ -147,7 +211,7 @@ export function seasonFromCfbd(raw: CfbdSnapshot): Season {
       throw new Error(`completed game ${g.id} has no final score`);
     }
 
-    games.push({
+    const game: Game = {
       id: g.id,
       week: g.week,
       start: g.startDate,
@@ -160,13 +224,101 @@ export function seasonFromCfbd(raw: CfbdSnapshot): Season {
       awayPoints: g.completed ? awayPoints : null,
       completed: g.completed,
       spread: spreadByGame.get(g.id) ?? null,
-    });
+    };
+    if (postseason) {
+      playoffGames.push({ ...game, conferenceGame: false, round: g.playoff?.round ?? "", homeSeed: g.playoff?.homeSeed ?? null, awaySeed: g.playoff?.awaySeed ?? null });
+      continue;
+    }
+    if (/championship/i.test(g.notes ?? "")) named.add(g.id);
+    games.push(game);
   }
 
+  markTitleGames(raw.year, teams, games, named);
   games.push(...projectedFlexGames(raw.year, teams, games));
   games.sort((a, b) => a.start.localeCompare(b.start) || a.id - b.id);
+  playoffGames.sort((a, b) => a.start.localeCompare(b.start) || a.id - b.id);
   const teamList = [...teams.values()].sort((a, b) => a.name.localeCompare(b.name));
-  return { year: raw.year, fetchedAt: raw.fetchedAt, teams: teamList, games };
+  return { year: raw.year, fetchedAt: raw.fetchedAt, teams: teamList, games, playoffGames, committeeRankings: committeeRankings(raw.rankings ?? []) };
+}
+
+/** A College Football Playoff game: CFBD's `playoff.competition` is "cfp", or (before that field) its note says so. */
+const isPlayoffRow = (g: CfbdGame): boolean =>
+  g.playoff ? g.playoff.competition === "cfp" : /college football playoff/i.test(g.notes ?? "");
+
+/** The committee's rankings from CFBD's /rankings weeks, oldest first (regular season, then postseason, by week). */
+function committeeRankings(weeks: readonly CfbdPollWeek[]): CommitteeRelease[] {
+  return weeks
+    .flatMap((w) => w.polls.filter((p) => p.poll === COMMITTEE_POLL).map((p) => ({
+      week: w.week,
+      postseason: w.seasonType === "postseason",
+      teamIds: [...p.ranks].sort((a, b) => a.rank - b.rank).map((r) => r.teamId),
+    })))
+    .sort((a, b) => Number(a.postseason) - Number(b.postseason) || a.week - b.week);
+}
+
+/**
+ * Seasons whose schedules were too broken (COVID-19 in 2020: canceled and postponed games everywhere) for the
+ * game-count check in findTitleGame; there the title game is found as it was before that check.
+ */
+const IRREGULAR_SEASONS: readonly number[] = [2020];
+
+/**
+ * The title game of the conference whose members are `ids`, as an index into `games`, or -1. Not part of the public
+ * API. A game CFBD's note names (`named`: "SEC Championship") between two members comes first. Otherwise, among
+ * games between two members in the latest week that has any (once earlier weeks have some): the only one, or else
+ * the only one at a neutral site (a regular-season game postponed into title week, like Cal-Stanford in 2018, is at
+ * home). It must also come after both teams' conference schedules: a game that leaves both of its teams short of
+ * the median member's count of games against members, or either one two short, is a postponed or last-week game, not
+ * the title game (before the title game is listed, the last regular week's only neutral-site game, like Michigan
+ * State-Maryland at Ford Field in 2025, would otherwise be taken for it). CFBD's conference flag can't tell: title
+ * games are conference games before 2025, non-conference games from 2025. Army-Navy (two American members, the week
+ * after the title game) and the Pac-12's flex games (week 13, the week before its title game) are left out. A
+ * conference of two teams (the Pac-12 in 2024-2025, which played twice) has none unless the note names one.
+ */
+export function findTitleGame(year: number, teams: ReadonlyMap<number, Team>, games: readonly Game[], ids: ReadonlySet<number>, named?: ReadonlySet<number>): number {
+  const between = games.flatMap((g, i) => {
+    const h = teams.get(g.homeId);
+    const a = teams.get(g.awayId);
+    const late = isArmyNavy(h?.name, a?.name) || isFlexGame(year, g.week, h?.conference, a?.conference);
+    return ids.has(g.homeId) && ids.has(g.awayId) && !late ? [i] : [];
+  });
+  const byName = between.filter((i) => named?.has(games[i].id));
+  if (byName.length > 0) return byName.reduce((x, i) => (games[i].week > games[x].week ? i : x));
+  // Two members (the Pac-12 in 2024-2025) play each other twice and have no title game.
+  if (between.length === 0 || ids.size < 3) return -1;
+  const last = Math.max(...between.map((i) => games[i].week));
+  const inLast = between.filter((i) => games[i].week === last);
+  if (inLast.length === between.length) return -1;
+  let pick = -1;
+  if (inLast.length === 1) pick = inLast[0];
+  else {
+    const neutral = inLast.filter((i) => games[i].neutralSite);
+    if (neutral.length === 1) pick = neutral[0];
+  }
+  if (pick < 0 || IRREGULAR_SEASONS.includes(year)) return pick;
+  const count = new Map<number, number>([...ids].map((id) => [id, 0]));
+  for (const i of between) {
+    if (i === pick) continue;
+    count.set(games[i].homeId, count.get(games[i].homeId)! + 1);
+    count.set(games[i].awayId, count.get(games[i].awayId)! + 1);
+  }
+  const counts = [...count.values()].sort((a, b) => a - b);
+  const median = counts[counts.length >> 1];
+  const h = count.get(games[pick].homeId)!;
+  const a = count.get(games[pick].awayId)!;
+  // With most members yet to play one another, the season is too early for a title game.
+  return median === 0 || (h < median && a < median) || h < median - 1 || a < median - 1 ? -1 : pick;
+}
+
+/** Marks each conference's title game (`Game.titleGame`), which is never a conference game. */
+function markTitleGames(year: number, teams: ReadonlyMap<number, Team>, games: Game[], named: ReadonlySet<number>): void {
+  const conferences = new Set([...teams.values()].map((t) => t.conference).filter((c): c is string => c !== null && c !== INDEPENDENTS));
+  for (const c of conferences) {
+    const ids = new Set([...teams.values()].filter((t) => t.conference === c).map((t) => t.id));
+    if (ids.size < 2) continue;
+    const i = findTitleGame(year, teams, games, ids, named);
+    if (i >= 0) games[i] = { ...games[i], conferenceGame: false, titleGame: true };
+  }
 }
 
 /**

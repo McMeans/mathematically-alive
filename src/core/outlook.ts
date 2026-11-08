@@ -5,6 +5,7 @@ import { playTitleGame, simulateNational, titleRace, type NationalPlayoff, type 
 import { championsNeeded, findFormat } from "./playoff";
 import { hasTiebreakRules } from "./rules";
 import { simulateSeason, type SimResult } from "./sim";
+import { titleResult } from "./paths";
 import { provenStatus } from "./proof";
 import { teamRecord } from "./season";
 import type { Game, Season, TeamRecord } from "./season";
@@ -55,6 +56,11 @@ export type TeamOutlook = {
   groupOfSix: boolean;
   /** Barred from the postseason this season (`Team.postseasonBan`): no title game, no playoff. */
   postseasonBan: boolean;
+  /**
+   * Its conference title game once final, if it played in it: whether it won, and "Beat Virginia 27-20 in the ACC
+   * title game". Null otherwise.
+   */
+  titleResult: { won: boolean; text: string } | null;
 };
 
 export type SeasonOutlook = {
@@ -286,6 +292,7 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
       status: statusOf(titleGame.get(id)! / n, id),
       groupOfSix,
       postseasonBan: barred.has(id),
+      titleResult: titleResult(season, conference, data.decided, id),
     })),
   };
 }
