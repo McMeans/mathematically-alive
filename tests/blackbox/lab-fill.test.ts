@@ -102,6 +102,27 @@ describe("season lab: conference standings with picks", () => {
     expect(c.teams.find((t) => t.teamId === s.id("A"))!.titleGame).toBe(1);
   });
 
+  it("a title pick for a team the picks put out of the title game is dropped and not counted", () => {
+    const lab = seasonLab(s, { ...opts, locks: { games: { [s.last.id]: s.id("B") }, titles: { "Mid-American": s.id("A") } } });
+    expect(lab.picks).toBe(1);
+    expect(lab.conferences[0].picked).toBeNull();
+    // A pick for a team in the game stands.
+    const kept = seasonLab(s, { ...opts, locks: { games: { [s.last.id]: s.id("B") }, titles: { "Mid-American": s.id("B") } } });
+    expect([kept.picks, kept.conferences[0].picked]).toEqual([2, s.id("B")]);
+  });
+
+  it("a conference whose rules count non-conference results has no matchup while one is open", () => {
+    // Every game picked but one Big 12 member's non-conference game, made unplayed here: total wins could still move.
+    const big12 = new Set(season.teams.filter((t) => t.conference === "Big 12").map((t) => t.id));
+    const nonConf = season.games.find((g) => g.completed && !g.conferenceGame && (big12.has(g.homeId) || big12.has(g.awayId)))!;
+    const s2: Season = { ...season, games: season.games.map((g) => (g === nonConf ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)) };
+    const all = fillLabLocks(s2, {}, "favorites");
+    delete all.games[nonConf.id];
+    const lab = seasonLab(s2, { ...base, locks: all });
+    expect(lab.conferences.find((c) => c.conference === "Big 12")!.matchup).toBeNull();
+    expect(lab.conferences.find((c) => c.conference === "SEC")!.matchup).not.toBeNull();
+  });
+
   it("a tie for second settled by head-to-head names that step", () => {
     // B beats A: both 2-2, and B won the meeting.
     const c = seasonLab(s, { ...opts, locks: { games: { [s.last.id]: s.id("B") } } }).conferences[0];

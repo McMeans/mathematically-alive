@@ -26,7 +26,8 @@ export type LabOptions = {
   /** Conferences whose title games are simulated. Each needs tiebreak rules for the season. */
   conferences: readonly string[];
   /**
-   * The picks. Ones the simulation would ignore are left out and not counted: a pick on a game already final, a title pick for a conference not in
+   * The picks. Ones the simulation would ignore are left out and not counted: a pick on a game already final, a title
+   * pick for a team outside its conference's exact title game (`LabConference.matchup`), a title pick for a conference not in
    * `conferences` or whose title game is final, and a playoff pick on a game already final.
    */
   locks?: Partial<LabLocks>;
@@ -126,16 +127,22 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     titles: Object.fromEntries(Object.entries(given.titles).filter(([c]) => opts.conferences.includes(c) && !titleFinal(season, c))),
     bracket: Object.fromEntries(Object.entries(given.bracket).filter(([k]) => !finals.has(Number(k)))),
   };
+  const names = new Map(season.teams.map((t) => [t.id, t.name]));
+  const set = (g: Game) => locks.games[g.id] !== undefined;
+  const winnerOf = (g: Game): number => locks.games[g.id] ?? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId);
+  const open = season.games.filter((g) => !g.completed && !g.titleGame && !set(g)).length;
+  const tables = new Map(opts.conferences.map((c) => [c, standingsWithPicks(season, c, set, winnerOf, names)]));
+  // A title pick for a team the picks have already put out of an exact title game never plays, so it counts nowhere.
+  for (const [c, id] of Object.entries(locks.titles)) {
+    const m = tables.get(c)?.matchup;
+    if (m?.exact && !m.teams.includes(id)) delete locks.titles[c];
+  }
   const national = simulateNational(season, {
     iterations: opts.iterations, seed: opts.seed, conferences: opts.conferences,
     locks: locks.games, titleLocks: locks.titles, bracketLocks: locks.bracket, reuse: opts.reuse,
   });
   const picks = Object.keys(locks.games).length + Object.keys(locks.titles).length + Object.keys(locks.bracket).length;
   const seasons = `${national.iterations.toLocaleString("en-US")} simulated seasons`;
-  const names = new Map(season.teams.map((t) => [t.id, t.name]));
-  const set = (g: Game) => locks.games[g.id] !== undefined;
-  const winnerOf = (g: Game): number => locks.games[g.id] ?? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId);
-  const open = season.games.filter((g) => !g.completed && !g.titleGame && !set(g)).length;
   const conferences = national.conferences.map((conference): LabConference => ({
     conference,
     name: conferenceName(conference),
@@ -147,7 +154,7 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
         teamId: t.teamId, titleGame: t.titleGame!, champion: t.champion!,
         text: `Title game ${formatSideOdds(t.titleGame!, "alive")} · champion ${formatSideOdds(t.champion!, "alive")}`,
       })),
-    ...standingsWithPicks(season, conference, set, winnerOf, names),
+    ...tables.get(conference)!,
   }));
   const ranking = national.teams.slice(0, opts.top ?? 25).map((t, k) => ({
     rank: k + 1, teamId: t.teamId, meanRank: t.meanRank,
