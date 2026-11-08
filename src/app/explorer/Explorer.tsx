@@ -68,8 +68,15 @@ function useWhatIf<R>(initial: R, conference: string | null, teamId: number, ope
     };
     worker.current = w;
     // A shared link's picks ("?picks=401-12.402-30") load as the starting what-if.
-    const shared = decodeLocks(new URLSearchParams(window.location.search).get("picks"), openGames);
+    const text = new URLSearchParams(window.location.search).get("picks");
+    const shared = decodeLocks(text, openGames);
     if (Object.keys(shared).length > 0) update(shared);
+    else if (text !== null) {
+      // Nothing in the link survived: drop the param so the address bar doesn't claim picks the page isn't showing.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("picks");
+      window.history.replaceState(window.history.state, "", url);
+    }
     return () => w.terminate();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load
   }, []);
