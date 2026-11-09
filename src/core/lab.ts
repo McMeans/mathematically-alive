@@ -285,6 +285,10 @@ export type LabCard = {
   field: LabCardSeed[];
   /** "Title favorite: Indiana, 24%", or "National champion: Indiana" once the final is picked. */
   champion: string;
+  /** The link preview's title: "My playoff picks · Season Lab", or the projection's with no picks. */
+  title: string;
+  /** The link preview's text: "3 picks. Title favorite: Indiana, 24%." */
+  description: string;
 };
 
 /**
@@ -300,7 +304,8 @@ export function labCard(season: Season, lab: SeasonLab): LabCard | null {
   const picks = lab.open === 0 ? "Every game picked" : lab.picks === 0 ? "No picks" : `${lab.picks} pick${lab.picks === 1 ? "" : "s"}`;
   const best = [...p.field].sort((a, b) => b.champion - a.champion || a.seed - b.seed)[0];
   const champion = best.champion >= 1 ? `National champion: ${name(best.teamId)}` : `Title favorite: ${name(best.teamId)}, ${formatOdds(best.champion)}`;
-  return { heading: p.heading, picks, field, champion };
+  const title = lab.picks === 0 ? "Projected playoff field · Season Lab" : "My playoff picks · Season Lab";
+  return { heading: p.heading, picks, field, champion, title, description: `${picks}. ${champion}.` };
 }
 
 /** Steps whose answer picks can't settle: the ranking stand-in, a coin toss, and scoring margin (picks have no score). */

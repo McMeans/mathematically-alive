@@ -19,12 +19,17 @@ describe("season lab: the share card", () => {
     const best = Math.max(...base.playoff!.field.map((s) => s.champion));
     const fav = base.playoff!.field.find((s) => s.champion === best)!;
     expect(card.champion).toMatch(new RegExp(`^Title favorite: ${team(fav.teamId).name}, \\d+%$`));
+    // The link preview: no picks reads as the projection.
+    expect(card.title).toBe("Projected playoff field · Season Lab");
+    expect(card.description).toBe(`No picks. ${card.champion}.`);
   });
 
   it("counts picks, and says so once every game is picked", () => {
     const g = season.games.find((x) => !x.completed && !x.titleGame)!;
     const one = seasonLab(season, { ...opts, locks: { games: { [g.id]: g.homeId } }, reuse: base.national });
     expect(labCard(season, one)!.picks).toBe("1 pick");
+    expect(labCard(season, one)!.title).toBe("My playoff picks · Season Lab");
+    expect(labCard(season, one)!.description).toMatch(/^1 pick\. Title favorite: .+, \d+%\.$/);
     const g2 = season.games.filter((x) => !x.completed && !x.titleGame)[1];
     const two = seasonLab(season, { ...opts, locks: { games: { [g.id]: g.homeId, [g2.id]: g2.awayId } }, reuse: base.national });
     expect(labCard(season, two)!.picks).toBe("2 picks");
