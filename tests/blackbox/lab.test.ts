@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { decodeLabLocks, encodeLabLocks, seasonFromCfbd, seasonLab, type CfbdSnapshot, type Season } from "@/core";
+import { decodeLabLocks, encodeLabLocks, fillLabLocks, seasonFromCfbd, seasonLab, type CfbdSnapshot, type Season } from "@/core";
 
 // Every FBS game of 2026 through week 9, from fixtures/cfp-2026.json.
 const season = seasonFromCfbd((JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot }).snapshot);
@@ -99,6 +99,25 @@ describe("season lab: picks in a link", () => {
     expect(text).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(text.length).toBeLessThan(40);
     expect(decodeLabLocks(season, text)).toEqual({ locks, settled: 0, dropped: 0, note: "" });
+  });
+
+  it("round-trips picks on projected games, which have negative ids, alongside real ones", () => {
+    // Projected games (a conference's missing week-13 games) stand in with negative ids.
+    const projected = [-2, -1].map((id, k) => ({ ...open[k], id }));
+    const s: Season = { ...season, games: [...season.games, ...projected] };
+    const picks = { games: { [-2]: projected[0].awayId, [-1]: projected[1].homeId, [g1.id]: g1.awayId } };
+    expect(decodeLabLocks(s, encodeLabLocks(s, picks))).toEqual({ locks: { ...picks, titles: {}, bracket: {} }, settled: 0, dropped: 0, note: "" });
+    // A full season of picks, projected games among them, comes back whole.
+    const all = fillLabLocks(s, {}, "favorites");
+    expect(decodeLabLocks(s, encodeLabLocks(s, all)).locks).toEqual(all);
+  });
+
+  it("a link from the first link format still reads", () => {
+    // Version 1: the first game's id as a plain gap from 0, then no title or bracket picks.
+    const bytes: number[] = [];
+    const put = (v: number) => { for (; v >= 128; v = Math.floor(v / 128)) bytes.push((v % 128) | 128); bytes.push(v); };
+    [1, 1, g1.id * 2 + 1, 0, 0].forEach(put);
+    expect(decodeLabLocks(season, Buffer.from(bytes).toString("base64url")).locks.games).toEqual({ [g1.id]: g1.awayId });
   });
 
   it("no picks round-trip to no picks, and an empty string reads as none", () => {

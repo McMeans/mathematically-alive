@@ -5,6 +5,12 @@ import type { BracketGame, BracketSide, LabBigGame, LabConference, LabFill, LabL
 import type { LabRequest, LabResponse, LabView } from "@/app/lab.worker";
 import { ShareButton } from "@/app/explorer/Share";
 
+/** The address to share: a link with its own preview image (`/lab/s/<code>`) once there are picks. */
+function labLink(): string {
+  const code = new URLSearchParams(window.location.search).get("picks");
+  return code ? `${window.location.origin}/lab/s/${encodeURIComponent(code)}` : window.location.href;
+}
+
 /** A game still to play, with the model's odds for each side. */
 export type LabGame = {
   id: number; week: number; homeId: number; awayId: number; neutral: boolean;
@@ -218,7 +224,7 @@ export function Lab({ initial, games, names, teams, paged }: Props) {
         <span className="ml-auto flex items-center gap-2">
           <button type="button" onClick={undo} disabled={!canUndo} className="press h-8 rounded-full border border-ink-muted/40 px-3 text-xs font-bold text-navy hover:bg-mist disabled:opacity-40">Undo</button>
           <button type="button" onClick={reset} disabled={picks === 0} className="press h-8 rounded-full border border-ink-muted/40 px-3 text-xs font-bold text-navy hover:bg-mist disabled:opacity-40">Reset</button>
-          <ShareButton small />
+          <ShareButton small link={labLink} />
         </span>
       </div>
       {note && <p role="status" className="mt-2 rounded-md bg-mist px-3 py-2 text-sm text-ink-soft">{note}</p>}

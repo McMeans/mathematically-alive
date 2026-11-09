@@ -48,7 +48,7 @@ Team pages get an "Open in Season Lab" link that carries their locks over.
 - It lives in the URL (compact encoding: sorted game ids as deltas, one bit for home/away, base64url). No server,
   no accounts. Personal data never goes in the URL; locks aren't personal.
 - A lock on a game that has since gone final is dropped with a note ("2 picks were settled by real results").
-- Share: copy link; later, a share image of the bracket (phase 5).
+- Share: copy link, with a share image of the field (phase 5).
 
 ## Modes
 
@@ -120,10 +120,14 @@ Phones are several times slower, so 20,000 per pick is too slow. Plan:
    `NationalResult.swings` (places in the field that differ between a game's two results), among games neither side
    wins over 90%. Ranking reasons come from `NationalTeam.profile`, the stand-in's features averaged over seasons.
 5. **Sharing:** bracket share image (Open Graph per link).
+   As built: Share copies `/lab/s/<code>`, a small server page with its own preview (title, `labCard`'s caption and
+   title favourite, and a 1200×630 image of the field by seed) that forwards to `/lab?picks=<code>`. `/lab` itself
+   stays built once, with an image of the no-picks field. A link's card comes from one quick run (2,000 seasons),
+   cached per code. The link format moved to version 2: projected games have negative ids, which version 1 couldn't
+   encode (a "Favorites win the rest" link came back as "183 picks no longer fit"); version 1 links still read.
 
 ## Open questions
 
-- Should the Lab replace the national page, or link from it? (Proposal: the national page becomes the Lab with no
-  picks.)
+- ~~Should the Lab replace the national page, or link from it?~~ Settled: `/national` redirects to `/lab`.
 - Committee noise in Filled mode: leave it out (proposed) or draw it from the seed?
 - Pickable bowl games: out of scope.
