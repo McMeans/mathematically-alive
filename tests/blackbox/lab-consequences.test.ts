@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { labChanges, seasonFromCfbd, seasonLab, type CfbdSnapshot } from "@/core";
+import { fillLabLocks, labChanges, seasonFromCfbd, seasonLab, simulateNational, type CfbdSnapshot } from "@/core";
 
 // Every FBS game of 2026 through week 9, from fixtures/cfp-2026.json.
 const season = seasonFromCfbd((JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot }).snapshot);
@@ -10,6 +10,7 @@ const name = (id: number) => season.teams.find((t) => t.id === id)!.name;
 // The biggest game, picked for its underdog.
 const big = season.games.find((g) => g.id === base.bigGames[0].gameId)!;
 const underdog = base.national.swings.find((s) => s.gameId === big.id)!.home >= 0.5 ? big.awayId : big.homeId;
+const home0 = (id: number) => base.national.swings.find((s) => s.gameId === id)!.home;
 const favourite = underdog === big.homeId ? big.awayId : big.homeId;
 const upset = seasonLab(season, { ...opts, locks: { games: { [big.id]: underdog } }, reuse: base.national });
 
@@ -107,5 +108,53 @@ describe("season lab: ranking reasons and big games", () => {
     }
     expect(upset.bigGames.some((g) => g.gameId === big.id)).toBe(false);
     expect(upset.national.swings.find((s) => s.gameId === big.id)!.spots).toBe(0);
+  });
+
+  it("with one game left open, its swing matches the field odds with it locked each way", () => {
+    // Every other game picked: only this game, the title games and the ranking's noise vary, so the field odds in
+    // the seasons the home team wins match a run with the home team locked in (within sampling error).
+    // The biggest game closest to a toss-up, so both sides have plenty of seasons.
+    const g = season.games.find((x) => x.id === [...base.bigGames].sort((p, q) => Math.abs(home0(p.gameId) - 0.5) - Math.abs(home0(q.gameId) - 0.5))[0].gameId)!;
+    const rest = fillLabLocks(season, {}, "favorites").games;
+    delete rest[g.id];
+    const run = (games: Record<number, number>) => simulateNational(season, { ...opts, iterations: 5000, locks: games });
+    const open = run(rest);
+    const home = run({ ...rest, [g.id]: g.homeId });
+    const away = run({ ...rest, [g.id]: g.awayId });
+    const field = (r: typeof open) => new Map(r.teams.map((t) => [t.teamId, t.playoff!.field]));
+    const h = field(home);
+    const a = field(away);
+    const expected = [...h.keys()].reduce((sum, id) => sum + Math.abs(h.get(id)! - a.get(id)!), 0) / 2;
+    const swing = open.swings.find((x) => x.gameId === g.id)!;
+    expect(swing.home).toBeCloseTo(home0(g.id), 1);
+    expect(expected).toBeGreaterThan(0.1);
+    expect(Math.abs(swing.spots - expected)).toBeLessThan(0.05);
+    // Every other game is locked: none swings.
+    expect(open.swings.filter((x) => x.gameId !== g.id).every((x) => x.spots === 0)).toBe(true);
+  }, 30_000);
+
+  it("a team's profile averages its picked record plus its title game", () => {
+    const all = fillLabLocks(season, {}, "favorites").games;
+    const r = simulateNational(season, { ...opts, locks: all });
+    const record = (id: number) => {
+      let w = 0;
+      let l = 0;
+      for (const g of season.games) {
+        if (g.titleGame || (g.homeId !== id && g.awayId !== id)) continue;
+        const win = g.completed ? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId) : all[g.id];
+        if (win === id) w++;
+        else l++;
+      }
+      return [w, l];
+    };
+    for (const t of r.teams.slice(0, 25)) {
+      const [w, l] = record(t.teamId);
+      // A title game adds a win for the champion and a loss for the other team, in the seasons it plays.
+      const title = t.titleGame ?? 0;
+      const champ = t.champion ?? 0;
+      expect(t.profile.wins).toBeCloseTo(w + champ, 6);
+      expect(t.profile.losses).toBeCloseTo(l + title - champ, 6);
+      expect(t.profile.champion).toBeCloseTo(t.conference && opts.conferences.includes(t.conference) ? champ : 0, 6);
+    }
   });
 });

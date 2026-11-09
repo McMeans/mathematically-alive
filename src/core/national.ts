@@ -128,8 +128,8 @@ export type NationalResult = {
   /**
    * Each regular-season game still to play (with no playoff, none), in schedule data order: `home`, the share of
    * seasons the home team wins it, and `spots`, how many places in the field differ on average between the seasons
-   * it wins and the seasons it loses (half the summed change in every team's field odds). 0 for a game one side
-   * always wins (a locked game).
+   * it wins and the seasons it loses (half the summed change in every team's field odds, each less the change
+   * sampling alone would show). 0 for a game one side always wins (a locked game).
    */
   swings: { gameId: number; home: number; spots: number }[];
   /** Replay every simulated season's title games and ranking. */
@@ -578,7 +578,17 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
     swings: !playoff ? [] : Array.from(open, (i, j) => {
       const h = homeWon[j];
       let sum = 0;
-      if (h > 0 && h < n) for (let k = 0; k < F; k++) if (inField[k] > 0) sum += Math.abs(homeField[j * F + k] / h - (inField[k] - homeField[j * F + k]) / (n - h));
+      if (h > 0 && h < n) {
+        for (let k = 0; k < F; k++) {
+          if (inField[k] === 0) continue;
+          const fh = homeField[j * F + k] / h;
+          const fa = (inField[k] - homeField[j * F + k]) / (n - h);
+          // Less the change sampling alone would show (the mean of |noise| for a true change of 0), so a lopsided
+          // game's few seasons on one side don't read as a big swing.
+          const noise = Math.sqrt((2 / Math.PI) * (fh * (1 - fh) / h + fa * (1 - fa) / (n - h)));
+          sum += Math.max(0, Math.abs(fh - fa) - noise);
+        }
+      }
       return { gameId: games[i].id, home: h / n, spots: sum / 2 };
     }),
     forEachIteration(cb) {
