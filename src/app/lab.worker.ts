@@ -29,6 +29,8 @@ let full: NationalResult | undefined;
 let newest = 0;
 // The last quick run, what the next pick's change log compares against (the same size and seed, so seasons line up).
 let shown: SeasonLab | undefined;
+// A shared link's picks aren't the visitor's last change: its first run shows none.
+let opened = false;
 
 function run(locks: LabLocks, iterations: number, reuse: NationalResult | undefined) {
   return seasonLab(season, { ...base, iterations, locks, reuse });
@@ -46,6 +48,7 @@ self.onmessage = async (e: MessageEvent<LabRequest>) => {
       const lab = decodeLabLocks(season, req.picks ?? "");
       const games = decodeLocks(req.games, season.games.filter((g) => !g.completed));
       const locks = { ...lab.locks, games: { ...lab.locks.games, ...games } };
+      opened = true;
       self.postMessage({ kind: "opened", id: req.id, locks, note: lab.note } satisfies LabResponse);
       return;
     }
@@ -62,7 +65,8 @@ self.onmessage = async (e: MessageEvent<LabRequest>) => {
     const q = run(req.locks, QUICK_ITERATIONS, quick ?? before.national);
     quick = q.national;
     shown = q;
-    const changes = labChanges(season, before, q);
+    const changes = opened ? null : labChanges(season, before, q);
+    opened = false;
     self.postMessage({ kind: "result", id: req.id, final: false, view: strip(q, changes), code } satisfies LabResponse);
     await new Promise((r) => setTimeout(r, 0)); // let a newer pick arrive
     if (req.id !== newest) return;

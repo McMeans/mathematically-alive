@@ -23,13 +23,31 @@ describe("season lab: what a pick changed", () => {
     expect(entered.length).toBeGreaterThan(0);
     for (const s of entered) expect(headline).toContain(`${name(s.teamId)} into the field as the ${s.seed} seed`);
     for (const s of left) expect(headline).toContain(`${name(s.teamId)} out`);
-    // The beaten favourite's playoff odds fall, and it leads the movers.
+    // The beaten favourite's playoff odds fall, and it is among the movers.
     const fav = movers.find((m) => m.teamId === favourite)!;
     expect(fav.what).toBe("field");
     expect(fav.after).toBeLessThan(fav.before);
     expect(fav.text).toMatch(new RegExp(`^${name(favourite)}: playoff \\d+% → \\d+%$`));
     expect(movers.length).toBeLessThanOrEqual(5);
     for (let k = 1; k < movers.length; k++) expect(Math.abs(movers[k].after - movers[k].before)).toBeLessThanOrEqual(Math.abs(movers[k - 1].after - movers[k - 1].before));
+  });
+
+  it("a pick that reorders the field without changing it names the seed moves", () => {
+    // The first big game whose either result only reshuffles seeds.
+    const field = (l: typeof base) => l.playoff!.field.map((x) => x.teamId).sort().join();
+    const found = base.bigGames.flatMap((b) => {
+      const g = season.games.find((x) => x.id === b.gameId)!;
+      return [g.homeId, g.awayId].map((w) => ({ g, w }));
+    }).map(({ g, w }) => seasonLab(season, { ...opts, locks: { games: { [g.id]: w } }, reuse: base.national }))
+      .find((l) => field(l) === field(base) && l.playoff!.field.some((x, k) => x.teamId !== base.playoff!.field[k].teamId))!;
+    const was = new Map(base.playoff!.field.map((x) => [x.teamId, x.seed]));
+    const moves = labChanges(season, base, found).headline.replace(/\.$/, "").split("; ");
+    expect(moves.length).toBeGreaterThan(0);
+    expect(moves.length).toBeLessThanOrEqual(2);
+    for (const m of moves) {
+      const s = found.playoff!.field.find((x) => m.startsWith(`${name(x.teamId)} `))!;
+      expect(m).toBe(`${name(s.teamId)} ${s.seed < was.get(s.teamId)! ? "up" : "down"} to the ${s.seed} seed`);
+    }
   });
 
   it("comparing a run with itself changes nothing", () => {
