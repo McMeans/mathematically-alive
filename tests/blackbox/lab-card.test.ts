@@ -28,7 +28,7 @@ describe("season lab: the share card", () => {
     const g = season.games.find((x) => !x.completed && !x.titleGame)!;
     const one = seasonLab(season, { ...opts, locks: { games: { [g.id]: g.homeId } }, reuse: base.national });
     expect(labCard(season, one)!.picks).toBe("1 pick");
-    expect(labCard(season, one)!.title).toBe("My playoff picks · Season Lab");
+    expect(labCard(season, one)!.title).toBe("Playoff picks · Season Lab");
     expect(labCard(season, one)!.description).toMatch(/^1 pick\. Title favorite: .+, \d+%\.$/);
     const g2 = season.games.filter((x) => !x.completed && !x.titleGame)[1];
     const two = seasonLab(season, { ...opts, locks: { games: { [g.id]: g.homeId, [g2.id]: g2.awayId } }, reuse: base.national });

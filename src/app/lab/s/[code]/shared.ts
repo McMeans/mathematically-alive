@@ -12,15 +12,14 @@ const cards = new Map<string, LabCard | null>();
 
 /**
  * The share card for a link's picks (`?picks=` code), or undefined for a code that isn't one: too long, malformed,
- * with picks that don't fit the season, or (with no pick settled since) not as the Lab writes it. Cached by the picks'
- * own encoding, so every code for one set of picks shares one run. Links whose picks have since gone final still work.
+ * or with picks that don't fit the season. Cached by the picks' own encoding, so every code for one set of picks
+ * (a version 1 link, a padded one) shares one run. Links whose picks have since gone final still work.
  */
 export function sharedCard(code: string): LabCard | null | undefined {
   if (code.length > MAX_CODE) return undefined;
-  const { locks, dropped, settled } = decodeLabLocks(season, code);
+  const { locks, dropped } = decodeLabLocks(season, code);
   if (dropped > 0) return undefined;
   const key = encodeLabLocks(season, locks);
-  if (settled === 0 && key !== code) return undefined;
   if (cards.has(key)) {
     const card = cards.get(key)!;
     cards.delete(key); // most recent last
