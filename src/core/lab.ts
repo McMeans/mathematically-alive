@@ -2,7 +2,8 @@
 // conference title game or playoff game, and see every conference's title race, the stand-in ranking, the field and
 // the bracket. Picks travel in a URL, so the codec lives here too. All wording comes from here.
 import { simulateNational, titleRace, type NationalResult } from "./national";
-import { conferenceName, formatFine, formatSideOdds } from "./paths";
+import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
+import { conferenceName, conferenceShort, formatFine, formatOdds, formatSideOdds } from "./paths";
 import { announcedField, bracketGames, findFormat } from "./playoff";
 import type { Game, Season } from "./season";
 import { gameWinProbability, mix, mulberry32 } from "./sim";
@@ -92,6 +93,19 @@ export type LabRanked = {
   meanRank: number;
   /** "Average rank 7.4 · top 12 in 63%". */
   text: string;
+  /**
+   * Why the stand-in ranks it there: its average record, then the one or two features that lift its score most
+   * above the listed teams' average. "About 11-1 · SEC title in 64%, tough schedule".
+   */
+  reason: string;
+};
+
+export type LabBigGame = {
+  gameId: number;
+  /** Places in the field that differ on average between its two results (`NationalResult.swings`). */
+  spots: number;
+  /** "Swings about 1.2 spots in the field". */
+  text: string;
 };
 
 export type SeasonLab = {
@@ -108,6 +122,11 @@ export type SeasonLab = {
   conferences: LabConference[];
   /** The committee stand-in's ranking by average place, best first. Modelled, not the committee. */
   ranking: LabRanked[];
+  /**
+   * The open games that move the field most, biggest first: up to 15, each swinging at least 0.1 spots, among games
+   * neither side wins more than 90% of the time (a long shot's swing is mostly noise). Empty with no playoff.
+   */
+  bigGames: LabBigGame[];
 };
 
 const empty = (): LabLocks => ({ games: {}, titles: {}, bracket: {} });
@@ -156,10 +175,17 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
       })),
     ...tables.get(conference)!,
   }));
-  const ranking = national.teams.slice(0, opts.top ?? 25).map((t, k) => ({
+  const listed = national.teams.slice(0, opts.top ?? 25);
+  const ranking = listed.map((t, k) => ({
     rank: k + 1, teamId: t.teamId, meanRank: t.meanRank,
     text: `Average rank ${t.meanRank.toFixed(1)} · top 12 in ${formatFine(t.top12)}`,
+    reason: rankReason(t, listed),
   }));
+  const bigGames = national.swings
+    .filter((g) => g.home >= 0.1 && g.home <= 0.9 && g.spots >= 0.1)
+    .sort((a, b) => b.spots - a.spots || a.gameId - b.gameId)
+    .slice(0, 15)
+    .map((g) => ({ gameId: g.gameId, spots: g.spots, text: `Swings about ${g.spots.toFixed(1)} ${g.spots.toFixed(1) === "1.0" ? "spot" : "spots"} in the field` }));
   return {
     national,
     picks,
@@ -168,7 +194,83 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     playoff: nationalView(national, { season }),
     conferences,
     ranking,
+    bigGames,
   };
+}
+
+type Ranked = SeasonLab["national"]["teams"][number];
+
+/** The two features that lift a team's stand-in score most above the listed teams' average, as words. */
+function rankReason(t: Ranked, listed: readonly Ranked[]): string {
+  const p = t.profile;
+  const avg = (f: (x: Ranked) => number) => listed.reduce((s, x) => s + f(x), 0) / listed.length;
+  const record = (x: Ranked) => W.wins * x.profile.wins + W.losses * x.profile.losses;
+  const parts = [
+    { lift: record(t) - avg(record), words: "strong record" },
+    { lift: W.rating * (p.rating - avg((x) => x.profile.rating)), words: "strong team rating" },
+    { lift: W.strength * (p.strength - avg((x) => x.profile.strength)), words: "tough schedule" },
+    { lift: W.champion * (p.champion - avg((x) => x.profile.champion)), words: `${t.conference ? conferenceShort(t.conference) : "conference"} title in ${formatOdds(p.champion)}` },
+  ].filter((x) => x.lift > 0).sort((a, b) => b.lift - a.lift).slice(0, 2);
+  // Round the wins, then take the losses from the games played, so the record adds up to a real season.
+  const wins = Math.round(p.wins);
+  const head = `About ${wins}-${Math.max(0, Math.round(p.wins + p.losses) - wins)}`;
+  return parts.length === 0 ? head : `${head} · ${parts.map((x) => x.words).join(", ")}`;
+}
+
+export type LabMover = {
+  teamId: number;
+  /** What moved: playoff field odds, or (with no playoff, or a bigger move) title-game odds. */
+  what: "field" | "title game";
+  before: number;
+  after: number;
+  /** "Miami: playoff 34% → 61%", "Duke: title game 40% → 100%". */
+  text: string;
+};
+
+export type LabChanges = {
+  /** "Miami into the field as the 11 seed; SMU out.", "Oregon up to the 2 seed.", or "No change to the projected field." Empty with no playoff. */
+  headline: string;
+  /** The biggest moves of at least 2 points, biggest first, up to 5. */
+  movers: LabMover[];
+};
+
+const MOVE = 0.02;
+
+/**
+ * What changed between two Lab runs of the same season (say, before and after a pick): the projected field's
+ * entries, exits and seed moves, and the teams whose field or title-game odds moved most. Compare runs of the same
+ * seed and size, so the simulated seasons line up and unrelated teams barely move.
+ */
+export function labChanges(season: Season, before: SeasonLab, after: SeasonLab): LabChanges {
+  const name = (id: number) => season.teams.find((t) => t.id === id)?.name ?? `Team ${id}`;
+  let headline = "";
+  if (before.playoff && after.playoff) {
+    const was = new Map(before.playoff.field.map((s) => [s.teamId, s.seed]));
+    const now = new Map(after.playoff.field.map((s) => [s.teamId, s.seed]));
+    const ins = after.playoff.field.filter((s) => !was.has(s.teamId)).map((s) => `${name(s.teamId)} into the field as the ${s.seed} seed`);
+    const outs = before.playoff.field.filter((s) => !now.has(s.teamId)).map((s) => `${name(s.teamId)} out`);
+    const moved = after.playoff.field
+      .filter((s) => was.has(s.teamId) && was.get(s.teamId) !== s.seed)
+      .sort((a, b) => Math.abs(was.get(b.teamId)! - b.seed) - Math.abs(was.get(a.teamId)! - a.seed) || a.seed - b.seed)
+      .slice(0, 2)
+      .map((s) => `${name(s.teamId)} ${s.seed < was.get(s.teamId)! ? "up" : "down"} to the ${s.seed} seed`);
+    const parts = ins.length + outs.length > 0 ? [...ins, ...outs] : moved;
+    headline = parts.length === 0 ? "No change to the projected field." : `${parts.join("; ")}.`;
+  }
+  const old = new Map(before.national.teams.map((t) => [t.teamId, t]));
+  const movers: LabMover[] = [];
+  for (const t of after.national.teams) {
+    const o = old.get(t.teamId);
+    if (!o) continue;
+    const field = t.playoff && o.playoff ? { what: "field" as const, before: o.playoff.field, after: t.playoff.field } : null;
+    const title = t.titleGame !== null && o.titleGame !== null ? { what: "title game" as const, before: o.titleGame, after: t.titleGame } : null;
+    const best = [field, title].filter((m) => m !== null).sort((a, b) => Math.abs(b.after - b.before) - Math.abs(a.after - a.before))[0];
+    if (!best || Math.abs(best.after - best.before) < MOVE) continue;
+    const label = best.what === "field" ? "playoff" : "title game";
+    movers.push({ teamId: t.teamId, ...best, text: `${name(t.teamId)}: ${label} ${formatOdds(best.before)} → ${formatOdds(best.after)}` });
+  }
+  movers.sort((a, b) => Math.abs(b.after - b.before) - Math.abs(a.after - a.before) || a.teamId - b.teamId);
+  return { headline, movers: movers.slice(0, 5) };
 }
 
 /** Steps whose answer picks can't settle: the ranking stand-in, a coin toss, and scoring margin (picks have no score). */

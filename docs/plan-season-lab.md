@@ -1,6 +1,6 @@
 # Plan: Season Lab
 
-Status: phases 1–3 shipped (core; `/lab` page, which replaced `/national`; Conferences tab and fills), November 2026. Each phase is one PR (core and app may split), following `CLAUDE.md`: black-box
+Status: phases 1–4 shipped (core; `/lab` page, which replaced `/national`; Conferences tab and fills; change log, ranking reasons and big games), November 2026. Each phase is one PR (core and app may split), following `CLAUDE.md`: black-box
 tests in the same change, the coverage gate, the `pr-review` skill. Read with `SPEC.md` and `docs/plan-national.md`.
 
 ## Goal
@@ -115,6 +115,10 @@ Phones are several times slower, so 20,000 per pick is too slow. Plan:
 2. **App: `/lab` with Games and Playoff tabs**, worker, progressive runs, URL state, Undo/Reset, team-page link.
 3. **Conferences tab, Fill and Complete modes**, tiebreak deciding steps.
 4. **Consequences:** the change log, ranking reasons, "big games" filter.
+   As built: `labChanges(season, before, after)` compares two runs of the same seed and size; the worker compares
+   each pick's quick run (2,000 seasons) with the last one, so unrelated teams barely move. Big games come from
+   `NationalResult.swings` (places in the field that differ between a game's two results), among games neither side
+   wins over 90%. Ranking reasons come from `NationalTeam.profile`, the stand-in's features averaged over seasons.
 5. **Sharing:** bracket share image (Open Graph per link).
 
 ## Open questions

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 // The national run stays on the server: it is large and the page only shows what the Lab words.
-const initial = { summary: baseLab.summary, picks: baseLab.picks, open: baseLab.open, playoff: baseLab.playoff, conferences: baseLab.conferences, ranking: baseLab.ranking };
+const initial = { summary: baseLab.summary, picks: baseLab.picks, open: baseLab.open, bigGames: baseLab.bigGames, playoff: baseLab.playoff, conferences: baseLab.conferences, ranking: baseLab.ranking, changes: null };
 const names = Object.fromEntries(season.teams.map((t) => [t.id, t.name]));
 const conferenceOfTeam = new Map(season.teams.map((t) => [t.id, t.conference]));
 

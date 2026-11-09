@@ -9,7 +9,7 @@
 // Every draw comes from a stream hashed from (seed, iteration, conference, team or bracket game), so a lock changes only its own
 // game's draw and what-if runs stay paired with the base run.
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
-import { powerConferences, teamRating, titleGameIndex } from "./committee";
+import { powerConferences, teamRating, titleGameIndex, type CommitteeFeatures } from "./committee";
 import { announcedField, bracketGames, championsNeeded, fieldPicker, findFormat, playoffRun, type AnnouncedField, type PlayoffRun } from "./playoff";
 import { isArmyNavy, type Game, type Season } from "./season";
 import { HOME_FIELD } from "./odds";
@@ -63,6 +63,11 @@ export type NationalTeam = {
   top25: number;
   /** Its playoff odds; null when the playoff isn't simulated (see NationalResult.playoff). */
   playoff: NationalPlayoff | null;
+  /**
+   * What the stand-in ranked it on, averaged over the simulated seasons: wins and losses (title game included),
+   * rating, strength of schedule, and `champion`, the share of seasons it is a power-conference champion.
+   */
+  profile: CommitteeFeatures;
 };
 
 /** One team's playoff odds: shares of simulated seasons. */
@@ -120,6 +125,13 @@ export type NationalResult = {
    * simulated) in that title game if it wins or loses that game.
    */
   games: { gameId: number; fieldIfWin: number; fieldIfLose: number; titleIfWin: number | null; titleIfLose: number | null }[];
+  /**
+   * Each regular-season game still to play (with no playoff, none), in schedule data order: `home`, the share of
+   * seasons the home team wins it, and `spots`, how many places in the field differ on average between the seasons
+   * it wins and the seasons it loses (half the summed change in every team's field odds, each less the change
+   * sampling alone would show). 0 for a game one side always wins (a locked game).
+   */
+  swings: { gameId: number; home: number; spots: number }[];
   /** Replay every simulated season's title games and ranking. */
   forEachIteration(cb: (iteration: number, season: NationalSeason) => void): void;
 };
@@ -292,6 +304,16 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const prior = opts.reuse && reusable.get(opts.reuse);
   const startOrder = prior && prior.season === season && prior.iterations === n ? prior.rankings : null;
   const rankSum = new Float64Array(F);
+  // The stand-in's features summed over seasons (NationalTeam.profile).
+  const winSum = new Float64Array(F);
+  const lossSum = new Float64Array(F);
+  const sosSum = new Float64Array(F);
+  const champSum = new Float64Array(F);
+  // Per regular-season game still to play: seasons the home team wins it, and of those, seasons each team is in the field.
+  const open = Int32Array.from([...unplayed].filter((i) => !games[i].titleGame));
+  const homeWon = new Uint32Array(open.length);
+  const homeField = new Uint32Array(playoff ? open.length * F : 0);
+  const fieldIdx = new Int32Array(T);
   const top = [new Uint32Array(F), new Uint32Array(F), new Uint32Array(F)];
   const cuts = [4, 12, 25];
   const rankIds = new Int32Array(F);
@@ -383,7 +405,13 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       if (!startOrder) order[k] = k;
     }
     if (startOrder) order.set(startOrder.subarray(it * F, (it + 1) * F));
-    for (let k = 0; k < F; k++) score[k] = scoreOf(k, teams.shift);
+    for (let k = 0; k < F; k++) {
+      score[k] = scoreOf(k, teams.shift);
+      winSum[k] += w[k];
+      lossSum[k] += l[k];
+      sosSum[k] += oppCount[k] + titleN[k] === 0 ? 0 : (oppSum[k] + titleSos[k]) / (oppCount[k] + titleN[k]);
+      champSum[k] += champ[k];
+    }
     sortBy(order, score);
     rankings.set(order, it * F);
     for (let p = 0; p < F; p++) {
@@ -403,6 +431,12 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       inField[k]++;
       if (T === 12 && s < 4) reached[0][k]++;
     });
+    for (let s = 0; s < T; s++) fieldIdx[s] = idx(field[s]);
+    for (let j = 0; j < open.length; j++) {
+      if (winnerAt(open[j]) !== games[open[j]].homeId) continue;
+      homeWon[j]++;
+      for (let s = 0; s < T; s++) homeField[j * F + fieldIdx[s]]++;
+    }
 
     // The focus team's games the other way, one at a time, everything else in the season unchanged: stage 2 again
     // only for the title races the game's two teams are in, then stages 3 and 4.
@@ -508,6 +542,7 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       top12: top[1][k] / n,
       top25: top[2][k] / n,
       playoff: playoff ? playoffOdds(k) : null,
+      profile: { wins: winSum[k] / n, losses: lossSum[k] / n, rating: rating[k], strength: sosSum[k] / n, champion: champSum[k] / n },
     };
   });
   teamsOut.sort((a, b) => a.meanRank - b.meanRank || a.teamId - b.teamId);
@@ -540,6 +575,22 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       gameId: games[o.i].id, fieldIfWin: o.field[0] / n, fieldIfLose: o.field[1] / n,
       titleIfWin: focusRace < 0 ? null : o.title[0] / n, titleIfLose: focusRace < 0 ? null : o.title[1] / n,
     })),
+    swings: !playoff ? [] : Array.from(open, (i, j) => {
+      const h = homeWon[j];
+      let sum = 0;
+      if (h > 0 && h < n) {
+        for (let k = 0; k < F; k++) {
+          if (inField[k] === 0) continue;
+          const fh = homeField[j * F + k] / h;
+          const fa = (inField[k] - homeField[j * F + k]) / (n - h);
+          // Less the change sampling alone would show (the mean of |noise| for a true change of 0), so a lopsided
+          // game's few seasons on one side don't read as a big swing.
+          const noise = Math.sqrt((2 / Math.PI) * (fh * (1 - fh) / h + fa * (1 - fa) / (n - h)));
+          sum += Math.max(0, Math.abs(fh - fa) - noise);
+        }
+      }
+      return { gameId: games[i].id, home: h / n, spots: sum / 2 };
+    }),
     forEachIteration(cb) {
       for (current = 0; current < n; current++) {
         for (let p = 0; p < F; p++) ranking[p] = fbs[rankings[current * F + p]].id;
