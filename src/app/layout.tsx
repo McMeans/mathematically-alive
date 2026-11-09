@@ -13,9 +13,21 @@ const spaceGrotesk = Space_Grotesk({
   weight: "700",
 });
 
+/** The site's address for absolute links; localhost when none is set or it doesn't parse. */
+function siteUrl(): URL {
+  for (const v of [process.env.SITE_URL, process.env.URL]) {
+    try {
+      if (v) return new URL(v);
+    } catch {
+      // not an address: try the next
+    }
+  }
+  return new URL("http://localhost:3000");
+}
+
 export const metadata: Metadata = {
-  // Netlify sets URL to the site's address; share images need it absolute.
-  metadataBase: new URL(process.env.URL ?? "http://localhost:3000"),
+  // Share images need an absolute address: Netlify's URL, or SITE_URL elsewhere.
+  metadataBase: siteUrl(),
   title: "Mathematically Alive",
   description: "Every path to the playoff, for every team.",
 };

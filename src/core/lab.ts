@@ -293,11 +293,11 @@ export type LabCard = {
 
 /**
  * The share card for a Lab run: its field by seed and the likeliest champion. Null when the season's playoff isn't
- * simulated.
+ * simulated (or has no field).
  */
 export function labCard(season: Season, lab: SeasonLab): LabCard | null {
   const p = lab.playoff;
-  if (!p) return null;
+  if (!p || p.field.length === 0) return null;
   const team = new Map(season.teams.map((t) => [t.id, t]));
   const name = (id: number) => team.get(id)?.name ?? `Team ${id}`;
   const field = p.field.map((s) => ({ seed: s.seed, teamId: s.teamId, name: name(s.teamId), color: team.get(s.teamId)?.color ?? null }));
