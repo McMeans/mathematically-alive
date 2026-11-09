@@ -42,7 +42,12 @@ export function cardImage(card: LabCard | null, through: string): ImageResponse 
           <div style={{ display: "flex", fontSize: 44, fontWeight: 700, color: "#14213D" }}>{card?.heading ?? "Season Lab"}</div>
           {card && <div style={{ display: "flex", fontSize: 26, color: "#3A4458" }}>{card.picks}</div>}
         </div>
-        <div style={{ display: "flex", gap: 48, marginTop: 20, flex: 1 }}>
+        {!card && (
+          <div style={{ display: "flex", flex: 1, fontSize: 34, color: "#3A4458", marginTop: 8 }}>
+            Pick any game left and watch the playoff field, bracket and ranking follow.
+          </div>
+        )}
+        <div style={{ display: card ? "flex" : "none", gap: 48, marginTop: 20, flex: 1 }}>
           {column(field.slice(0, half))}
           {column(field.slice(half))}
         </div>

@@ -17,15 +17,15 @@ let runs = 0;
 const cards = new Map<string, LabCard | null>();
 
 /**
- * The share card for a link's picks (`?picks=` code), or undefined for a code that isn't one: too long, malformed,
- * or with picks that don't fit the season. Cached by the picks' own encoding, so every code for one set of picks
+ * The share card for a link's picks (`?picks=` code), or undefined for a code too long to be one. Null (the plain
+ * preview, no run) for a code with picks that no longer fit the season or a malformed one: the Lab explains those. Cached by the picks' own encoding, so every code for one set of picks
  * (a version 1 link, a padded one) shares one run. Links whose picks have since gone final still work. Null (the
  * plain preview, not cached) when this instance has run its share for the minute.
  */
 export function sharedCard(code: string): LabCard | null | undefined {
   if (code.length > MAX_CODE) return undefined;
   const { locks, dropped } = decodeLabLocks(season, code);
-  if (dropped > 0) return undefined;
+  if (dropped > 0) return null;
   const key = encodeLabLocks(season, locks);
   if (cards.has(key)) {
     const card = cards.get(key)!;
