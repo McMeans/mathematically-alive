@@ -22,9 +22,9 @@ function copyByHand(text: string): boolean {
 /**
  * Shares the page's address, which carries the picks (`?picks=`). Phones get the system share sheet; elsewhere the
  * link is copied. `small` matches the summary column's Reset; otherwise the pinned bar's, with a shorter label to leave room for
- * the team name.
+ * the team name. `link` overrides the address shared.
  */
-export function ShareButton({ small = false, className = "" }: { small?: boolean; className?: string }) {
+export function ShareButton({ small = false, className = "", link }: { small?: boolean; className?: string; link?: () => string }) {
   const [note, setNote] = useState("");
   useEffect(() => {
     if (!note) return;
@@ -33,7 +33,7 @@ export function ShareButton({ small = false, className = "" }: { small?: boolean
   }, [note]);
 
   async function share() {
-    const url = window.location.href;
+    const url = link?.() ?? window.location.href;
     try {
       if (navigator.share && window.matchMedia("(pointer: coarse)").matches) {
         await navigator.share({ title: document.title, url });

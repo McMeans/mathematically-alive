@@ -14,6 +14,8 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
+  // Netlify sets URL to the site's address; share images need it absolute.
+  metadataBase: new URL(process.env.URL ?? "http://localhost:3000"),
   title: "Mathematically Alive",
   description: "Every path to the playoff, for every team.",
 };

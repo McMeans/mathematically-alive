@@ -273,6 +273,36 @@ export function labChanges(season: Season, before: SeasonLab, after: SeasonLab):
   return { headline, movers: movers.slice(0, 5) };
 }
 
+/** One seed on the share card. `color`: the team's colour from the data ("#ba0c2f"), or null. */
+export type LabCardSeed = { seed: number; teamId: number; name: string; color: string | null };
+
+/** What a Lab link's share image shows: the projected field and who is favoured to win it all. */
+export type LabCard = {
+  /** "Projected playoff field", or "Playoff field" once announced. */
+  heading: string;
+  /** "No picks", "3 picks", or "Every game picked" once no regular-season game is open. */
+  picks: string;
+  field: LabCardSeed[];
+  /** "Title favorite: Indiana, 24%", or "National champion: Indiana" once the final is picked. */
+  champion: string;
+};
+
+/**
+ * The share card for a Lab run: its field by seed and the likeliest champion. Null when the season's playoff isn't
+ * simulated.
+ */
+export function labCard(season: Season, lab: SeasonLab): LabCard | null {
+  const p = lab.playoff;
+  if (!p) return null;
+  const team = new Map(season.teams.map((t) => [t.id, t]));
+  const name = (id: number) => team.get(id)?.name ?? `Team ${id}`;
+  const field = p.field.map((s) => ({ seed: s.seed, teamId: s.teamId, name: name(s.teamId), color: team.get(s.teamId)?.color ?? null }));
+  const picks = lab.open === 0 ? "Every game picked" : lab.picks === 0 ? "No picks" : `${lab.picks} pick${lab.picks === 1 ? "" : "s"}`;
+  const best = [...p.field].sort((a, b) => b.champion - a.champion || a.seed - b.seed)[0];
+  const champion = best.champion >= 1 ? `National champion: ${name(best.teamId)}` : `Title favorite: ${name(best.teamId)}, ${formatOdds(best.champion)}`;
+  return { heading: p.heading, picks, field, champion };
+}
+
 /** Steps whose answer picks can't settle: the ranking stand-in, a coin toss, and scoring margin (picks have no score). */
 const UNSETTLED = new Set(["ranking", "draw", "scoring margin"]);
 
@@ -327,11 +357,16 @@ export function fillLabLocks(season: Season, locks: Partial<LabLocks>, how: LabF
 }
 
 // --- Lock codec: picks as a short URL-safe string. ---------------------------------------------------------------
-// Bytes, as unsigned LEB128 varints: a version (1); the game picks, sorted by id, each (id gap * 2 + 1 if the away
-// team wins); the title picks, each (conference's place in the season's sorted conference list, team id); the
-// bracket picks, each (game index, team id). Each list starts with its length. Then base64url without padding.
+// Bytes, as unsigned LEB128 varints: a version (2); the game picks, sorted by id, each (gap * 2 + 1 if the away team
+// wins), where the first gap is from 0 and zigzagged (projected games have negative ids), the rest plain; the title
+// picks, each (conference's place in the season's sorted conference list, team id); the bracket picks, each (game
+// index, team id). Each list starts with its length. Then base64url without padding. Version 1 had no zigzag (and
+// broke on negative ids); its links still read.
 
-const VERSION = 1;
+const VERSION = 2;
+/** -1 → 1, 1 → 2, -2 → 3: a signed gap as an unsigned one. */
+const zig = (n: number) => (n < 0 ? -2 * n - 1 : 2 * n);
+const unzig = (n: number) => (n % 2 === 1 ? -(n + 1) / 2 : n / 2);
 
 const conferencesOf = (season: Season): string[] =>
   [...new Set(season.teams.flatMap((t) => (t.conference ? [t.conference] : [])))].sort();
@@ -345,7 +380,7 @@ export function encodeLabLocks(season: Season, locks: Partial<LabLocks>): string
   const out: number[] = [];
   const put = (v: number) => {
     let x = v;
-    while (x >= 0x80) { out.push((x & 0x7f) | 0x80); x = Math.floor(x / 128); }
+    while (x >= 0x80) { out.push((x % 128) | 0x80); x = Math.floor(x / 128); }
     out.push(x);
   };
   put(VERSION);
@@ -353,11 +388,11 @@ export function encodeLabLocks(season: Season, locks: Partial<LabLocks>): string
   const ids = Object.keys(games).map(Number).sort((a, b) => a - b);
   put(ids.length);
   let prev = 0;
-  for (const id of ids) {
+  for (const [k, id] of ids.entries()) {
     const g = byId.get(id);
     if (!g) throw new Error(`pick for unknown game ${id}`);
     if (games[id] !== g.homeId && games[id] !== g.awayId) throw new Error(`team ${games[id]} is not in game ${id}`);
-    put((id - prev) * 2 + (games[id] === g.awayId ? 1 : 0));
+    put((k === 0 ? zig(id) : id - prev) * 2 + (games[id] === g.awayId ? 1 : 0));
     prev = id;
   }
   const confs = conferencesOf(season);
@@ -414,12 +449,14 @@ export function decodeLabLocks(season: Season, text: string): DecodedLabLocks {
     }
   };
   try {
-    if (get() !== VERSION) return (dropped = 1), done();
+    const version = get();
+    if (version !== VERSION && version !== 1) return (dropped = 1), done();
     const byId = new Map(season.games.map((g) => [g.id, g]));
     let id = 0;
-    for (let n = get(); n > 0; n--) {
+    for (let n = get(), first = true; n > 0; n--, first = false) {
       const v = get();
-      id += Math.floor(v / 2);
+      const gap = Math.floor(v / 2);
+      id += first && version === VERSION ? unzig(gap) : gap;
       const g = byId.get(id);
       if (!g) dropped++;
       else if (g.completed) settled++;
