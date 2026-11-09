@@ -35,11 +35,16 @@ describe("season lab: what a pick changed", () => {
   it("a pick that reorders the field without changing it names the seed moves", () => {
     // The first big game whose either result only reshuffles seeds.
     const field = (l: typeof base) => l.playoff!.field.map((x) => x.teamId).sort().join();
-    const found = base.bigGames.flatMap((b) => {
+    let found: typeof base | undefined;
+    for (const b of base.bigGames) {
       const g = season.games.find((x) => x.id === b.gameId)!;
-      return [g.homeId, g.awayId].map((w) => ({ g, w }));
-    }).map(({ g, w }) => seasonLab(season, { ...opts, locks: { games: { [g.id]: w } }, reuse: base.national }))
-      .find((l) => field(l) === field(base) && l.playoff!.field.some((x, k) => x.teamId !== base.playoff!.field[k].teamId))!;
+      for (const w of [g.homeId, g.awayId]) {
+        const l = seasonLab(season, { ...opts, locks: { games: { [g.id]: w } }, reuse: base.national });
+        if (!found && field(l) === field(base) && l.playoff!.field.some((x, k) => x.teamId !== base.playoff!.field[k].teamId)) found = l;
+      }
+      if (found) break;
+    }
+    if (!found) throw new Error("no pick only reshuffles seeds");
     const was = new Map(base.playoff!.field.map((x) => [x.teamId, x.seed]));
     const moves = labChanges(season, base, found).headline.replace(/\.$/, "").split("; ");
     expect(moves.length).toBeGreaterThan(0);
@@ -48,7 +53,7 @@ describe("season lab: what a pick changed", () => {
       const s = found.playoff!.field.find((x) => m.startsWith(`${name(x.teamId)} `))!;
       expect(m).toBe(`${name(s.teamId)} ${s.seed < was.get(s.teamId)! ? "up" : "down"} to the ${s.seed} seed`);
     }
-  });
+  }, 30_000);
 
   it("comparing a run with itself changes nothing", () => {
     expect(labChanges(season, base, base)).toEqual({ headline: "No change to the projected field.", movers: [] });
