@@ -12,15 +12,18 @@ const KEEP = 200;
 const ITERATIONS = 500;
 // Uncached runs allowed per minute in one server instance; past that a link gets the plain preview, with no run.
 const PER_MINUTE = 30;
-let window0 = 0;
+let windowStart = 0;
 let runs = 0;
 const cards = new Map<string, LabCard | null>();
 
 /**
- * The share card for a link's picks (`?picks=` code), or undefined for a code too long to be one. Null (the plain
- * preview, no run) for a code with picks that no longer fit the season or a malformed one: the Lab explains those. Cached by the picks' own encoding, so every code for one set of picks
- * (a version 1 link, a padded one) shares one run. Links whose picks have since gone final still work. Null (the
- * plain preview, not cached) when this instance has run its share for the minute.
+ * The share card for a link's picks (`?picks=` code).
+ *
+ * - Undefined: the code is too long to be a Lab link (404).
+ * - Null: the plain preview, with no run. For a malformed code or picks that no longer fit the season (the Lab explains
+ *   those), and when this instance has used its runs for the minute (not cached, so the card fills in later).
+ * - Otherwise the card, cached by the picks' own encoding: every code for one set of picks (a version 1 link, a padded
+ *   one) shares one run. Picks that have since gone final are dropped, and the link still works.
  */
 export function sharedCard(code: string): LabCard | null | undefined {
   if (code.length > MAX_CODE) return undefined;
@@ -34,7 +37,7 @@ export function sharedCard(code: string): LabCard | null | undefined {
     return card;
   }
   const now = Date.now();
-  if (now - window0 >= 60_000) { window0 = now; runs = 0; }
+  if (now - windowStart >= 60_000) { windowStart = now; runs = 0; }
   if (++runs > PER_MINUTE) return null;
   const card = labCard(season, seasonLab(season, { iterations: ITERATIONS, seed: SEED, conferences: SUPPORTED_CONFERENCES, locks }));
   if (cards.size >= KEEP) cards.delete(cards.keys().next().value!);
