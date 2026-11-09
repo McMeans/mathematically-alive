@@ -54,6 +54,7 @@ self.onmessage = async (e: MessageEvent<LabRequest>) => {
     }
     if (req.kind === "reset") {
       shown = undefined;
+      opened = false; // a link with no usable picks never runs: the next pick is the visitor's own
       return;
     }
     if (req.kind === "fill") {
