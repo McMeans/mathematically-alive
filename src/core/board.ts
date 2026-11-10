@@ -2,7 +2,7 @@
 // to root against, the likeliest title-game matchup, and the playoff race around the cut line. Read from one season
 // simulation and the national run over the same seasons. All wording the page shows is here.
 import type { NationalResult } from "./national";
-import { conferenceName, formatOdds, formatRecord, formatSideOdds } from "./paths";
+import { conferenceName, formatOdds, formatRecord, formatSideOdds, shownSideOdds } from "./paths";
 import { powerConferences } from "./committee";
 import { fieldPicker, playoffFormat } from "./playoff";
 import { INDEPENDENTS, teamRecord, type Game, type Season } from "./season";
@@ -407,8 +407,9 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
 
   // Help from elsewhere: games that clearly move the playoff odds, grouped by the side to root against.
   const games: { game: HelpGame; against: number; swing: number }[] = [];
-  const today = Math.round((inField.reduce((a, b) => a + b, 0) / n) * 100);
-  const change = (p: number) => { const d = Math.round(p * 100) - today; return d > 0 ? `+${d}` : d < 0 ? `−${-d}` : null; };
+  // In points of the odds as shown beside it, so "0.4%" against today's "<0.1%" reads "+0.3".
+  const today = shownSideOdds(inField.reduce((a, b) => a + b, 0) / n, "alive");
+  const change = (p: number) => { const d = Math.round((shownSideOdds(p, "alive") - today) * 10) / 10; return d > 0 ? `+${d}` : d < 0 ? `−${-d}` : null; };
   others.forEach(({ g }, k) => {
     let hn = 0, hIn = 0, aIn = 0, hT = 0, aT = 0;
     for (let it = 0; it < n; it++) {

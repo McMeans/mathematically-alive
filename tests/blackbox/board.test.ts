@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { INDEPENDENTS, committeeRanks, explore, exploreIndependent, oneIn, seasonFromCfbd, type CfbdSnapshot, type PlayoffRace, type RaceItem, type RaceRow, type Season } from "@/core";
+import { INDEPENDENTS, committeeRanks, explore, exploreIndependent, formatSideOdds, oneIn, seasonFromCfbd, type CfbdSnapshot, type PlayoffRace, type RaceItem, type RaceRow, type Season } from "@/core";
 
 // Every FBS game of 2026 through week 9, from fixtures/cfp-2026.json.
 const season = seasonFromCfbd((JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot }).snapshot);
@@ -83,15 +83,17 @@ describe("help from elsewhere", { timeout: 60_000 }, () => {
     }
   });
 
-  it("says what each side does to the team's playoff odds today: a gain for the side to root for", () => {
-    const today = Math.round(me.playoff * 100);
+  it("says what each side does to the team's playoff odds today, in points of the odds as shown: a gain for the side to root for", () => {
+    const shown = (p: number) => Number(formatSideOdds(p, "alive").replace(/[<>%]/g, ""));
+    const today = shown(me.playoff);
     for (const g of board.help) for (const game of g.games) for (const side of game.sides) {
-      const d = Math.round(side.playoff * 100) - today;
+      expect(side.playoffText).toBe(formatSideOdds(side.playoff, "alive"));
+      const d = Math.round((shown(side.playoff) - today) * 10) / 10;
       expect(side.playoffChange).toBe(d > 0 ? `+${d}` : d < 0 ? `−${-d}` : null);
     }
     const [good, bad] = board.help[0].games[0].sides;
-    expect(good.playoffChange).toMatch(/^\+\d+$/);
-    if (bad.playoffChange !== null) expect(bad.playoffChange).toMatch(/^−\d+$/);
+    expect(good.playoffChange).toMatch(/^\+\d+(\.\d)?$/);
+    if (bad.playoffChange !== null) expect(bad.playoffChange).toMatch(/^−\d+(\.\d)?$/);
   });
 
   it("says how the games were chosen, and that the rest barely matter", () => {
