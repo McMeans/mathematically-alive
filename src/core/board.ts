@@ -293,8 +293,7 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
   const own = unplayed.filter(({ g }) => g.homeId === teamId || g.awayId === teamId);
   const others = unplayed.filter(({ g }) => g.homeId !== teamId && g.awayId !== teamId);
 
-  // Per season: the team's wins in its games left, which side won each game elsewhere, and whether every result of
-  // the best shot's steps happened, in order.
+  // Each game's place in the season, as the simulation's winnerOf takes it.
   const index = new Map(season.games.map((g, i) => [g.id, i]));
   // The best shot's steps: the team's own results, then each rival's, then the rest (favorites winning).
   const byId = new Map(season.games.map((g) => [g.id, g]));
@@ -316,7 +315,8 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
     add("rest", "Favorites win the rest", `${rest.length} ${rest.length === 1 ? "game" : "games"}`, rest);
   }
   const groupIdx = shotGroups.map((gr) => gr.results.map((p) => ({ i: index.get(p.gameId)!, winner: p.winner })));
-  // Per season: how many steps in a row, from the first, happened.
+  // Per season: the team's wins in its games left, which side won each game elsewhere, and how many of the best
+  // shot's steps happened in a row, from the first.
   const reach = new Uint8Array(n);
   const ownWins = new Uint8Array(n);
   const homeWon = new Uint8Array(n * others.length);
