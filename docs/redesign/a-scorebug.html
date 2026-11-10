@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draft A · Score bug</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Draft A: broadcast score bug. Segmented bars, team-colour chip, a live yellow, a bottom-line ticker. */
+:root {
+  --bug: #0f1a2b; --seg: #1a2840; --seg-2: #24365a; --bug-text: #ffffff; --bug-muted: #a9b7cf;
+  --live: #ffc629; --team: #ad0000;
+  --ground: #eef1f5; --card: #ffffff; --ink: #0f1a2b; --ink-soft: #3b4860; --ink-muted: #5a6780; --rule: #d5dbe5;
+  --up: #157347; --down: #b3261e;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.45 Barlow, system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+::selection { background: var(--live); color: var(--bug); }
+:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.bc { font-family: "Barlow Semi Condensed", sans-serif; text-transform: uppercase; letter-spacing: .02em; }
+
+.app { display: flex; flex-direction: column; min-height: 100dvh; }
+
+/* Top bug: the team's whole situation in one strip. */
+.top { position: sticky; top: 0; z-index: 5; background: var(--bug); color: var(--bug-text); }
+.strip { display: flex; align-items: stretch; height: 64px; }
+.brand { display: flex; align-items: center; gap: 8px; padding: 0 20px; font-weight: 700; font-size: 17px; border-right: 1px solid var(--seg-2); }
+.brand svg { width: 24px; height: 24px; }
+.team { display: flex; align-items: stretch; text-align: left; }
+.team .chip { width: 10px; background: var(--team); }
+.team .nm { display: flex; flex-direction: column; justify-content: center; padding: 0 18px; background: var(--seg); min-width: 210px; }
+.team .nm b { font-size: 26px; font-weight: 800; line-height: 1; display: flex; align-items: center; gap: 8px; }
+.team .nm b svg { width: 14px; height: 14px; color: var(--bug-muted); }
+.team .nm span { font-size: 13px; color: var(--bug-muted); margin-top: 3px; text-transform: none; letter-spacing: 0; font-family: Barlow, sans-serif; }
+.team:hover .nm { background: var(--seg-2); }
+.stat { display: flex; align-items: center; gap: 12px; padding: 0 20px; border-left: 1px solid var(--seg-2); }
+.stat small { font-size: 13px; font-weight: 600; color: var(--bug-muted); letter-spacing: .06em; line-height: 1.1; }
+.stat b { font-size: 34px; font-weight: 800; line-height: 1; }
+.stat.lead { background: var(--live); color: var(--bug); border-left: 0; }
+.stat.lead small { color: #4a3b00; }
+.stat.word b { font-size: 22px; }
+.stat .det { display: flex; flex-direction: column; font-family: Barlow, sans-serif; text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--bug-muted); line-height: 1.3; }
+.stat .det em { font-style: normal; color: #fff; font-weight: 600; }
+.beta { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 0 4px; border: 1px solid currentColor; border-radius: 2px; line-height: 14px; vertical-align: 2px; }
+.asof { margin-left: auto; display: flex; align-items: center; padding: 0 20px; font-size: 13px; color: var(--bug-muted); }
+.tolab { display: flex; align-items: center; gap: 6px; padding: 0 20px; color: #fff; text-decoration: none; border-left: 1px solid var(--seg-2); font-weight: 700; font-size: 16px; letter-spacing: .04em; }
+.tolab:hover { background: var(--seg); }
+.tolab i { font-style: normal; color: var(--live); }
+
+/* Bottom line: games elsewhere, the way a broadcast runs them. */
+.ticker { display: flex; align-items: stretch; height: 34px; background: var(--seg); border-top: 1px solid var(--seg-2); overflow: hidden; }
+.ticker .lab { position: relative; z-index: 1; display: flex; align-items: center; padding: 0 14px; background: var(--live); color: var(--bug); font-weight: 800; font-size: 14px; flex: none; }
+.ticker .run { display: flex; gap: 0; white-space: nowrap; animation: run 40s linear infinite; }
+.ticker:hover .run { animation-play-state: paused; }
+.ticker .it { display: flex; align-items: center; gap: 8px; padding: 0 18px; font-size: 14px; border-right: 1px solid var(--seg-2); }
+.ticker .it b { font-weight: 700; }
+.ticker .it .wk { color: var(--bug-muted); font-size: 12px; font-weight: 600; }
+.ticker .it .v { color: var(--live); font-weight: 800; }
+@keyframes run { to { transform: translateX(-50%); } }
+
+.body { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 320px; min-height: 0; }
+.main { padding: 24px 28px 40px; overflow-y: auto; }
+.rail { padding: 24px 20px; overflow-y: auto; border-left: 1px solid var(--rule); }
+h2 { font-family: "Barlow Semi Condensed", sans-serif; font-weight: 800; font-size: 22px; text-transform: uppercase; letter-spacing: .02em; margin: 0 0 2px; }
+.sub { margin: 0 0 14px; color: var(--ink-soft); }
+
+/* Each game is a score bug: who, when, chance, then the two results as buttons. */
+.games { display: flex; flex-direction: column; gap: 10px; max-width: 860px; }
+.g { display: grid; grid-template-columns: 76px minmax(0, 1fr) 132px 132px; align-items: stretch; background: var(--bug); color: var(--bug-text); border-radius: 3px; overflow: hidden; min-height: 58px; }
+.g .d { display: flex; flex-direction: column; justify-content: center; padding: 0 12px; background: var(--seg); }
+.g .d b { font-size: 15px; font-weight: 700; line-height: 1.1; }
+.g .d span { font-size: 12px; color: var(--bug-muted); font-weight: 600; }
+.g .m { display: flex; flex-direction: column; justify-content: center; padding: 0 16px; min-width: 0; }
+.g .m b { font-size: 20px; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g .m b em { font-style: normal; color: var(--bug-muted); font-weight: 600; margin-right: 4px; }
+.g .m span { font-size: 13px; color: var(--bug-muted); }
+.g .m .nc { display: inline-block; margin-left: 8px; font-size: 11px; padding: 1px 6px; border: 1px solid var(--bug-muted); border-radius: 2px; vertical-align: 3px; }
+.r { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 0 16px; border-left: 1px solid var(--seg-2); text-align: left; transition: background-color 140ms; }
+.r small { font-size: 12px; font-weight: 700; color: var(--bug-muted); letter-spacing: .08em; }
+.r b { font-size: 26px; font-weight: 800; line-height: 1; }
+.r b i { display: block; font-style: normal; font-size: 12px; font-weight: 600; color: var(--bug-muted); margin-top: 3px; letter-spacing: .02em; }
+.r.up b { color: #7ee2a8; }
+.r.down b { color: #ff9b8f; }
+.r:hover { background: var(--seg); }
+.r.likely { box-shadow: inset 0 -3px 0 rgba(255,198,41,.55); }
+.r[aria-pressed="true"] { background: var(--live); }
+.r[aria-pressed="true"] small, .r[aria-pressed="true"] b, .r[aria-pressed="true"] b i { color: var(--bug); }
+/* Elsewhere: games that move Louisville's odds, pickable like its own. The one that matters leads; the rest sit quieter and fold away. */
+.else { grid-column: 1 / -1; display: grid; grid-template-columns: 96px minmax(0, 1fr); background: var(--seg); border-top: 1px solid var(--seg-2); }
+.else .lab { padding: 14px 12px; font-size: 12px; font-weight: 700; color: var(--bug-muted); letter-spacing: .04em; }
+.egs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; padding: 6px 16px 8px 0; }
+.eg { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 6px; padding: 5px 0; }
+.eg.key { grid-column: 1 / -1; max-width: 460px; }
+.eg.some { border-top: 1px solid var(--seg-2); }
+.eg.some .mu { font-size: 13px; }
+.eg.some .e { height: 28px; min-width: 70px; }
+.eg.some .e b { font-size: 15px; line-height: 28px; }
+.eg.minor { display: none; border-top: 1px solid var(--seg-2); }
+.else.open .eg.minor { display: grid; }
+.eg .mu { display: flex; flex-direction: column; min-width: 0; font-size: 14px; font-weight: 700; line-height: 1.15; }
+.eg .mu i { font-style: normal; font-size: 12px; font-weight: 600; color: var(--bug-muted); }
+.eg.minor .mu { font-size: 13px; font-weight: 600; color: #d6deeb; }
+.e { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; min-width: 76px; height: 32px; padding: 0 10px; border: 1px solid var(--seg-2); border-radius: 2px; background: var(--bug); }
+.e small { font-size: 12px; font-weight: 700; color: var(--bug-muted); }
+.e b { font-size: 17px; font-weight: 800; line-height: 32px; }
+.e.up b { color: #7ee2a8; }
+.e.down b { color: #ff9b8f; }
+.eg.minor .e { height: 28px; min-width: 70px; }
+.eg.minor .e b { font-size: 15px; line-height: 28px; }
+.e:hover { border-color: var(--bug-muted); }
+.e[aria-pressed="true"] { background: var(--live); border-color: var(--live); }
+.e[aria-pressed="true"] small, .e[aria-pressed="true"] b { color: var(--bug); }
+.else .more { grid-column: 1 / -1; justify-self: start; margin-top: 2px; padding: 4px 0; font-size: 13px; font-weight: 600; color: var(--bug-muted); text-decoration: underline; text-underline-offset: 3px; }
+.else .more:hover { color: #fff; }
+
+/* Path card: a lower third. */
+.path { margin-top: 32px; max-width: 860px; background: var(--card); border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; }
+.path .hd { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: var(--bug); color: #fff; }
+.path .hd b { font-family: "Barlow Semi Condensed", sans-serif; font-weight: 800; font-size: 18px; text-transform: uppercase; }
+.path .hd span { color: var(--live); font-family: "Barlow Semi Condensed", sans-serif; font-weight: 800; font-size: 18px; }
+.path ol { list-style: none; margin: 0; padding: 0; }
+.path li { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--rule); }
+.path li:first-child { border-top: 0; }
+.path li .p { font-weight: 600; color: var(--ink-soft); }
+.path .ft { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink-muted); }
+.fill { height: 38px; padding: 0 16px; border-radius: 3px; background: var(--bug); color: #fff; font-family: "Barlow Semi Condensed", sans-serif; font-weight: 700; font-size: 16px; text-transform: uppercase; letter-spacing: .04em; flex: none; }
+.fill:hover { background: var(--seg-2); }
+
+/* Rail: a standings graphic. */
+.rail h3 { font-family: "Barlow Semi Condensed", sans-serif; font-weight: 800; font-size: 17px; text-transform: uppercase; margin: 0 0 8px; }
+.stand { background: var(--bug); color: #fff; border-radius: 3px; overflow: hidden; }
+.stand .row { display: grid; grid-template-columns: 6px 1fr 40px 56px; align-items: center; height: 38px; border-top: 1px solid var(--seg-2); font-family: "Barlow Semi Condensed", sans-serif; text-transform: uppercase; }
+.stand .row:first-child { border-top: 0; }
+.stand .row .c { height: 100%; }
+.stand .row .n { padding-left: 12px; font-weight: 700; font-size: 16px; }
+.stand .row .w { color: var(--bug-muted); font-weight: 600; font-size: 15px; }
+.stand .row .o { text-align: right; padding-right: 12px; font-weight: 800; font-size: 17px; }
+.stand .row.me { background: var(--seg-2); }
+.stand .row.me .o { color: var(--live); }
+.cfp { margin-top: 28px; font-size: 14px; }
+.cfp h3 .beta { color: var(--ink-muted); margin-left: 4px; }
+.cfp ul { list-style: none; margin: 0; padding: 0; }
+.cfp li { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 7px 0; border-top: 1px solid var(--rule); }
+.cfp li:first-child { border-top: 0; }
+.cfp li b { font-weight: 600; }
+.cfp li span:last-child { color: var(--ink-muted); white-space: nowrap; }
+.cfp li span:last-child em { font-style: normal; font-weight: 700; color: var(--up); }
+.yours { margin-top: 28px; font-size: 14px; }
+.yours p { margin: 0; color: var(--ink-muted); }
+.acts { display: flex; gap: 8px; margin-top: 12px; }
+.acts[hidden] { display: none; }
+.acts button, .acts a { flex: 1; display: flex; align-items: center; justify-content: center; height: 36px; border-radius: 3px; font-family: "Barlow Semi Condensed", sans-serif; font-weight: 700; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; text-decoration: none; }
+.acts .share { background: var(--bug); color: #fff; }
+.acts .share:hover { background: var(--seg-2); }
+.acts a { border: 1px solid var(--rule); color: var(--ink); background: var(--card); }
+.acts a:hover { border-color: var(--ink-muted); }
+.yours ul { list-style: none; margin: 0; padding: 0; }
+.yours li { display: flex; justify-content: space-between; padding: 7px 0; border-top: 1px solid var(--rule); }
+.yours li:first-child { border-top: 0; }
+.method { margin-top: 28px; font-size: 12px; color: var(--ink-muted); }
+
+@media (min-width: 900px) { .app { height: 100dvh; } .body { overflow: hidden; } }
+/* Below wide desktop, games elsewhere run one per line so names don't wrap. */
+@media (max-width: 1379px) { .egs { grid-template-columns: minmax(0, 1fr); } .eg.key { max-width: none; } }
+/* Short desktop: a slimmer strip so the games start high. */
+@media (max-height: 700px) and (min-width: 900px) {
+  .strip { height: 52px; }
+  .team .nm b { font-size: 22px; }
+  .stat b { font-size: 28px; }
+  .main { padding-top: 16px; }
+  .g { min-height: 50px; }
+}
+@media (max-width: 1180px) and (min-width: 900px) { .asof { display: none; } .brand span { display: none; } }
+
+/* Phone: the bug becomes two rows; each game bug wraps its results under it. */
+@media (max-width: 899px) {
+  .strip { height: auto; flex-wrap: wrap; }
+  .brand { display: none; }
+  .team { flex: 1 0 100%; }
+  .team .nm { flex: 1; min-width: 0; padding: 10px 14px; }
+  .team .nm b { font-size: 22px; }
+  .stat { flex: 1; padding: 8px 12px; gap: 8px; border-top: 1px solid var(--seg-2); }
+  .stat:first-of-type { border-left: 0; }
+  .stat small { font-size: 11px; }
+  .stat b { font-size: 24px; }
+  .stat.word b { font-size: 16px; }
+  .asof { display: none; }
+  .body { display: block; }
+  .main { padding: 18px 14px 32px; overflow: visible; }
+  .g { grid-template-columns: 72px 1fr 1fr; }
+  .g .d b { white-space: nowrap; }
+  .g .d { grid-row: span 2; }
+  .g .m { grid-column: 2 / -1; padding: 10px 12px; }
+  .r { border-left: 0; border-top: 1px solid var(--seg-2); padding: 8px 12px; }
+  .r + .r { border-left: 1px solid var(--seg-2); }
+  .else { grid-template-columns: 1fr; }
+  .else .lab { padding: 10px 12px 0; }
+  .egs { grid-template-columns: 1fr; padding: 2px 12px 8px; }
+  .ticker { display: none; }
+  .rail { border: 0; border-top: 1px solid var(--rule); padding: 24px 14px 40px; }
+  .path .ft { flex-direction: column; align-items: stretch; }
+}
+@media (prefers-reduced-motion: reduce) { .ticker .run { animation: none; } .r { transition: none; } }
+
+/* Draft control: compare with and without logos. */
+.lg { display: inline-block; width: 1.2em; height: 1.2em; object-fit: contain; vertical-align: -0.24em; margin-right: .35em; }
+.rk { font-size: max(11px, .74em); font-weight: 700; margin-right: .3em; letter-spacing: 0; }
+.nologos .lg { display: none; }
+.logo-toggle { position: fixed; left: 14px; bottom: 14px; z-index: 50; height: 32px; padding: 0 14px; border-radius: 16px; background: #fff; color: #111; border: 1px solid #c9ccd2; font: 600 13px/1 system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,.15); cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="strip bc">
+      <div class="brand">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="32" rx="28" ry="17" transform="rotate(-35 32 32)" fill="#fff"/><path d="M14 36 L24 36 L28 26 L34 42 L38 32 L50 32" stroke="#0f1a2b" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round" transform="rotate(-35 32 32)"/></svg>
+        <span>Mathematically Alive</span>
+      </div>
+      <button class="team" aria-haspopup="listbox">
+        <span class="chip"></span>
+        <span class="nm"><b><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/97.png" alt="">Louisville <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" stroke-width="1.8" fill="none"/></svg></b><span>6-3 · 5-2 ACC</span></span>
+      </button>
+      <div class="stat lead"><small>Title<br>game</small><b>9%</b></div>
+      <div class="stat"><small>Win<br>ACC</small><b>3%</b></div>
+      <div class="stat"><small>Playoff<br>est. <span class="beta">Beta</span></small><b>5%</b><span class="det"><span>Bye <em>0.2%</em></span><span>Title <em>0.1%</em></span></span></div>
+      <span class="asof">Through Nov 7</span>
+      <a class="tolab" href="a-lab.html">Season Lab <i>→</i></a>
+    </div>
+    <div class="ticker bc" aria-label="Games elsewhere">
+      <span class="lab">Root for</span>
+      <div class="run">
+        <span class="it"><span class="wk">Nov 14</span><b>SMU</b> over <span class="rk">#16</span>Wake Forest <span class="v">19%</span></span>
+        <span class="it"><span class="wk">Nov 21</span><b>Georgia Tech</b> over <span class="rk">#16</span>Wake Forest <span class="v">26%</span></span>
+        <span class="it"><span class="wk">Nov 28</span><b>Duke</b> over <span class="rk">#16</span>Wake Forest <span class="v">21%</span></span>
+        <span class="it"><span class="wk">Nov 28</span><b>Boston College</b> over <span class="rk">#1</span>Miami <span class="v">14%</span></span>
+        <span class="it" aria-hidden="true"><span class="wk">Nov 14</span><b>SMU</b> over <span class="rk">#16</span>Wake Forest <span class="v">19%</span></span>
+        <span class="it" aria-hidden="true"><span class="wk">Nov 21</span><b>Georgia Tech</b> over <span class="rk">#16</span>Wake Forest <span class="v">26%</span></span>
+        <span class="it" aria-hidden="true"><span class="wk">Nov 28</span><b>Duke</b> over <span class="rk">#16</span>Wake Forest <span class="v">21%</span></span>
+        <span class="it" aria-hidden="true"><span class="wk">Nov 28</span><b>Boston College</b> over <span class="rk">#1</span>Miami <span class="v">14%</span></span>
+      </div>
+    </div>
+  </header>
+
+  <div class="body">
+    <main class="main">
+      <h2>Remaining games</h2>
+      <p class="sub">Each number is Louisville’s title-game odds if that result happens. Tap to lock it. Green helps.</p>
+
+      <div class="games bc">
+        <div class="g">
+          <div class="d"><b>Nov 14</b><span>Sat</span></div>
+          <div class="m"><b><em>at</em><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/153.png" alt="">North Carolina</b><span>56% to win</span></div>
+          <button class="r up likely" aria-pressed="false" data-w="Beat North Carolina"><small>Win</small><b>16%<i>CFP 8%</i></b></button>
+          <button class="r down" aria-pressed="false" data-w="Lose to North Carolina"><small>Lose</small><b>0.2%<i>CFP 0.5%</i></b></button>
+          <div class="else open"><span class="lab">Elsewhere</span>
+            <div class="egs">
+              <div class="eg key"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/2567.png" alt="">SMU vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/154.png" alt=""><span class="rk">#16</span>Wake Forest</span><i>WAKE 56% to win</i></span>
+                <button class="e up" aria-pressed="false" data-w="SMU beats Wake Forest"><small>SMU</small><b>19%</b></button>
+                <button class="e down" aria-pressed="false" data-w="Wake Forest beats SMU"><small>WAKE</small><b>2%</b></button></div>
+              <div class="eg some"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/2390.png" alt=""><span class="rk">#1</span>Miami vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/150.png" alt="">Duke</span><i>MIA 83% to win</i></span>
+                <button class="e up" aria-pressed="false" data-w="Miami beats Duke"><small>MIA</small><b>10%</b></button>
+                <button class="e down" aria-pressed="false" data-w="Duke beats Miami"><small>DUKE</small><b>8%</b></button></div>
+              <div class="eg minor"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/259.png" alt="">Virginia Tech vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/24.png" alt="">Stanford</span><i>VT 86% to win</i></span>
+                <button class="e flat" aria-pressed="false" data-w="Virginia Tech beats Stanford"><small>VT</small><b>10%</b></button>
+                <button class="e flat" aria-pressed="false" data-w="Stanford beats Virginia Tech"><small>STAN</small><b>9%</b></button></div>
+              <div class="eg minor"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/152.png" alt="">NC State vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/183.png" alt="">Syracuse</span><i>SYR 56% to win</i></span>
+                <button class="e flat" aria-pressed="false" data-w="NC State beats Syracuse"><small>NCST</small><b>9%</b></button>
+                <button class="e flat" aria-pressed="false" data-w="Syracuse beats NC State"><small>SYR</small><b>10%</b></button></div>
+              <div class="eg minor"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/228.png" alt="">Clemson vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/59.png" alt="">Georgia Tech</span><i>CLEM 81% to win</i></span>
+                <button class="e flat" aria-pressed="false" data-w="Clemson beats Georgia Tech"><small>CLEM</small><b>9%</b></button>
+                <button class="e flat" aria-pressed="false" data-w="Georgia Tech beats Clemson"><small>GT</small><b>10%</b></button></div>
+              <div class="eg minor"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/258.png" alt="">Virginia vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/25.png" alt="">California</span><i>UVA 79% to win</i></span>
+                <button class="e flat" aria-pressed="false" data-w="Virginia beats California"><small>UVA</small><b>9%</b></button>
+                <button class="e flat" aria-pressed="false" data-w="California beats Virginia"><small>CAL</small><b>10%</b></button></div>
+              <div class="eg minor"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/221.png" alt="">Pittsburgh vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/52.png" alt="">Florida State</span><i>PITT 59% to win</i></span>
+                <button class="e flat" aria-pressed="false" data-w="Pittsburgh beats Florida State"><small>PITT</small><b>9%</b></button>
+                <button class="e flat" aria-pressed="false" data-w="Florida State beats Pittsburgh"><small>FSU</small><b>10%</b></button></div>
+              <button class="more" aria-expanded="true" data-n="5">Hide the 5 that barely matter</button>
+            </div></div>
+        </div>
+        <div class="g">
+          <div class="d"><b>Nov 21</b><span>Sat</span></div>
+          <div class="m"><b><em>vs</em><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/221.png" alt="">Pittsburgh</b><span>72% to win</span></div>
+          <button class="r up likely" aria-pressed="false" data-w="Beat Pittsburgh"><small>Win</small><b>12%<i>CFP 6%</i></b></button>
+          <button class="r down" aria-pressed="false" data-w="Lose to Pittsburgh"><small>Lose</small><b>0.2%<i>CFP 0.4%</i></b></button>
+          <div class="else"><span class="lab">Elsewhere</span>
+            <div class="egs">
+              <div class="eg key"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/59.png" alt="">Georgia Tech vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/154.png" alt=""><span class="rk">#16</span>Wake Forest</span><i>WAKE 87% to win</i></span>
+                <button class="e up" aria-pressed="false" data-w="Georgia Tech beats Wake Forest"><small>GT</small><b>26%</b></button>
+                <button class="e down" aria-pressed="false" data-w="Wake Forest beats Georgia Tech"><small>WAKE</small><b>7%</b></button></div>
+              <div class="eg some"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/2390.png" alt=""><span class="rk">#1</span>Miami vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/259.png" alt="">Virginia Tech</span><i>MIA 86% to win</i></span>
+                <button class="e down" aria-pressed="false" data-w="Miami beats Virginia Tech"><small>MIA</small><b>9%</b></button>
+                <button class="e up" aria-pressed="false" data-w="Virginia Tech beats Miami"><small>VT</small><b>11%</b></button></div>
+              <div class="eg minor"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/25.png" alt="">California vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/24.png" alt="">Stanford</span><i>CAL 61% to win</i></span>
+                <button class="e flat" aria-pressed="false" data-w="California beats Stanford"><small>CAL</small><b>10%</b></button>
+                <button class="e flat" aria-pressed="false" data-w="Stanford beats California"><small>STAN</small><b>9%</b></button></div>
+              <div class="eg minor"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/52.png" alt="">Florida State vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/152.png" alt="">NC State</span><i>FSU 67% to win</i></span>
+                <button class="e flat" aria-pressed="false" data-w="Florida State beats NC State"><small>FSU</small><b>9%</b></button>
+                <button class="e flat" aria-pressed="false" data-w="NC State beats Florida State"><small>NCST</small><b>10%</b></button></div>
+              <div class="eg minor"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/258.png" alt="">Virginia vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/153.png" alt="">North Carolina</span><i>UVA 52% to win</i></span>
+                <button class="e flat" aria-pressed="false" data-w="Virginia beats North Carolina"><small>UVA</small><b>10%</b></button>
+                <button class="e flat" aria-pressed="false" data-w="North Carolina beats Virginia"><small>UNC</small><b>9%</b></button></div>
+              <div class="eg minor"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/150.png" alt="">Duke vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/228.png" alt="">Clemson</span><i>DUKE 67% to win</i></span>
+                <button class="e flat" aria-pressed="false" data-w="Duke beats Clemson"><small>DUKE</small><b>10%</b></button>
+                <button class="e flat" aria-pressed="false" data-w="Clemson beats Duke"><small>CLEM</small><b>9%</b></button></div>
+              <div class="eg minor"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/103.png" alt="">Boston College vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/183.png" alt="">Syracuse</span><i>BC 51% to win</i></span>
+                <button class="e flat" aria-pressed="false" data-w="Boston College beats Syracuse"><small>BC</small><b>10%</b></button>
+                <button class="e flat" aria-pressed="false" data-w="Syracuse beats Boston College"><small>SYR</small><b>9%</b></button></div>
+              <button class="more" aria-expanded="false" data-n="5">+5 that barely matter</button>
+            </div></div>
+        </div>
+        <div class="g">
+          <div class="d"><b>Nov 28</b><span>Sat</span></div>
+          <div class="m"><b><em>at</em><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/96.png" alt=""><span class="rk">#6</span>Kentucky<span class="nc">Non-con</span></b><span>55% to win · doesn’t move the ACC race</span></div>
+          <button class="r" aria-pressed="false" data-w="Beat Kentucky"><small>Win</small><b>6%<i>CFP · no ACC effect</i></b></button>
+          <button class="r" aria-pressed="false" data-w="Lose to Kentucky"><small>Lose</small><b>3%<i>CFP · no ACC effect</i></b></button>
+          <div class="else"><span class="lab">Elsewhere</span>
+            <div class="egs">
+              <div class="eg key"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/154.png" alt=""><span class="rk">#16</span>Wake Forest vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/150.png" alt="">Duke</span><i>WAKE 72% to win</i></span>
+                <button class="e down" aria-pressed="false" data-w="Wake Forest beats Duke"><small>WAKE</small><b>5%</b></button>
+                <button class="e up" aria-pressed="false" data-w="Duke beats Wake Forest"><small>DUKE</small><b>21%</b></button></div>
+              <div class="eg some"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/2390.png" alt=""><span class="rk">#1</span>Miami vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/103.png" alt="">Boston College</span><i>MIA 96% to win</i></span>
+                <button class="e down" aria-pressed="false" data-w="Miami beats Boston College"><small>MIA</small><b>9%</b></button>
+                <button class="e up" aria-pressed="false" data-w="Boston College beats Miami"><small>BC</small><b>14%</b></button></div>
+              <div class="eg some"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/24.png" alt="">Stanford vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/2567.png" alt="">SMU</span><i>SMU 92% to win</i></span>
+                <button class="e down" aria-pressed="false" data-w="Stanford beats SMU"><small>STAN</small><b>8%</b></button>
+                <button class="e up" aria-pressed="false" data-w="SMU beats Stanford"><small>SMU</small><b>10%</b></button></div>
+              <div class="eg some"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/153.png" alt="">North Carolina vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/152.png" alt="">NC State</span><i>NCST 54% to win</i></span>
+                <button class="e down" aria-pressed="false" data-w="North Carolina beats NC State"><small>UNC</small><b>9%</b></button>
+                <button class="e up" aria-pressed="false" data-w="NC State beats North Carolina"><small>NCST</small><b>10%</b></button></div>
+              <div class="eg minor"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/259.png" alt="">Virginia Tech vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/258.png" alt="">Virginia</span><i>VT 54% to win</i></span>
+                <button class="e flat" aria-pressed="false" data-w="Virginia Tech beats Virginia"><small>VT</small><b>10%</b></button>
+                <button class="e flat" aria-pressed="false" data-w="Virginia beats Virginia Tech"><small>UVA</small><b>9%</b></button></div>
+              <div class="eg minor"><span class="mu"><span><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/25.png" alt="">California vs <img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/221.png" alt="">Pittsburgh</span><i>PITT 80% to win</i></span>
+                <button class="e flat" aria-pressed="false" data-w="California beats Pittsburgh"><small>CAL</small><b>10%</b></button>
+                <button class="e flat" aria-pressed="false" data-w="Pittsburgh beats California"><small>PITT</small><b>9%</b></button></div>
+              <button class="more" aria-expanded="false" data-n="2">+2 that barely matter</button>
+            </div></div>
+        </div>
+      </div>
+
+      <section class="path">
+        <div class="hd"><b>Likeliest way in</b><span>1 in 3</span></div>
+        <ol>
+          <li><span><b>Louisville beats</b> North Carolina and Pittsburgh</span><span class="p">40%</span></li>
+          <li><span><b>Wake Forest loses to</b> SMU and beats Georgia Tech; Duke either way</span><span class="p">38%</span></li>
+        </ol>
+        <div class="ft"><span>Favorites win the other 5 games it needs. Then Louisville gets in about 33% of the time, depending on the ranking tiebreak.</span><button class="fill">Fill in this path</button></div>
+      </section>
+    </main>
+
+    <aside class="rail">
+      <h3>The race</h3>
+      <div class="stand">
+        <div class="row"><span class="c" style="background:#f47321"></span><span class="n"><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/2390.png" alt=""><span class="rk">#1</span>Miami</span><span class="w">6-0</span><span class="o">99%</span></div>
+        <div class="row"><span class="c" style="background:#9e7e38"></span><span class="n"><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/154.png" alt=""><span class="rk">#16</span>Wake Forest</span><span class="w">5-1</span><span class="o">62%</span></div>
+        <div class="row"><span class="c" style="background:#0033a0"></span><span class="n"><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/2567.png" alt="">SMU</span><span class="w">5-2</span><span class="o">25%</span></div>
+        <div class="row me"><span class="c" style="background:#ad0000"></span><span class="n"><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/97.png" alt="">Louisville</span><span class="w">5-2</span><span class="o">9%</span></div>
+        <div class="row"><span class="c" style="background:#003087"></span><span class="n"><img class="lg" src="https://cdn.collegefootballdata.com/logos-dark/64/150.png" alt="">Duke</span><span class="w">4-2</span><span class="o">3%</span></div>
+      </div>
+      <div class="cfp">
+        <h3>For the playoff <span class="beta">Beta</span></h3>
+        <ul>
+          <li><span><b><img class="lg" src="https://cdn.collegefootballdata.com/logos/64/59.png" alt="">Georgia Tech</b> over <span class="rk">#16</span>Wake Forest</span><span><em>10%</em> vs 4%</span></li>
+          <li><span><b><img class="lg" src="https://cdn.collegefootballdata.com/logos/64/2567.png" alt="">SMU</b> over <span class="rk">#16</span>Wake Forest</span><span><em>8%</em> vs 3%</span></li>
+          <li><span><b><img class="lg" src="https://cdn.collegefootballdata.com/logos/64/150.png" alt="">Duke</b> over <span class="rk">#16</span>Wake Forest</span><span><em>8%</em> vs 4%</span></li>
+          <li><span><b><img class="lg" src="https://cdn.collegefootballdata.com/logos/64/2306.png" alt="">Kansas State</b> over <span class="rk">#22</span>Arizona</span><span><em>6%</em> vs 5%</span></li>
+        </ul>
+      </div>
+      <div class="yours">
+        <h3>Your picks</h3>
+        <p id="none">Nothing locked yet.</p>
+        <ul id="list"></ul>
+        <div class="acts" id="acts" hidden><button class="share" type="button">Share picks</button><a href="a-lab.html">Open in Lab</a></div>
+      </div>
+      <p class="method">Playoff odds are our own estimate, not the committee. Title-game odds come from 20,000 simulated seasons; “In” and “Out” are proven. #N is this week’s committee ranking.</p>
+    </aside>
+  </div>
+</div>
+<script>
+// Draft only: the fold for games that barely matter.
+document.querySelectorAll('.else .more').forEach(m => m.addEventListener('click', () => {
+  const el = m.closest('.else'), open = !el.classList.contains('open'), n = m.dataset.n;
+  el.classList.toggle('open', open); m.setAttribute('aria-expanded', String(open));
+  m.textContent = open ? `Hide the ${n} that barely matter` : `+${n} that barely matter`;
+}));
+// Draft only: picking lights the result and lists it; numbers don't recompute.
+document.querySelectorAll('.r, .e').forEach(b => b.addEventListener('click', () => {
+  const g = b.closest('.eg') || b.closest('.g');
+  const on = b.getAttribute('aria-pressed') !== 'true';
+  g.querySelectorAll(':scope > .r, :scope > .e').forEach(p => p.setAttribute('aria-pressed', 'false'));
+  b.setAttribute('aria-pressed', String(on));
+  const list = document.getElementById('list'); list.innerHTML = '';
+  document.querySelectorAll('.r[aria-pressed="true"], .e[aria-pressed="true"]').forEach(p => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span>${p.dataset.w}</span><span>${p.closest('.g').querySelector('.d b').textContent}</span>`;
+    list.append(li);
+  });
+  document.getElementById('none').hidden = list.children.length > 0;
+  document.getElementById('acts').hidden = list.children.length === 0;
+}));
+</script>
+<button type="button" class="logo-toggle" id="logoToggle" aria-pressed="true">Logos: on</button>
+<script>
+// Draft control: logos on or off, remembered across the four drafts.
+(() => {
+  const k = "ma-draft-logos", b = document.getElementById("logoToggle");
+  let on = true;
+  try { on = localStorage.getItem(k) !== "off"; } catch {}
+  const set = (v) => {
+    on = v;
+    document.documentElement.classList.toggle("nologos", !on);
+    b.setAttribute("aria-pressed", String(on));
+    b.textContent = on ? "Logos: on" : "Logos: off";
+    try { localStorage.setItem(k, on ? "on" : "off"); } catch {}
+  };
+  set(on);
+  b.addEventListener("click", (e) => { e.stopPropagation(); set(!on); });
+})();
+</script>
+</body>
+</html>

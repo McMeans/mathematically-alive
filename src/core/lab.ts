@@ -72,6 +72,23 @@ export type LabTitleMatchup = {
   text: string;
 };
 
+/**
+ * A conference's title game as it stands: the exact matchup once the picks settle it, else its two likeliest teams.
+ * For picking a title-game winner before the matchup is settled: a pick stands while these two stay the same two.
+ */
+export type LabFinal = {
+  /** Likelier to play in it first (seed order once exact). */
+  teams: [number, number];
+  /** Both ids sorted: the same two in either order are the same matchup. */
+  key: string;
+  /** Each side's chance to win it if they meet: its title share over its title-game share, the two scaled to add to 1. */
+  chances: [number, number];
+  /** "64%". */
+  texts: [string, string];
+  /** The picks settle it (`LabConference.matchup.exact`). */
+  exact: boolean;
+};
+
 export type LabConference = {
   conference: string;
   /** Display name: "MAC", "SEC". */
@@ -84,6 +101,8 @@ export type LabConference = {
   standings: LabStanding[];
   /** The title game once every game its rules count is final or picked; null before. */
   matchup: LabTitleMatchup | null;
+  /** The matchup to pick a winner in; null with fewer than two teams in the race. */
+  final: LabFinal | null;
 };
 
 export type LabRanked = {
@@ -174,7 +193,8 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
         text: `Title game ${formatSideOdds(t.titleGame!, "alive")} · champion ${formatSideOdds(t.champion!, "alive")}`,
       })),
     ...tables.get(conference)!,
-  }));
+    final: null,
+  })).map((c) => ({ ...c, final: labFinal(c, national) }));
   const listed = national.teams.slice(0, opts.top ?? 25);
   const ranking = listed.map((t, k) => ({
     rank: k + 1, teamId: t.teamId, meanRank: t.meanRank,
@@ -196,6 +216,21 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     ranking,
     bigGames,
   };
+}
+
+/** The matchup to pick a title-game winner in: the exact one, or the two likeliest teams. */
+function labFinal(c: LabConference, national: NationalResult): LabFinal | null {
+  const pair: [number, number] | null = c.matchup?.exact ? c.matchup.teams : c.teams.length >= 2 ? [c.teams[0].teamId, c.teams[1].teamId] : null;
+  if (!pair) return null;
+  const odds = (id: number) => national.teams.find((t) => t.teamId === id);
+  const cond = pair.map((id) => {
+    const t = odds(id);
+    return t && t.titleGame ? (t.champion ?? 0) / t.titleGame : 0.5;
+  });
+  const total = cond[0] + cond[1];
+  const a = total > 0 ? cond[0] / total : 0.5;
+  const chances: [number, number] = [a, 1 - a];
+  return { teams: pair, key: [...pair].sort((x, y) => x - y).join("|"), chances, texts: [formatOdds(chances[0]), formatOdds(chances[1])], exact: c.matchup?.exact ?? false };
 }
 
 type Ranked = SeasonLab["national"]["teams"][number];
@@ -335,6 +370,39 @@ function standingsWithPicks(
     ? `${vs}, ${how}.`
     : `Comes down to the ${decided.steps.filter((s) => UNSETTLED.has(s)).join(" and ")} tiebreak, which picks can't settle. The odds below are simulated.`;
   return { standings, matchup: { teams: decided.teams, exact, steps: decided.steps, text } };
+}
+
+/** One team's odds in a Lab run, for following a pinned team. Null odds: not simulated (no playoff, or no title race). */
+export type LabTeamOdds = {
+  teamId: number;
+  playoff: number | null;
+  titleGame: number | null;
+  champion: number | null;
+  /** For display: "9%", "<0.1%", "—" when not simulated. */
+  playoffText: string;
+  titleGameText: string;
+  championText: string;
+};
+
+/** A team's odds in a Lab run (`SeasonLab.national`), null when the run doesn't have the team. */
+export function labTeamOdds(national: NationalResult, teamId: number): LabTeamOdds | null {
+  const t = national.teams.find((x) => x.teamId === teamId);
+  if (!t) return null;
+  const show = (p: number | null) => (p === null ? "—" : formatSideOdds(p, "alive"));
+  const playoff = t.playoff?.field ?? null;
+  return { teamId, playoff, titleGame: t.titleGame, champion: t.champion, playoffText: show(playoff), titleGameText: show(t.titleGame), championText: show(t.champion) };
+}
+
+/**
+ * How a pinned team's odds moved, in points of the odds as shown ("+4 pts", "−2 pts"), so 5% to 9% reads +4; null when
+ * the shown odds didn't change or either side isn't simulated.
+ */
+export function labOddsChange(before: number | null, after: number | null): string | null {
+  if (before === null || after === null) return null;
+  const shown = (p: number) => Number.parseFloat(formatSideOdds(p, "alive").replace(/[<>%]/g, "")) || 0;
+  const d = Math.round((shown(after) - shown(before)) * 10) / 10;
+  if (d === 0) return null;
+  return `${d > 0 ? "+" : "−"}${Math.abs(d)} pts`;
 }
 
 /** How `fillLabLocks` picks the open games: the favourite always wins, or one season drawn from a seed. */

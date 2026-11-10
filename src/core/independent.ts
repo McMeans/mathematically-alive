@@ -7,6 +7,7 @@ import { BARRED, formatOdds, formatSideOdds } from "./paths";
 import { findFormat } from "./playoff";
 import { INDEPENDENTS, teamRecord, type Game, type Season, type TeamRecord } from "./season";
 import { gameWinProbability, simulateSeason, type SimResult } from "./sim";
+import { teamBoard, type TeamBoard } from "./board";
 import { playoffSignals, type PlayoffSignal } from "./view";
 
 export { INDEPENDENTS };
@@ -67,6 +68,8 @@ export type IndependentExploration = {
   games: IndependentGame[];
   /** Results elsewhere that clearly move its playoff odds. */
   playoffGames: PlayoffSignal[];
+  /** The page's board: odds by final record, help from elsewhere, the playoff race (no title game). */
+  board: TeamBoard | null;
   /** The national run behind the odds: pass it as `reuse` to the next what-if. Not serializable. */
   national: NationalResult;
 };
@@ -139,5 +142,5 @@ export function exploreIndependent(season: Season, opts: IndependentOptions & { 
         projected: g.projected === true,
       };
     });
-  return { outlook: teams, games, playoffGames: playoffSignals(season, sim, national, teamId), national };
+  return { outlook: teams, games, playoffGames: playoffSignals(season, sim, national, teamId), board: teamBoard(season, sim, national, teamId, null, opts.locks), national };
 }

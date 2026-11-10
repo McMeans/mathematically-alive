@@ -3,35 +3,103 @@
 /* Screens tall enough to pin a block above a scrolling list without squeezing the list. */
 @custom-variant tall (@media (min-height: 640px));
 
-/* Brand: identity direction D ("Pulse type, Proof colors").
-   The site is light-only for now. */
+/* Brand: the stadium scoreboard (design B). A green board with lit numbers, an amber lamp for what's picked or
+   matters most, on a light gray ground. Saira Condensed for board lettering and numbers, Public Sans for reading.
+   The site is light-only. */
 @theme {
-  --color-navy: #14213d;
-  --color-turf: #1f7a4d;
-  --color-marker: #d9622b;
-  --color-marker-text: #b4501f; /* marker orange darkened for text on white */
-  --color-mist: #f3f5f8;
-  /* Results on the needs card: a win needed is turf, a loss needed teal. The -ink shades are their text on the light tints. */
+  --color-board: #133f2e;
+  --color-board-deep: #0c2c20;
+  --color-board-deeper: #0a241a;
+  --color-board-line: #2a5a46;
+  --color-board-text: #d7e4dc;
+  --color-board-muted: #9fbcae;
+  --color-plate: #f3f0e6;
+  --color-plate-ink: #121a16;
+  --color-lamp: #f2b134;
+  /* Amber as text on the light ground (the lamp itself is too light there). */
+  --color-lamp-ink: #8a5d00;
+  --color-root: #5fd08f;
+  --color-ground: #e4e7e5;
+  --color-paper: #f6f8f7;
+  --color-ink: #15201b;
+  --color-ink-soft: #3d4a43;
+  --color-ink-muted: #5d6a63;
+  --color-rule: #d6d4cc;
+  --color-help: #1d6b46;
+  --color-hurt: #a3281c;
+  /* A loss in odds, lit on the board (the counterpart of `root`). */
+  --color-drop: #f0806e;
+
+  /* Earlier tokens, mapped onto the board's palette so every view speaks it. */
+  --color-navy: #15201b;
+  --color-turf: #1d6b46;
   --color-turf-ink: #17603c;
+  --color-marker: #f2b134;
+  --color-marker-text: #8a5d00;
+  --color-mist: #f6f8f7;
   --color-teal: #0e7490;
   --color-teal-ink: #0b5466;
-  --color-ink-muted: #5b6478;
-  --color-ink-soft: #3a4458;
 
-  --font-sans: var(--font-inter);
-  --font-display: var(--font-space-grotesk);
+  --font-sans: var(--font-public-sans);
+  --font-display: var(--font-saira);
 }
 
 body {
-  background: #ffffff;
-  color: var(--color-navy);
+  background: var(--color-ground);
+  color: var(--color-ink);
   font-family: var(--font-sans), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+::selection {
+  background: var(--color-lamp);
+  color: var(--color-plate-ink);
+}
+/* In the base layer, so a field whose box shows the ring (the team searches) can turn it off with outline-none. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-lamp);
+    outline-offset: 2px;
+  }
+}
+
+/* The board's dot texture, for the header. */
+.board-dots {
+  background-color: var(--color-board);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1.2px);
+  background-size: 6px 6px;
+}
+/* Board lettering: condensed, upper case. */
+.cond {
+  font-family: var(--font-saira), sans-serif;
+  text-transform: uppercase;
+}
+/* A number lit on the board: it flips once when it changes. */
+.plate {
+  font-family: var(--font-saira), sans-serif;
+  font-weight: 800;
+  line-height: 1;
+}
+.plate-hang {
+  animation: hang 180ms steps(2) both;
+}
+@keyframes hang {
+  50% {
+    transform: rotateX(90deg);
+  }
+}
+@keyframes bump {
+  from {
+    background: color-mix(in srgb, var(--color-lamp) 45%, var(--color-board));
+  }
+}
+.bump {
+  animation: bump 900ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Thin scrollbars that sit flush with the page: no track, a slim rounded thumb that darkens on hover. */
 .scroll-thin {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--color-navy) 18%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--color-ink) 18%, transparent) transparent;
 }
 .scroll-thin:hover {
   scrollbar-color: color-mix(in srgb, var(--color-navy) 35%, transparent) transparent;

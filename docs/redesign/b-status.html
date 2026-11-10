@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draft B · Playoff race</title>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Draft 5: three numbers to place a team (today's committee rank, its projected final rank, its playoff seed) and
+   three ways to fit them on the 300px race card. The field is picked with the 2026 rules from the projected ranking. */
+:root {
+  --board: #133f2e; --board-deep: #0c2c20; --board-line: #2a5a46; --board-text: #d7e4dc; --board-muted: #9fbcae;
+  --plate: #f3f0e6; --plate-ink: #121a16; --lamp: #f2b134; --lamp-ink: #8a5d00;
+  --ground: #e4e7e5; --paper: #f6f8f7; --ink: #15201b; --ink-muted: #5d6a63; --rule: #d6d4cc;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.45 "Public Sans", system-ui, sans-serif; }
+.wrap { max-width: 1060px; margin: 0 auto; padding: 28px 16px 80px; }
+h1 { font: 800 36px/1 "Saira Condensed"; text-transform: uppercase; margin: 0 0 6px; }
+h2 { font: 800 24px/1 "Saira Condensed"; text-transform: uppercase; margin: 40px 0 6px; }
+.lede { color: var(--ink-muted); margin: 0 0 8px; max-width: 80ch; }
+.lede b, li b { color: var(--ink); }
+ul.rules { margin: 6px 0 0; padding-left: 18px; color: var(--ink-muted); max-width: 82ch; }
+ul.rules li { margin: 5px 0; }
+.logo { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
+
+.three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0 6px; max-width: 900px; }
+@media (max-width: 700px) { .three { grid-template-columns: 1fr; } }
+.three div { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; font-size: 13px; color: var(--ink-muted); }
+.three b { display: block; font: 800 16px/1.1 "Saira Condensed"; text-transform: uppercase; color: var(--ink); margin-bottom: 3px; }
+
+.ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 10px 0 0; }
+.ctl > span { font: 700 12px/1 "Saira Condensed"; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-muted); width: 76px; }
+.chip { font: 700 14px/1 "Saira Condensed"; letter-spacing: .05em; text-transform: uppercase; border: 1px solid var(--rule); background: #fff; color: var(--ink); padding: 7px 10px; border-radius: 3px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--lamp); border-color: var(--lamp); color: var(--plate-ink); }
+.why { font-size: 14px; color: var(--ink-muted); min-height: 3em; max-width: 82ch; margin: 12px 0 4px; }
+.why b { color: var(--ink); }
+.lnote { font-size: 14px; color: var(--ink); max-width: 82ch; margin: 0 0 14px; min-height: 3em; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, 300px); gap: 18px; align-items: start; }
+@media (max-width: 680px) { .grid { grid-template-columns: minmax(0, 300px); } }
+.opt > b { font: 800 17px/1 "Saira Condensed"; text-transform: uppercase; display: block; margin-bottom: 6px; }
+.paper { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 16px; }
+.rh { font: 800 18px/1.1 "Saira Condensed"; text-transform: uppercase; letter-spacing: .03em; margin: 0 0 2px; }
+.rs { font: 600 14px/1.2 "Saira Condensed"; color: var(--ink-muted); margin: 0 0 10px; }
+.more { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+
+.race { background: var(--board-deep); color: var(--board-text); border-radius: 4px; padding: 6px 0; }
+.r, .ch { display: grid; grid-template-columns: 1.9rem minmax(0,1fr) auto 2.6rem; align-items: center; gap: 6px; padding: 7px 12px; min-height: 38px; }
+.race.cols3 .r, .race.cols3 .ch { grid-template-columns: 1.9rem minmax(0,1fr) 2rem 2.6rem; }
+.ch { min-height: 0; padding: 4px 12px 6px; border-bottom: 1px solid var(--board-line); margin-bottom: 2px; font: 700 10.5px/1 "Saira Condensed"; letter-spacing: .08em; color: var(--board-muted); text-transform: uppercase; }
+.ch span:nth-child(3), .ch span:nth-child(4) { text-align: right; }
+.race.cols3 .ch span:nth-child(3) { text-align: center; }
+.r.me { box-shadow: inset 3px 0 var(--lamp); }
+.r.dim .t .nm, .r.dim .od, .r.dim .pl { color: var(--board-muted); }
+.r.dim.me .t .nm, .r.dim.me .od { color: var(--lamp); }
+.pl { font: 800 14px/1 "Saira Condensed"; color: var(--board-muted); display: flex; flex-direction: column; gap: 2px; }
+.pl.lit { color: #fff; }
+.pl i, .sd i { font: 700 9.5px/1 "Saira Condensed"; font-style: normal; letter-spacing: .06em; color: var(--board-text); }
+.sd { font: 800 15px/1 "Saira Condensed"; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.t { display: flex; align-items: center; gap: 6px; font: 700 16px/1 "Saira Condensed"; text-transform: uppercase; color: #fff; min-width: 0; white-space: nowrap; }
+.t .nm { overflow: hidden; text-overflow: ellipsis; }
+.t .rk { color: var(--board-muted); font-size: 13px; }
+.rec { font: 700 14px/1 "Saira Condensed"; color: var(--board-muted); text-align: right; }
+.od { font: 800 18px/1 "Saira Condensed"; text-align: right; color: #fff; }
+.me .t, .me .od { color: var(--lamp); }
+.line { margin: 6px 12px; border-top: 1px dashed var(--lamp); position: relative; height: 0; }
+.line span { position: absolute; right: 0; top: -8px; background: var(--board-deep); padding-left: 6px; font: 700 11px/1 "Saira Condensed"; letter-spacing: .08em; color: var(--lamp); text-transform: uppercase; }
+.line.bye { border-top-color: var(--board-line); }
+.line.bye span { color: var(--board-muted); }
+.hd { padding: 6px 12px 0; font: 700 11px/1 "Saira Condensed"; letter-spacing: .09em; color: var(--board-muted); text-transform: uppercase; }
+.gap { padding: 0 12px; color: var(--board-muted); line-height: .6; }
+.r.bid { box-shadow: inset 3px 0 var(--board-line); background: rgba(255,255,255,.035); }
+.r.bid.me { box-shadow: inset 3px 0 var(--lamp); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Playoff race · draft 5</h1>
+  <p class="lede">Three numbers can place a team, and they're not the same thing. Texas Tech is <b>#15 today</b>, <b>projected 14th</b> after championship week, and the <b>11 seed</b>, because it wins the Big 12 and seeding only counts the 12 in the field.</p>
+  <div class="three">
+    <div><b>#15 · Committee rank now</b>The latest committee top 25. Muted, by the name, as today.</div>
+    <div><b>14 · Projected final rank</b>Where our committee stand-in ranks the team after championship week, over the simulated seasons, with your picks. Every team has one (Virginia: 70).</div>
+    <div><b>11 · Seed</b>Its place among the 12 in the projected field. Only teams in have one.</div>
+  </div>
+
+  <div class="ctl" role="group" aria-label="Layout" id="lay"></div>
+  <p class="lnote" id="lnote"></p>
+  <div class="ctl" role="group" aria-label="Scenario" id="scen"></div>
+  <p class="why" id="why"></p>
+  <div class="grid" id="opts"></div>
+
+  <h2>Rules in the draft</h2>
+  <ul class="rules">
+    <li><b>Projected final rank:</b> the team's median final rank over the simulated seasons, after championship week, with the page's picks locked. Past 25 it's our stand-in's order, not the committee's, but it still places a far-off team (Virginia 70).</li>
+    <li><b>Field:</b> the four power champions, the highest-ranked Group of Six team, Notre Dame if projected 12th or better, then at-large by projected rank to 12. Seeds straight by projected rank.</li>
+    <li><b>Tags:</b> every power champion and the Group of Six team, always. Notre Dame only when the top-12 rule is what gets it in. <b>Edge:</b> a tagged team seeded under the at-large line.</li>
+    <li><b>Window:</b> well inside the field, two either side. Near the line or out: the two above the line, every bid under it, the first teams out (down to the page's team if close), ⋯ then the team if far.</li>
+  </ul>
+</main>
+
+<script>
+const L = (id) => `<img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/${id}.png" alt="">`;
+// key: [name, logo id, record, committee rank now, odds, kind]. kind: "P" power, "G" Group of Six, "N" Notre Dame.
+const T = {
+  OSU: ["Ohio State", 194, "9-0", 1, "In", "P"], IND: ["Indiana", 84, "9-0", 3, "99%", "P"], MIA: ["Miami", 2390, "9-0", 2, "97%", "P"],
+  UGA: ["Georgia", 61, "8-1", 4, "93%", "P"], TEX: ["Texas", 251, "7-2", 8, "86%", "P"], BAMA: ["Alabama", 333, "7-2", 6, "82%", "P"],
+  ND: ["Notre Dame", 87, "8-1", 7, "88%", "N"], OU: ["Oklahoma", 201, "7-2", 10, "74%", "P"], MISS: ["Ole Miss", 145, "8-1", 5, "66%", "P"],
+  WF: ["Wake Forest", 154, "8-1", 16, "45%", "P"], ORE: ["Oregon", 2483, "6-3", 23, "42%", "P"], BYU: ["BYU", 252, "7-2", 9, "40%", "P"],
+  USC: ["USC", 30, "7-2", 20, "39%", "P"], TTU: ["Texas Tech", 2641, "8-1", 15, "50%", "P"], VAN: ["Vanderbilt", 238, "7-2", 17, "31%", "P"],
+  LOU: ["Louisville", 97, "6-3", null, "15%", "P"], BSU: ["Boise State", 68, "8-1", 25, "63%", "G"], MEM: ["Memphis", 235, "8-1", null, "22%", "G"],
+  UVA: ["Virginia", 258, "4-5", null, "&lt;1%", "P"],
+};
+const FAR = { UVA: 70 };
+const CHAMPS = { OSU: "B1G", MIA: "ACC", UGA: "SEC", TTU: "B12" };
+const SCEN = {
+  base: { label: "Likeliest", rank: ["OSU", "IND", "MIA", "UGA", "TEX", "BAMA", "ND", "OU", "MISS", "WF", "ORE", "BYU", "USC", "TTU", "VAN", "LOU", "BSU", "MEM"],
+    why: "Projected 14th and 17th, Texas Tech (Big 12 champion) and Boise State (top Group of Six) are seeds 11 and 12. Oregon, BYU and USC are projected 11th–13th but out: the bids took their spots." },
+  nd12: { label: "Notre Dame projected #12", rank: ["OSU", "IND", "MIA", "UGA", "TEX", "BAMA", "OU", "MISS", "WF", "ORE", "BYU", "ND", "USC", "TTU", "VAN", "LOU", "BSU", "MEM"],
+    why: "Notre Dame projected 12th keeps its bid and gets in as the 10 seed, over Oregon and BYU (projected 10th and 11th). It gets the ND tag because the top-12 rule is what puts it in." },
+  nd13: { label: "Notre Dame projected #13", rank: ["OSU", "IND", "MIA", "UGA", "TEX", "BAMA", "OU", "MISS", "WF", "ORE", "BYU", "USC", "ND", "TTU", "VAN", "LOU", "BSU", "MEM"],
+    why: "Projected 13th, Notre Dame has no bid. The seventh at-large spot goes to Oregon (projected 10th), and Notre Dame is out." },
+};
+const PAGES = { MIA: "Miami", ND: "Notre Dame", WF: "Wake Forest", TTU: "Texas Tech", BSU: "Boise State", ORE: "Oregon", LOU: "Louisville", UVA: "Virginia" };
+
+function pick(rank) {
+  const autos = new Set();
+  let g6 = false;
+  rank.forEach((k, i) => {
+    if (CHAMPS[k]) autos.add(k);
+    else if (!g6 && T[k][5] === "G") { autos.add(k); g6 = true; }
+    else if (T[k][5] === "N" && i < 12) autos.add(k);
+  });
+  let atLarge = 12 - autos.size, last = null;
+  const field = [];
+  for (const k of rank) {
+    if (autos.has(k)) field.push(k);
+    else if (atLarge > 0) { field.push(k); atLarge--; last = k; }
+  }
+  const lastRank = rank.indexOf(last);
+  const tag = (k) => CHAMPS[k] ?? (T[k][5] === "G" && autos.has(k) ? "G6" : T[k][5] === "N" && autos.has(k) && rank.indexOf(k) > lastRank ? "ND" : "");
+  return { field, last, lastRank, rank, out: rank.filter((k) => !field.includes(k)), tag };
+}
+
+// Items: rows {k, seed, proj, tag, out, under} and markers {m: "bye" | "line" | "head"}.
+function seedOrder(p) {
+  const it = [], cut = p.field.indexOf(p.last);
+  p.field.forEach((k, i) => {
+    if (i === 4) it.push({ m: "bye" });
+    it.push({ k, seed: i + 1, proj: p.rank.indexOf(k) + 1, tag: p.tag(k), under: i > cut });
+    if (i === cut) it.push({ m: "line" });
+  });
+  it.push({ m: "head" });
+  p.out.forEach((k) => it.push({ k, proj: p.rank.indexOf(k) + 1, out: true }));
+  return it;
+}
+function rankOrder(p) {
+  const it = [];
+  let bye = false;
+  p.rank.forEach((k, i) => {
+    const seed = p.field.indexOf(k) + 1;
+    if (!bye && i === 4) { it.push({ m: "bye" }); bye = true; }
+    it.push(seed ? { k, seed, proj: i + 1, tag: p.tag(k), under: i > p.lastRank } : { k, proj: i + 1, out: true });
+    if (i === p.lastRank) it.push({ m: "line" });
+  });
+  return it;
+}
+
+const LAYOUTS = {
+  A: { label: "A · Seed first (draft 4)", order: seedOrder, cols3: false,
+    note: "Kept from draft 4. Left number is the seed; teams out have none. Projected rank isn't shown, so Oregon (projected 11th) and Virginia (70th) carry no number.",
+    lead: (x) => [x.out ? "" : x.seed, x.out ? "" : x.tag], mid: (x) => T[x.k][2] },
+  B: { label: "B · Projected rank first", order: rankOrder, cols3: true, head: ["Proj.", "Team · now", "Seed", "Field"],
+    note: "The card reads like the projected top 25. Left: projected rank, for every team (Virginia 70). The record column becomes a Seed column with the tag under it. Bids ranked below the line keep their rank (14, 17) but show their seed (11, 12). Rank order, so in and out mix below the line.",
+    lead: (x) => [x.proj, ""], mid: (x) => (x.out ? "" : `<span class="sd">${x.seed}${x.tag ? `<i>${x.tag}</i>` : ""}</span>`) },
+  C: { label: "C · Seed first, projected rank beside", order: seedOrder, cols3: true, head: ["Seed", "Team · now", "Proj.", "Field"],
+    note: "Seed order like A, so the field reads as a block and bids sit under the line. The record column becomes a Projected column, so you see why: Texas Tech is the 11 seed but projected 14th; Oregon, out, is projected 11th.",
+    lead: (x) => [x.out ? "" : x.seed, x.out ? "" : x.tag], mid: (x) => `<span class="sd" style="color:var(--board-muted)">${x.proj}</span>` },
+};
+
+function visible(items, me) {
+  const rows = items.map((x, i) => (x.k ? i : -1)).filter((i) => i >= 0);
+  const pos = rows.findIndex((i) => items[i].k === me);
+  const lineAt = items.findIndex((x) => x.m === "line");
+  const above = rows.filter((i) => i < lineAt).length;
+  const show = new Set();
+  if (pos >= 0 && pos < above - 2) {
+    const lo = Math.max(0, Math.min(pos - 2, above - 5));
+    for (let j = lo; j < lo + 5; j++) show.add(rows[j]);
+    return show;
+  }
+  show.add(rows[above - 2]); show.add(rows[above - 1]);
+  if (pos >= 0 && pos < above) show.add(rows[pos - 1]);
+  let outs = 0;
+  const mine = rows[pos];
+  for (const i of rows.filter((i) => i > lineAt)) {
+    const x = items[i];
+    if (!x.out) { show.add(i); continue; }
+    if (outs < 2 || (mine > lineAt && i <= mine && outs < 5)) { show.add(i); outs++; }
+  }
+  if (mine !== undefined) show.add(mine);
+  return show;
+}
+
+function rowHtml(lay, x, cls) {
+  const [n, id, , rk, odds] = T[x.k];
+  const [lead, tag] = lay.lead(x);
+  const lit = lay === LAYOUTS.B && !x.out;
+  return `<div class="r ${cls}"><span class="pl${lit ? " lit" : ""}">${lead}${tag ? `<i>${tag}</i>` : ""}</span><span class="t">${L(id)}${rk ? `<span class="rk">#${rk}</span>` : ""}<span class="nm">${n}</span></span><span class="rec">${lay.mid(x)}</span><span class="od">${odds}</span></div>`;
+}
+
+function card(lay, p, page) {
+  const items = lay.order(p);
+  const show = visible(items, page);
+  let h = lay.head ? `<div class="ch">${lay.head.map((s) => `<span>${s}</span>`).join("")}</div>` : "";
+  let prev = -1;
+  items.forEach((x, i) => {
+    if (x.m) {
+      const next = [...show].filter((j) => j > i);
+      if (!next.length || prev < 0) return;
+      if (x.m === "bye") h += `<div class="line bye"><span>First-round byes</span></div>`;
+      if (x.m === "line") h += `<div class="line"><span>Last at-large</span></div>`;
+      if (x.m === "head" && next.some((j) => items[j].out)) h += `<div class="hd">Next in line</div>`;
+      return;
+    }
+    if (!show.has(i)) return;
+    if (prev >= 0 && items.slice(prev + 1, i).some((y) => y.k)) h += `<div class="gap">⋯</div>`;
+    h += rowHtml(lay, x, [x.k === page ? "me" : "", x.out ? "dim" : "", x.tag && x.under ? "bid" : ""].join(" "));
+    prev = i;
+  });
+  if (FAR[page]) h += `<div class="gap">⋯</div>` + rowHtml(lay, { k: page, proj: FAR[page], out: true }, "me dim");
+  return `<div class="race${lay.cols3 ? " cols3" : ""}">${h}</div>`;
+}
+
+let lay = "B", scen = "base";
+function render() {
+  const p = pick(SCEN[scen].rank), L_ = LAYOUTS[lay];
+  document.getElementById("lay").innerHTML = `<span>Layout</span>` + Object.entries(LAYOUTS).map(([k, l]) => `<button type="button" class="chip" aria-pressed="${k === lay}" data-l="${k}">${l.label}</button>`).join("");
+  document.getElementById("scen").innerHTML = `<span>Scenario</span>` + Object.entries(SCEN).map(([k, s]) => `<button type="button" class="chip" aria-pressed="${k === scen}" data-s="${k}">${s.label}</button>`).join("");
+  document.getElementById("lnote").textContent = L_.note;
+  document.getElementById("why").innerHTML = SCEN[scen].why;
+  document.getElementById("opts").innerHTML = Object.entries(PAGES).map(([k, n]) => {
+    const seed = p.field.indexOf(k) + 1, proj = FAR[k] ?? p.rank.indexOf(k) + 1;
+    return `<div class="opt"><b>${n} page <span style="font:600 13px 'Public Sans';text-transform:none;color:var(--ink-muted)">· proj. ${proj}${seed ? ` · seed ${seed}` : " · out"}</span></b>
+      <div class="paper"><div class="rh">Playoff race</div><div class="rs">${lay === "A" ? "Projected seeds · chance to make the field" : "Projected final ranking and seeds"}</div>${card(L_, p, k)}<a class="more">The whole field in the Lab →</a></div></div>`;
+  }).join("");
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.l) lay = b.dataset.l;
+  if (b.dataset.s) scen = b.dataset.s;
+  render();
+});
+render();
+</script>
+</body>
+</html>

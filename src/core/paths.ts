@@ -19,6 +19,8 @@ export type PathOptions = {
   locks?: Record<number, number>;
   /** An earlier national run to copy untouched title races from (`NationalOptions.reuse`). */
   reuse?: NationalResult;
+  /** Forced title-game winners: conference -> the team that wins it, in the seasons it plays in it (`NationalOptions.titleLocks`). */
+  titleLocks?: Record<string, number>;
 };
 
 export type PathStatus = "clinched" | "alive" | "eliminated";
@@ -148,6 +150,39 @@ export function mustWinConference(o: TeamOutlook): boolean {
 
 /** Why a team barred from the postseason (`Team.postseasonBan`) shows Out everywhere. Not part of the public API. */
 export const BARRED = "Barred from the postseason this season: no title game, no playoff";
+
+/** One goal's status in the header: "Playoff · Needs a miracle". `live` while the goal is still possible. */
+export type StatusTag = { label: string; live: boolean };
+
+/**
+ * How alive a team is for one goal, from its odds and what's proven: "Clinched", "In control" (50% or better), "In
+ * the hunt" (10%+), "Long shot" (1%+), "Needs a miracle" (under 1%, not out), "Out".
+ */
+export function goalStatus(p: number, proven: PathStatus): string {
+  if (proven === "clinched") return "Clinched";
+  if (proven === "eliminated") return "Out";
+  if (p >= 0.5) return "In control";
+  if (p >= 0.1) return "In the hunt";
+  if (p >= 0.01) return "Long shot";
+  return "Needs a miracle";
+}
+
+/**
+ * The header's tags, one per goal: the playoff, then the conference title game (`titleGame` names it, "ACC title
+ * game"; null for an independent). The playoff is only proven once the field is announced, or barred.
+ */
+export function statusTags(
+  o: { playoff: number; cfp: NationalPlayoff | null; postseasonBan: boolean; status?: PathStatus; titleGame?: number },
+  titleGame: string | null,
+): StatusTag[] {
+  const playoff = o.postseasonBan ? "Barred" : goalStatus(o.playoff, o.cfp?.run ? (o.cfp.run.seed === null ? "eliminated" : "clinched") : "alive");
+  const tags: StatusTag[] = [{ label: `Playoff · ${playoff}`, live: playoff !== "Out" && playoff !== "Barred" }];
+  if (titleGame !== null && o.status !== undefined) {
+    const t = goalStatus(o.titleGame ?? 0, o.status);
+    tags.push({ label: `${titleGame} · ${t}`, live: t !== "Out" });
+  }
+  return tags;
+}
 
 /**
  * How the team's playoff odds come about, when that needs saying: a team barred from the postseason can't get in;

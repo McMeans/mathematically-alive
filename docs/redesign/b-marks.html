@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draft B · Pick mark and dropdown</title>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Experiments: the pick mark and the dropdown, without circles. Each option in place, on the real components. */
+:root {
+  --board: #133f2e; --board-deep: #0c2c20; --board-line: #2a5a46; --board-text: #d7e4dc; --board-muted: #9fbcae;
+  --plate: #f3f0e6; --plate-ink: #121a16; --lamp: #f2b134; --lamp-ink: #8a5d00;
+  --ground: #e4e7e5; --paper: #f6f8f7; --ink: #15201b; --ink-muted: #5d6a63; --rule: #d6d4cc;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.45 "Public Sans", system-ui, sans-serif; }
+.cond { font-family: "Saira Condensed", sans-serif; text-transform: uppercase; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 28px 20px 60px; }
+h1 { font: 800 34px/1 "Saira Condensed"; text-transform: uppercase; margin: 0 0 6px; }
+h2 { font: 800 24px/1 "Saira Condensed"; text-transform: uppercase; margin: 40px 0 4px; }
+.lede { color: var(--ink-muted); margin: 0 0 8px; max-width: 64ch; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; margin-top: 14px; }
+.opt { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 12px; }
+.opt > b { font: 800 17px/1 "Saira Condensed"; text-transform: uppercase; display: block; }
+.opt > p { margin: 4px 0 10px; font-size: 13px; color: var(--ink-muted); }
+.board { background: var(--board-deep); color: var(--board-text); border-radius: 4px; padding: 6px; display: grid; gap: 6px; }
+
+/* Game row */
+.game { display: grid; grid-template-columns: 1fr 22px 1fr; align-items: center; }
+.vs { text-align: center; font-size: 12px; color: var(--board-muted); }
+.team { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 40px; padding: 6px 9px; border-radius: 3px;
+  border: 1px solid var(--board-line); background: rgba(255,255,255,.04); color: #fff; font: 700 17px/1 "Saira Condensed"; text-transform: uppercase; position: relative; overflow: hidden; }
+.team.home { flex-direction: row-reverse; }
+.team .n { display: flex; align-items: center; gap: 6px; }
+.team.home .n { flex-direction: row-reverse; }
+.team .o { font: 800 16px/1 "Saira Condensed"; color: var(--board-muted); }
+.team.on { background: var(--lamp); border-color: var(--lamp); color: var(--plate-ink); }
+.team.lost { opacity: .4; }
+.team.lost .n span { text-decoration: line-through; }
+.logo { width: 18px; height: 18px; object-fit: contain; }
+
+/* Race card */
+.race { background: var(--board-deep); color: var(--board-text); border-radius: 4px; padding: 8px 12px; display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
+.race .hd { grid-column: span 2; display: flex; align-items: center; gap: 8px; font: 700 13px/1 "Saira Condensed"; letter-spacing: .08em; color: var(--board-muted); }
+.race .t { display: flex; align-items: center; gap: 6px; font: 700 17px/1.2 "Saira Condensed"; text-transform: uppercase; color: #fff; }
+.race .t.me { color: var(--lamp); }
+.race .p { font: 800 17px/1 "Saira Condensed"; text-align: right; color: #fff; }
+.race .p.me { color: var(--lamp); }
+
+/* Header picker */
+.head { background: var(--board); color: #fff; border-radius: 4px; padding: 14px 16px; display: flex; align-items: center; gap: 10px;
+  background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1.2px); background-size: 6px 6px; }
+.head .name { display: flex; align-items: center; gap: 8px; font: 800 34px/1 "Saira Condensed"; text-transform: uppercase; }
+
+svg { flex-shrink: 0; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Pick mark and dropdown</h1>
+  <p class="lede">The ringed check and the circled chevron, swapped for marks with square corners, like the rest of the board. Each option is shown on the pieces it would replace.</p>
+
+  <h2>Pick mark</h2>
+  <p class="lede">On a picked side (amber), and beside the picked team in a conference race.</p>
+  <div class="grid" id="marks"></div>
+
+  <h2>Dropdown</h2>
+  <p class="lede">On a conference race card, and on the team picker in the team page's header.</p>
+  <div class="grid" id="drops"></div>
+</main>
+<script>
+const logo = (id) => `<img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/${id}.png" alt="">`;
+const logoL = (id) => `<img class="logo" src="https://cdn.collegefootballdata.com/logos/64/${id}.png" alt="">`;
+const LOU = 97, UNC = 153, MIA = 2390;
+
+// Pick marks: [name, note, mark on amber, mark on the board].
+const check = (stroke, w = 2.6) => `<svg viewBox="0 0 16 16" width="1em" height="1em"><path d="M3 8.6 6.4 12 13 4.6" fill="none" stroke="${stroke}" stroke-width="${w}" stroke-linecap="square"/></svg>`;
+const tile = (bg, fg) => `<svg viewBox="0 0 16 16" width="1em" height="1em"><rect x="1" y="1" width="14" height="14" rx="2" fill="${bg}"/><path d="M4.2 8.4 6.8 11 11.8 5.4" fill="none" stroke="${fg}" stroke-width="2.2" stroke-linecap="square"/></svg>`;
+const marks = [
+  ["A · Bare check", "A heavy check with square ends, no ring. Plain and clear.",
+    `<span style="font-size:20px;display:flex">${check("var(--plate-ink)")}</span>`, `<span style="font-size:16px;display:flex">${check("var(--lamp)")}</span>`],
+  ["B · Square lamp", "A small square, like a scoreboard bulb. Same corners as the buttons.",
+    `<span style="font-size:20px;display:flex">${tile("var(--plate-ink)", "var(--lamp)")}</span>`, `<span style="font-size:16px;display:flex">${tile("var(--lamp)", "var(--board-deep)")}</span>`],
+  ["C · Pick tab", "A cut-in tab on the side's edge. No glyph; the race uses an amber bar.",
+    `<span style="position:absolute;right:0;top:0;bottom:0;width:6px;background:var(--plate-ink)"></span>`, ``, true],
+  ["D · Odds stay, check leads", "Keep the odds, with a small check before them, so the number never disappears.",
+    `<span style="display:flex;align-items:center;gap:3px;font:800 16px/1 'Saira Condensed'"><span style="font-size:14px;display:flex">${check("var(--plate-ink)", 3)}</span>56%</span>`, `<span style="font-size:15px;display:flex">${check("var(--lamp)", 3)}</span>`],
+];
+document.getElementById("marks").innerHTML = marks.map(([name, note, onAmber, onBoard, bar]) => `
+  <div class="opt"><b>${name}</b><p>${note}</p>
+    <div class="board">
+      <div class="game">
+        <div class="team on"><span class="n">${logoL(LOU)}<span>Louisville</span></span>${onAmber}</div>
+        <span class="vs">at</span>
+        <div class="team home lost"><span class="n">${logo(UNC)}<span>UNC</span></span><span class="o">44%</span></div>
+      </div>
+    </div>
+    <div class="race" style="margin-top:8px${bar ? ";padding-left:0" : ""}">
+      <span class="hd" ${bar ? 'style="padding-left:12px"' : ""}>ACC</span>
+      <span class="t">${bar ? '<span style="width:4px;align-self:stretch;margin-right:8px"></span>' : ""}${logo(MIA)} Miami</span><span class="p">99%</span>
+      <span class="t me">${bar ? '<span style="width:4px;align-self:stretch;background:var(--lamp);margin-right:8px"></span>' : ""}${logo(LOU)} Louisville ${onBoard}</span><span class="p me">97%</span>
+    </div>
+  </div>`).join("");
+
+// Dropdowns: [name, note, control on the race card, control by the team name].
+const chev = (size, w = 2) => `<svg viewBox="0 0 12 12" width="${size}" height="${size}"><path d="M2.5 4.5 6 8 9.5 4.5" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="square"/></svg>`;
+const box = (inner, s) => `<span style="display:flex;align-items:center;justify-content:center;width:${s}px;height:${s}px;border:1px solid var(--board-line);border-radius:3px;color:var(--board-muted)">${inner}</span>`;
+const drops = [
+  ["A · Bare chevron", "Just the chevron, a little heavier, in the muted board color.",
+    `<span style="margin-left:auto;color:var(--board-muted);display:flex">${chev(12, 2.2)}</span>`,
+    `<span style="color:var(--board-muted);display:flex">${chev(20, 2.2)}</span>`],
+  ["B · Square button", "The chevron in a box with the buttons' 3px corners.",
+    `<span style="margin-left:auto">${box(chev(10, 2), 20)}</span>`, box(chev(14, 2.2), 30)],
+  ["C · Plus and minus", "A square that reads open or closed: + to open, − once open.",
+    `<span style="margin-left:auto">${box('<svg viewBox="0 0 12 12" width="10" height="10"><path d="M6 2v8M2 6h8" stroke="currentColor" stroke-width="2"/></svg>', 20)}</span>`,
+    box(chev(14, 2.2), 30)],
+  ["D · Word and caret", "Says what opens: “Standings ▾” on races, “Change team ▾” on the header.",
+    `<span class="cond" style="margin-left:auto;display:flex;align-items:center;gap:4px;font-size:12px;letter-spacing:.06em;color:var(--board-muted)">Standings ${chev(10, 2.2)}</span>`,
+    `<span class="cond" style="display:flex;align-items:center;gap:4px;white-space:nowrap;height:26px;padding:0 8px;border:1px solid var(--board-line);border-radius:3px;font:700 13px/1 'Saira Condensed';letter-spacing:.06em;color:var(--board-muted)">Change team ${chev(10, 2.2)}</span>`],
+];
+document.getElementById("drops").innerHTML = drops.map(([name, note, onRace, onHead]) => `
+  <div class="opt"><b>${name}</b><p>${note}</p>
+    <div class="race">
+      <span class="hd">ACC ${onRace}</span>
+      <span class="t">${logo(MIA)} Miami</span><span class="p">99%</span>
+      <span class="t">${logo(154)} Wake Forest</span><span class="p">62%</span>
+    </div>
+    <div class="head" style="margin-top:8px"><span class="name">${logo(LOU).replace('class="logo"', 'class="logo" style="width:32px;height:32px"')} Louisville</span>${onHead}</div>
+  </div>`).join("");
+</script>
+</body>
+</html>

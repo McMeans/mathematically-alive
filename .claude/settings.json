@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm lint)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm test)",
+      "Bash(.claude/skills/coverage-gate/gate.sh)",
+      "mcp__ccd_pr__get_status"
+    ]
+  }
+}

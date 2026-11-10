@@ -4,7 +4,7 @@ import { ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
 import data from "./data/season.json";
 
 /** A conference team's page (`conference`), or an independent's (`conference` null). */
-export type SimRequest = { id: number; conference: string | null; teamId: number; locks: Record<number, number> };
+export type SimRequest = { id: number; conference: string | null; teamId: number; locks: Record<number, number>; titles?: Record<string, number> };
 export type SimResponse =
   | (Omit<Exploration, "national"> & { id: number; independent: false })
   | (Omit<IndependentExploration, "national"> & { id: number; independent: true });
@@ -18,14 +18,14 @@ setTimeout(() => {
 }, 0);
 
 self.onmessage = (e: MessageEvent<SimRequest>) => {
-  const { id, conference, teamId, locks } = e.data;
+  const { id, conference, teamId, locks, titles } = e.data;
   if (conference === null) {
     const { national, ...r } = exploreIndependent(season, { iterations: ITERATIONS, seed: SEED, teamId, locks, reuse: last });
     last = national;
     self.postMessage({ id, independent: true, ...r } satisfies SimResponse);
     return;
   }
-  const { national, ...r } = explore(season, { conference, iterations: ITERATIONS, seed: SEED, teamId, locks, reuse: last });
+  const { national, ...r } = explore(season, { conference, iterations: ITERATIONS, seed: SEED, teamId, locks, titleLocks: titles, reuse: last });
   last = national ?? last;
   self.postMessage({ id, independent: false, ...r } satisfies SimResponse);
 };

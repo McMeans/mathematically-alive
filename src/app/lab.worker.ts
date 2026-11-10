@@ -1,16 +1,19 @@
 // The Season Lab's simulations and link codec, off the main thread (the codec needs the whole season, which only
 // this worker loads). Each pick runs twice: a quick pass for numbers right away, then the full run. A newer pick
 // skips the full run of an older one.
-import { decodeLabLocks, decodeLocks, encodeLabLocks, fillLabLocks, labChanges, seasonLab, type LabChanges, type LabFill, type LabLocks, type NationalResult, type Season, type SeasonLab } from "@/core";
+import { decodeLabLocks, decodeLocks, encodeLabLocks, fillLabLocks, labChanges, labTeamOdds, seasonLab, type LabChanges, type LabFill, type LabLocks, type LabTeamOdds, type NationalResult, type Season, type SeasonLab } from "@/core";
 import { ITERATIONS, QUICK_ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
 import data from "./data/season.json";
 
-/** What the page shows. `changes`: what the last pick changed, from the quick runs (null before any). */
-export type LabView = Omit<SeasonLab, "national"> & { changes: LabChanges | null };
+/**
+ * What the page shows. `changes`: what the last pick changed, from the quick runs (null before any). `focus`: the
+ * pinned team's odds in this run (null when none is pinned).
+ */
+export type LabView = Omit<SeasonLab, "national"> & { changes: LabChanges | null; focus: LabTeamOdds | null };
 export type LabRequest =
-  | { kind: "run"; id: number; locks: LabLocks }
-  /** A link's picks: the Lab's own (`picks`), or a team page's game picks (`games`). */
-  | { kind: "open"; id: number; picks: string | null; games: string | null }
+  | { kind: "run"; id: number; locks: LabLocks; focus: number | null }
+  /** A link's picks: the Lab's own (`picks`), or a team page's game picks (`games`) and title-game pick (`titles`). */
+  | { kind: "open"; id: number; picks: string | null; games: string | null; titles: Record<string, number> }
   /** Pick every open game: favourites, or one season drawn from a seed. */
   | { kind: "fill"; id: number; locks: LabLocks; how: LabFill }
   /** Back to no picks (the page shows its own no-picks view): the next pick's changes are against no picks. */
@@ -35,9 +38,9 @@ let opened = false;
 function run(locks: LabLocks, iterations: number, reuse: NationalResult | undefined) {
   return seasonLab(season, { ...base, iterations, locks, reuse });
 }
-const strip = (lab: SeasonLab, changes: LabChanges | null): LabView => ({
+const strip = (lab: SeasonLab, changes: LabChanges | null, focus: number | null): LabView => ({
   summary: lab.summary, picks: lab.picks, open: lab.open, playoff: lab.playoff, conferences: lab.conferences,
-  ranking: lab.ranking, bigGames: lab.bigGames, changes,
+  ranking: lab.ranking, bigGames: lab.bigGames, changes, focus: focus === null ? null : labTeamOdds(lab.national, focus),
 });
 
 self.onmessage = async (e: MessageEvent<LabRequest>) => {
@@ -47,7 +50,7 @@ self.onmessage = async (e: MessageEvent<LabRequest>) => {
     if (req.kind === "open") {
       const lab = decodeLabLocks(season, req.picks ?? "");
       const games = decodeLocks(req.games, season.games.filter((g) => !g.completed));
-      const locks = { ...lab.locks, games: { ...lab.locks.games, ...games } };
+      const locks = { ...lab.locks, games: { ...lab.locks.games, ...games }, titles: { ...lab.locks.titles, ...req.titles } };
       opened = true;
       self.postMessage({ kind: "opened", id: req.id, locks, note: lab.note } satisfies LabResponse);
       return;
@@ -68,12 +71,12 @@ self.onmessage = async (e: MessageEvent<LabRequest>) => {
     shown = q;
     const changes = opened ? null : labChanges(season, before, q);
     opened = false;
-    self.postMessage({ kind: "result", id: req.id, final: false, view: strip(q, changes), code } satisfies LabResponse);
+    self.postMessage({ kind: "result", id: req.id, final: false, view: strip(q, changes, req.focus), code } satisfies LabResponse);
     await new Promise((r) => setTimeout(r, 0)); // let a newer pick arrive
     if (req.id !== newest) return;
     const f = run(req.locks, ITERATIONS, full);
     full = f.national;
-    self.postMessage({ kind: "result", id: req.id, final: true, view: strip(f, changes), code } satisfies LabResponse);
+    self.postMessage({ kind: "result", id: req.id, final: true, view: strip(f, changes, req.focus), code } satisfies LabResponse);
   } catch {
     self.postMessage({ kind: "error", id: req.id } satisfies LabResponse);
   }

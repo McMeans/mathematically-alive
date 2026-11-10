@@ -31,9 +31,10 @@ Every change to `src/core` behavior ships with black-box tests in the same chang
 
 ## Brand
 
-Identity direction D (canvas: https://claude.ai/artifact/KL6C75XoRFuUYPqYurETpt). Light-only, white page.
+Design B, the stadium scoreboard (drafts: `docs/redesign/b-scoreboard.html`, `docs/redesign/b-lab.html`). A green board with lit numbers on a light gray ground; light-only.
 
-- Type: Space Grotesk 700 for display (`font-display`), Inter for body and data (`font-sans`).
-- Colors (Tailwind tokens in `src/app/globals.css`): `navy` #14213D (text, the ball), `turf` #1F7A4D (good for your team: helps, a picked win, a win it needs), `marker` #D9622B (brand only: your team in the race, the one main action, the logo; fills only, `marker-text` #B4501F for orange text on white), `mist` #F3F5F8 (cards), `ink-soft` #3A4458 (secondary text), `ink-muted` #5B6478 (labels, captions).
-- One meaning per color: turf green is good for your team; red (`red-600`/`red-700`) bad (hurts, a picked loss); `teal` #0E7490 a loss your team needs from a rival; marker orange the brand; navy everything else, the big odds included. Beta tags, Reset and Undo stay neutral.
-- Mark: a football whose laces form a pulse line. `src/app/Logo.tsx`; below 48px it drops the lace ticks. Favicon is `src/app/icon.svg`; `public/logo.svg` is the standalone file for README, social and external use.
+- Type: Saira Condensed 600–800 for board lettering and every number (`font-display`, the `cond` and `plate` classes), Public Sans for reading (`font-sans`).
+- Colors (Tailwind tokens in `src/app/globals.css`): `board` #133F2E (header, game boards) with `board-deep`/`board-deeper` and `board-line`; `board-text`/`board-muted` for text on it; `plate` #F3F0E6 (the cream plate: current nav item, Share); `lamp` #F2B134 (amber: a pick, the page's team in a race, the cut line, a big game's outline; `lamp-ink` #8A5D00 for amber text on the ground); `root` #5FD08F (a gain in odds on the board: "+5" on the side to root for); `drop` #F0806E (a loss in odds on the board, "−2"); `ground` #E4E7E5 page, `paper` #F6F8F7 rails; `ink` #15201B text, `ink-soft`, `ink-muted`.
+- One meaning per color: amber is what's picked or lit; green is a gain in odds, red a loss; numbers are lit digits on the board, never boxes. Only buttons get an outline; a pick fills amber.
+- Team logos from CollegeFootballData (`logos-dark` on the board, `logos` on light or amber). `TeamLogo` in `src/app/explorer/Board.tsx`.
+- Mark: a football whose laces form a pulse line. `src/app/Logo.tsx` (cream ball, board-green pulse on the board; pass `color`/`pulse` on light grounds); below 48px it drops the lace ticks. Favicon `src/app/icon.svg` and `public/logo.svg` are the board-green ball with a cream pulse.

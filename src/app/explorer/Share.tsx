@@ -24,7 +24,12 @@ function copyByHand(text: string): boolean {
  * link is copied. `small` matches the summary column's Reset; otherwise the pinned bar's, with a shorter label to leave room for
  * the team name. `link` overrides the address shared.
  */
-export function ShareButton({ small = false, className = "", link }: { small?: boolean; className?: string; link?: () => string }) {
+export function ShareButton({ small = false, className = "", link, board = false, label }: {
+  small?: boolean; className?: string; link?: () => string;
+  /** The cream plate on the board header, not the plain button on the ground. */
+  board?: boolean;
+  label?: string;
+}) {
   const [note, setNote] = useState("");
   useEffect(() => {
     if (!note) return;
@@ -47,17 +52,21 @@ export function ShareButton({ small = false, className = "", link }: { small?: b
     }
   }
 
-  const size = small ? "h-8 text-xs" : "min-h-10 text-sm";
+  const look = board
+    ? "cond h-9 rounded-[3px] bg-plate px-4 text-base tracking-[0.05em] text-plate-ink hover:bg-white md:h-[38px]"
+    : `cond ${small ? "h-9" : "min-h-10"} rounded-[3px] border border-rule bg-white px-3 text-[15px] tracking-[0.05em] text-ink hover:border-ink-muted`;
   return (
     <button
       type="button"
       onClick={share}
       title={note || undefined}
-      className={`press flex ${size} shrink-0 animate-rise items-center gap-1.5 rounded-full border border-ink-muted/40 bg-white px-3 font-bold text-navy hover:bg-mist ${className}`}
+      className={`press flex shrink-0 items-center gap-1.5 font-bold ${look} ${className}`}
     >
       {/* The label keeps its width (the phone bar is tight); only the icon shows the result, and screen readers hear it. */}
-      <span aria-hidden className="inline-block w-3 text-center">{note === "Link copied" ? "✓" : note ? "!" : "↗"}</span>
-      <span>{small ? "Share picks" : "Share"}</span>
+      <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        {note === "Link copied" ? <path d="M4.5 10.5l3.5 3.5 7.5-8" /> : note ? <path d="M10 5v6M10 14.5v.5" /> : <><path d="M10 3v10M6 7l4-4 4 4" /><path d="M5 11v4.5A1.5 1.5 0 0 0 6.5 17h7a1.5 1.5 0 0 0 1.5-1.5V11" /></>}
+      </svg>
+      <span>{label ?? (small ? "Share picks" : "Share")}</span>
       <span aria-live="polite" className="sr-only">{note}</span>
     </button>
   );
