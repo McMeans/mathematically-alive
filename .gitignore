@@ -46,9 +46,10 @@ next-env.d.ts
 # Local tool state: personal settings, machine paths, caches
 .claude/settings.local.json
 .claude/launch.json
-.impeccable/config.local.json
-.impeccable/hook.cache.json
-.impeccable/live/
-# Impeccable's prebuilt macOS binaries (17 MB each), kept out of git; installing the skill locally provides them
-.claude/skills/impeccable/scripts/bin/
-.github/skills/impeccable/scripts/bin/
+.impeccable/
+# Impeccable (design skill): installed locally, not vendored into the repo
+.claude/skills/impeccable/
+.github/skills/impeccable/
+.claude/agents/impeccable-*
+.github/agents/impeccable-*
+.github/hooks/impeccable.json

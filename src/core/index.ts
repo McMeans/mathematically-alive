@@ -31,7 +31,7 @@ export { conferenceName, conferenceShort, formatChampion, formatChance, formatFi
 export { explore } from "./explore";
 export { committeeRanks, oneIn } from "./board";
 export type { BestShot, HelpGame as BoardHelpGame, HelpGroup, HelpSide, OwnChance, PlayoffRace, RaceItem, ShotStep, RaceRow, RecordOdds, TeamBoard, TitleWeek, WayIn } from "./board";
-export { decodeLabLocks, encodeLabLocks, fillLabLocks, labCard, labChanges, labOddsChange, labTeamOdds, seasonLab } from "./lab";
+export { decodeLabLocks, decodeTitlePick, encodeLabLocks, fillLabLocks, labCard, labChanges, labOddsChange, labTeamOdds, seasonLab } from "./lab";
 export type { DecodedLabLocks, LabBigGame, LabCard, LabCardSeed, LabChanges, LabConference, LabFill, LabFinal, LabMover, LabLocks, LabOptions, LabRanked, LabStanding, LabTeamOdds, LabTitleMatchup, LabTitleTeam, SeasonLab } from "./lab";
 export type { Exploration } from "./explore";
 export type { KeyGame, OddsLabels, PathOptions, PathStatus, TeamPath } from "./paths";

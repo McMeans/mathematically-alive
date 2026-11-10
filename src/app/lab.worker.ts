@@ -1,7 +1,7 @@
 // The Season Lab's simulations and link codec, off the main thread (the codec needs the whole season, which only
 // this worker loads). Each pick runs twice: a quick pass for numbers right away, then the full run. A newer pick
 // skips the full run of an older one.
-import { decodeLabLocks, decodeLocks, encodeLabLocks, fillLabLocks, labChanges, labTeamOdds, seasonLab, type LabChanges, type LabFill, type LabLocks, type LabTeamOdds, type NationalResult, type Season, type SeasonLab } from "@/core";
+import { decodeLabLocks, decodeLocks, decodeTitlePick, encodeLabLocks, fillLabLocks, labChanges, labTeamOdds, seasonLab, type LabChanges, type LabFill, type LabLocks, type LabTeamOdds, type NationalResult, type Season, type SeasonLab } from "@/core";
 import { ITERATIONS, QUICK_ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
 import data from "./data/season.json";
 
@@ -12,8 +12,8 @@ import data from "./data/season.json";
 export type LabView = Omit<SeasonLab, "national"> & { changes: LabChanges | null; focus: LabTeamOdds | null };
 export type LabRequest =
   | { kind: "run"; id: number; locks: LabLocks; focus: number | null }
-  /** A link's picks: the Lab's own (`picks`), or a team page's game picks (`games`) and title-game pick (`titles`). */
-  | { kind: "open"; id: number; picks: string | null; games: string | null; titles: Record<string, number> }
+  /** A link's picks: the Lab's own (`picks`), or a team page's game picks (`games`) and title-game pick (`title`, `<conference>~<team>`). */
+  | { kind: "open"; id: number; picks: string | null; games: string | null; title: string | null }
   /** Pick every open game: favourites, or one season drawn from a seed. */
   | { kind: "fill"; id: number; locks: LabLocks; how: LabFill }
   /** Back to no picks (the page shows its own no-picks view): the next pick's changes are against no picks. */
@@ -50,7 +50,7 @@ self.onmessage = async (e: MessageEvent<LabRequest>) => {
     if (req.kind === "open") {
       const lab = decodeLabLocks(season, req.picks ?? "");
       const games = decodeLocks(req.games, season.games.filter((g) => !g.completed));
-      const locks = { ...lab.locks, games: { ...lab.locks.games, ...games }, titles: { ...lab.locks.titles, ...req.titles } };
+      const locks = { ...lab.locks, games: { ...lab.locks.games, ...games }, titles: { ...lab.locks.titles, ...decodeTitlePick(season, req.title) } };
       opened = true;
       self.postMessage({ kind: "opened", id: req.id, locks, note: lab.note } satisfies LabResponse);
       return;

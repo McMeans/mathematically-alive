@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { decodeLabLocks, encodeLabLocks, fillLabLocks, seasonFromCfbd, seasonLab, type CfbdSnapshot, type Season } from "@/core";
+import { decodeLabLocks, decodeTitlePick, encodeLabLocks, fillLabLocks, seasonFromCfbd, seasonLab, type CfbdSnapshot, type Season } from "@/core";
 
 // Every FBS game of 2026 through week 9, from fixtures/cfp-2026.json.
 const season = seasonFromCfbd((JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot }).snapshot);
@@ -162,5 +162,26 @@ describe("season lab: picks in a link", () => {
     expect(() => encodeLabLocks(season, { titles: { SEC: -5 } })).toThrow(/team -5 is not in SEC/);
     expect(() => encodeLabLocks(season, { bracket: { 99: g1.homeId } })).toThrow(/bracket game 99/);
     expect(() => encodeLabLocks(season, { bracket: { 0: -5 } })).toThrow(/team -5 isn't in the season/);
+  });
+});
+
+describe("season lab: a team page's title pick in a link", () => {
+  const georgia = sec.teams[0].teamId;
+  const ind = season.teams.find((t) => t.conference === "FBS Independents")!;
+
+  it("a title pick for a team in its conference opens as that pick", () => {
+    expect(decodeTitlePick(season, `SEC~${georgia}`)).toEqual({ SEC: georgia });
+  });
+
+  it("a stale or hand-edited title pick is dropped, so the Lab still runs", () => {
+    for (const bad of ["Nope~5", `SEC~-5`, `Big Ten~${georgia}`, `FBS Independents~${ind.id}`, "SEC", `SEC~${georgia}~1`, "SEC~abc", "", null]) {
+      expect(decodeTitlePick(season, bad)).toEqual({});
+    }
+  });
+
+  it("whatever it keeps encodes into a Lab link without throwing", () => {
+    for (const text of [`SEC~${georgia}`, "Nope~5", `Big Ten~${georgia}`]) {
+      expect(() => encodeLabLocks(season, { titles: decodeTitlePick(season, text) })).not.toThrow();
+    }
   });
 });

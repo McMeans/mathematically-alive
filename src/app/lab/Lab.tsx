@@ -159,16 +159,15 @@ function useLab(initial: LabView) {
     const params = new URLSearchParams(window.location.search);
     const picks = params.get("picks");
     const games = params.get("games");
-    const title = params.get("title")?.split("~");
+    const title = params.get("title"); // checked in the worker: a stale or hand-edited pick is dropped
     const team = Number(params.get("team"));
-    const titles = title && title.length === 2 && Number(title[1]) ? { [title[0]]: Number(title[1]) } : {};
     if (Number.isInteger(team) && team > 0) {
       focusRef.current = team;
       queueMicrotask(() => setFocusState(team));
     }
-    if (picks !== null || games !== null || Object.keys(titles).length > 0) {
+    if (picks !== null || games !== null || title !== null) {
       opening.current = ++latest.current;
-      w.postMessage({ kind: "open", id: opening.current, picks, games, titles } satisfies LabRequest);
+      w.postMessage({ kind: "open", id: opening.current, picks, games, title } satisfies LabRequest);
     }
     return () => { clearTimeout(timer.current); w.terminate(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load: the worker and a shared link's picks

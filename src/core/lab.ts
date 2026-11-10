@@ -490,6 +490,24 @@ export function encodeLabLocks(season: Season, locks: Partial<LabLocks>): string
   return toBase64Url(out);
 }
 
+/** Whether a title pick still fits: its team is in the conference, which has a title game not yet played. */
+function titleFit(season: Season, conference: string | undefined, team: number): "keep" | "settled" | "drop" {
+  if (conference === undefined || season.teams.find((x) => x.id === team)?.conference !== conference) return "drop";
+  try { return titleFinal(season, conference) ? "settled" : "keep"; } catch { return "drop"; } // no title-game rules
+}
+
+/**
+ * A team page's title-game pick in a Lab link, `<conference>~<team id>` (`?title=SEC~61`), as Lab title picks. A
+ * link can be stale or hand-edited, so the pick is kept only when the team is in that conference and its title game
+ * is still to play; anything else gives no pick. Never throws.
+ */
+export function decodeTitlePick(season: Season, text: string | null | undefined): LabLocks["titles"] {
+  const m = /^([^~]+)~([1-9]\d{0,14})$/.exec(text ?? "");
+  if (!m) return {};
+  const team = Number(m[2]);
+  return titleFit(season, m[1], team) === "keep" ? { [m[1]]: team } : {};
+}
+
 export type DecodedLabLocks = {
   locks: LabLocks;
   /** Picks dropped because the real game has since gone final. */
@@ -539,11 +557,9 @@ export function decodeLabLocks(season: Season, text: string): DecodedLabLocks {
     for (let n = get(); n > 0; n--) {
       const c = confs[get()];
       const team = get();
-      const t = season.teams.find((x) => x.id === team);
-      if (c === undefined || t?.conference !== c) { dropped++; continue; }
-      let final: boolean;
-      try { final = titleFinal(season, c); } catch { dropped++; continue; } // no title-game rules
-      if (final) settled++;
+      const fit = titleFit(season, c, team);
+      if (fit === "drop") dropped++;
+      else if (fit === "settled") settled++;
       else locks.titles[c] = team;
     }
     const size = bracketGames(findFormat(season.year)?.teams ?? 12).length;
