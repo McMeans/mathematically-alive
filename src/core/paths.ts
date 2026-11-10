@@ -75,16 +75,36 @@ export function formatTitleOdds(p: number, status: PathStatus): string {
  * 0% in the sample shows as under 0.1%, and 100% only once it's in. A team that's out can show 0%.
  */
 export function formatSideOdds(p: number, status: PathStatus): string {
-  if (p === 0 && status !== "eliminated") return "<0.1%";
-  if (p === 1 && status !== "clinched") return ">99%";
-  return formatFine(p);
+  return shown(sideOdds(p, status));
 }
 
 /** Odds with one decimal under 1%, so long shots can be told apart: "0.4%", "<0.1%"; whole percents otherwise. */
 export function formatFine(p: number): string {
-  if (p > 0 && p < 0.001) return "<0.1%";
-  if (p >= 0.001 && p < 0.0095) return `${(Math.round(p * 1000) / 10).toFixed(1)}%`;
-  return formatOdds(p);
+  return shown(fineOdds(p));
+}
+
+/** Odds as shown, as a number: the percent and the mark before it ("<0.1%" is 0.1 with "<"). */
+type Shown = { pct: number; mark: "<" | ">" | "" };
+const shown = ({ pct, mark }: Shown) => `${mark}${Number.isInteger(pct) ? pct : pct.toFixed(1)}%`;
+
+function fineOdds(p: number): Shown {
+  if (p > 0 && p < 0.001) return { pct: 0.1, mark: "<" };
+  if (p >= 0.001 && p < 0.0095) return { pct: Math.round(p * 1000) / 10, mark: "" };
+  const r = Math.round(p * 100);
+  if (p > 0 && r === 0) return { pct: 1, mark: "<" };
+  if (p < 1 && r === 100) return { pct: 99, mark: ">" };
+  return { pct: r, mark: "" };
+}
+
+function sideOdds(p: number, status: PathStatus): Shown {
+  if (p === 0 && status !== "eliminated") return { pct: 0.1, mark: "<" };
+  if (p === 1 && status !== "clinched") return { pct: 99, mark: ">" };
+  return fineOdds(p);
+}
+
+/** The percent `formatSideOdds` shows, as a number (">99%" is 99), for differences between shown odds. */
+export function shownSideOdds(p: number, status: PathStatus): number {
+  return sideOdds(p, status).pct;
 }
 
 /** A team's record for display: "4-5 (2-4 ACC)", or just "4-5" for an independent or without a conference. */

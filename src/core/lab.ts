@@ -3,7 +3,7 @@
 // the bracket. Picks travel in a URL, so the codec lives here too. All wording comes from here.
 import { simulateNational, titleRace, type NationalResult } from "./national";
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
-import { conferenceName, conferenceShort, formatFine, formatOdds, formatSideOdds } from "./paths";
+import { conferenceName, conferenceShort, formatFine, formatOdds, formatSideOdds, shownSideOdds } from "./paths";
 import { announcedField, bracketGames, findFormat } from "./playoff";
 import type { Game, Season } from "./season";
 import { gameWinProbability, mix, mulberry32 } from "./sim";
@@ -399,8 +399,7 @@ export function labTeamOdds(national: NationalResult, teamId: number): LabTeamOd
  */
 export function labOddsChange(before: number | null, after: number | null): string | null {
   if (before === null || after === null) return null;
-  const shown = (p: number) => Number.parseFloat(formatSideOdds(p, "alive").replace(/[<>%]/g, "")) || 0;
-  const d = Math.round((shown(after) - shown(before)) * 10) / 10;
+  const d = Math.round((shownSideOdds(after, "alive") - shownSideOdds(before, "alive")) * 10) / 10;
   if (d === 0) return null;
   return `${d > 0 ? "+" : "−"}${Math.abs(d)} pts`;
 }

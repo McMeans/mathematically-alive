@@ -35,6 +35,12 @@ describe("season lab: how a pinned team's odds moved", () => {
     expect(labOddsChange(0.004, 0.007)).toBe("+0.3 pts");
   });
 
+  it("reads the edge odds as shown: \">99%\" as 99 and \"<0.1%\" as 0.1", () => {
+    expect(labOddsChange(0.98, 1)).toBe("+1 pts"); // 98% to >99%
+    expect(labOddsChange(0.995, 0.999)).toBeNull(); // >99% both ways
+    expect(labOddsChange(0, 0.004)).toBe("+0.3 pts"); // <0.1% to 0.4%
+  });
+
   it("says nothing when the shown odds are the same or not simulated", () => {
     expect(labOddsChange(0.05, 0.051)).toBeNull();
     expect(labOddsChange(null, 0.2)).toBeNull();

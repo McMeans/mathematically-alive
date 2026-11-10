@@ -296,8 +296,7 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
   // Each game's place in the season, as the simulation's winnerOf takes it.
   const index = new Map(season.games.map((g, i) => [g.id, i]));
   // The best shot's steps: the team's own results, then each rival's, then the rest (favorites winning).
-  const byId = new Map(season.games.map((g) => [g.id, g]));
-  const involves = (gameId: number, id: number) => { const g = byId.get(gameId)!; return g.homeId === id || g.awayId === id; };
+  const involves = (gameId: number, id: number) => { const g = season.games[index.get(gameId)!]; return g.homeId === id || g.awayId === id; };
   const shotGroups: { kind: "step" | "rest"; text: string; detail: string; results: { gameId: number; winner: number }[] }[] = [];
   if (likeliest && likeliest.picks.length > 0) {
     const taken = new Set<number>();
@@ -445,11 +444,10 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
     grp.games.push(x);
     grp.swing += x.swing;
   }
-  const order = new Map(season.games.map((g, i) => [g.id, i]));
   const help: HelpGroup[] = [...groups].sort((a, b) => b[1].swing - a[1].swing).slice(0, MAX_GROUPS).map(([id, grp]) => ({
     teamId: id, team: name(id), title: `Root against ${name(id)}`,
     record: formatRecord(teamRecord(season, id, locks), season.teams.find((t) => t.id === id)?.conference ?? null),
-    games: grp.games.map((x) => x.game).sort((a, b) => order.get(a.gameId)! - order.get(b.gameId)!),
+    games: grp.games.map((x) => x.game).sort((a, b) => index.get(a.gameId)! - index.get(b.gameId)!),
   }));
   const helpNote = help.length === 0
     ? `No game elsewhere moves ${me}’s playoff odds by more than a point.`
