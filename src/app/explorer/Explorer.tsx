@@ -492,9 +492,14 @@ function Loading({ name }: { name?: string }) {
   return (
     // Sticks to the top of the column, so it covers what's on screen however far the column is scrolled.
     <div className="sticky top-0 z-10 -mx-4 -mt-4 h-0 md:-mx-6 md:-mt-6">
-      <div className="flex h-dvh justify-center bg-white/75 pt-24">
-        <div role="status" className="flex h-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-navy shadow">
-          <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-navy/25 border-t-navy" />
+      <div className="flex h-dvh justify-center bg-ground/75 pt-24">
+        {/* A small board: three lamps light in turn, then the team's name in board lettering. */}
+        <div role="status" className="board-dots cond flex h-fit items-center gap-3 rounded px-4 py-2.5 text-[15px] font-bold tracking-wide text-board-text shadow-lg">
+          <span aria-hidden className="chase flex gap-1.5">
+            <span />
+            <span />
+            <span />
+          </span>
           {name ? `Loading ${name}…` : <span className="sr-only">Loading</span>}
         </div>
       </div>
