@@ -1,6 +1,7 @@
 // Season Lab (docs/plan-season-lab.md): play out the rest of the season with picks for any regular-season game,
 // conference title game or playoff game, and see every conference's title race, the stand-in ranking, the field and
 // the bracket. Picks travel in a URL, so the codec lives here too. All wording comes from here.
+import { liveRanking, type LiveRanked } from "./live";
 import { simulateNational, titleRace, type NationalResult } from "./national";
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { conferenceName, conferenceShort, formatFine, formatOdds, formatSideOdds, shownChange } from "./paths";
@@ -142,6 +143,11 @@ export type SeasonLab = {
   /** The committee stand-in's ranking by average place, best first. Modelled, not the committee. */
   ranking: LabRanked[];
   /**
+   * The live ranking (live.ts): the committee's latest, moved only by the results since it and these picks (game
+   * picks, and title picks as champions). Its top 25 (or `top`), best first.
+   */
+  live: LiveRanked[];
+  /**
    * The open games that move the field most, biggest first: up to 15, each swinging at least 0.1 spots, among games
    * neither side wins more than 90% of the time (a long shot's swing is mostly noise). Empty with no playoff.
    */
@@ -206,8 +212,10 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     .sort((a, b) => b.spots - a.spots || a.gameId - b.gameId)
     .slice(0, 15)
     .map((g) => ({ gameId: g.gameId, spots: g.spots, text: `Swings about ${g.spots.toFixed(1)} ${g.spots.toFixed(1) === "1.0" ? "spot" : "spots"} in the field` }));
+  const live = liveRanking(season, { locks: locks.games, champions: Object.values(locks.titles) }).teams.slice(0, opts.top ?? 25);
   return {
     national,
+    live,
     picks,
     open,
     summary: `${picks === 0 ? "No picks yet" : picks === 1 ? "1 pick" : `${picks} picks`}${open === 0 && picks > 0 ? " · every game picked" : ""} · ${seasons}`,

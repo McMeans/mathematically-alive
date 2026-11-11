@@ -39,8 +39,6 @@ type Props = {
   paged: number[];
   /** Each team with a page: its odds with no picks. */
   baseOdds: Record<number, LabTeamOdds>;
-  /** The latest committee ranking by team: "#16". */
-  ranks: Record<number, string>;
   through: string;
   asOf: string;
 };
@@ -261,13 +259,15 @@ type FieldView = "seeds" | "bracket" | "top25";
 
 const PIN_ICON = <svg viewBox="0 0 16 16" aria-hidden className="h-3.5 w-3.5"><path d="M6 1.5h4l-.6 4.2 2.6 2.6v1.2H8.6V15H7.4V9.5H4V8.3l2.6-2.6z" fill="currentColor" /></svg>;
 
-export function Lab({ initial, games, names, abbrs, teams, paged, baseOdds, ranks, through, asOf }: Props) {
+export function Lab({ initial, games, names, abbrs, teams, paged, baseOdds, through, asOf }: Props) {
   const { locks, view, status, refining, note, focus, canUndo, pickGame, pickTitle, pickBracket, bracketPicks, fill, undo, pin, reset, resetBracket } = useLab(initial);
   const [tab, setTab] = useState<Tab>("field");
   const [fieldView, setFieldView] = useState<FieldView>("seeds");
   const [lastPinned, setLastPinned] = useState<number | null>(null);
   const pagedSet = useMemo(() => new Set(paged), [paged]);
   const name = (id: number) => names[id] ?? `Team ${id}`;
+  // Ranks by name: the live ranking's top 25 (the committee's latest, moved by the picks); none before its first ranking.
+  const ranks = useMemo(() => (view.live.some((t) => t.committeeRank !== null) ? Object.fromEntries(view.live.map((t) => [t.teamId, `#${t.rank}`])) : {}), [view.live]);
   const picks = count(locks);
   const before = focus !== null ? baseOdds[focus] ?? null : null;
   const now = focus === null ? null : picks === 0 ? before : view.focus?.teamId === focus ? view.focus : before;
@@ -485,9 +485,13 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
       {fieldView === "bracket" && p && <Bracket games={p.bracket} picked={picked} abbr={abbr} name={name} onPick={onPick} onReset={onResetBracket} />}
       {fieldView === "top25" && (
         <>
-          <p className="mb-2 text-[13px] text-ink-muted">Projected final ranking. Amber numbers are in the field.</p>
+          <p className="mb-2 text-[13px] text-ink-muted">The committee&rsquo;s latest ranking, moved only by results since and your picks. Arrows show the move. Amber numbers are in the field.</p>
           <div className="rounded bg-board-deep py-1.5">
-            {view.ranking.map((r) => <FieldRow key={r.teamId} seed={r.rank} lit={inField.has(r.teamId)} id={r.teamId} rank={ranks[r.teamId]} name={name(r.teamId)} odds="" me={r.teamId === focus} />)}
+            {view.live.map((r) => (
+              <FieldRow key={r.teamId} seed={r.rank} lit={inField.has(r.teamId)} id={r.teamId} name={name(r.teamId)} me={r.teamId === focus}
+                odds={r.change > 0 ? `▲${r.change}` : r.change < 0 ? `▼${-r.change}` : ""} tone={r.change > 0 ? "text-root" : "text-drop"}
+                tag={r.committeeRank === null ? "Unranked" : undefined} />
+            ))}
           </div>
         </>
       )}
@@ -496,7 +500,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
   );
 }
 
-function FieldRow({ seed, lit, id, rank, name, odds, me, tag }: { seed?: number; lit?: boolean; id: number; rank?: string; name: string; odds: string; me?: boolean; tag?: string }) {
+function FieldRow({ seed, lit, id, rank, name, odds, me, tag, tone }: { seed?: number; lit?: boolean; id: number; rank?: string; name: string; odds: string; me?: boolean; tag?: string; tone?: string }) {
   return (
     <div className={`grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2.5 px-3.5 py-1.5 ${me ? "bg-lamp/10" : ""}`}>
       <span className={`plate text-center text-[22px] ${lit ? "text-lamp" : "text-board-muted"}`}>{seed ?? ""}</span>
@@ -504,7 +508,7 @@ function FieldRow({ seed, lit, id, rank, name, odds, me, tag }: { seed?: number;
         <TeamLogo id={id} /> <span className="truncate">{rank && <span className="mr-1 text-[0.74em] font-bold text-board-muted">{rank}</span>}{name}</span>
         {tag && <i className="ml-1 font-sans text-[11px] font-semibold not-italic tracking-[0.06em] text-lamp">{tag}</i>}
       </span>
-      <span className={`plate text-[22px] ${me ? "text-lamp" : "text-white"}`}>{odds}</span>
+      <span className={`plate text-[22px] ${tone ?? (me ? "text-lamp" : "text-white")}`}>{odds}</span>
     </div>
   );
 }

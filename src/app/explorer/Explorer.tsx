@@ -69,12 +69,14 @@ export const pct = (p: number | null) => (p === null ? "—" : formatOdds(p));
  * Picks and the what-if worker. `conference` null: an independent's page. `read` takes the worker's answer for this
  * kind of page (null for the other kind, which can't happen).
  */
-function useWhatIf<R>(initial: R, conference: string | null, teamId: number, openGames: OpenGame[], read: (r: SimResponse) => R | null,
+function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conference: string | null, teamId: number, openGames: OpenGame[], read: (r: SimResponse) => R | null,
   /** Checks a new result against the title picks: returns the title picks to keep when some no longer stand, else null. */
   check?: (r: R, titles: Titles) => Titles | null) {
   const [locks, setLocks] = useState<Locks>({});
   const [titles, setTitles] = useState<Titles>({});
   const [result, setResult] = useState<R>(initial);
+  // Ranks by name: the committee's latest with no picks, then moved by the picks (the worker's live ranking).
+  const [ranks, setRanks] = useState(initialRanks);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const worker = useRef<Worker | null>(null);
@@ -90,6 +92,7 @@ function useWhatIf<R>(initial: R, conference: string | null, teamId: number, ope
       const r = reader.current(e.data);
       if (r !== null) {
         setResult(r);
+        setRanks(e.data.ranks);
         const keep = checker.current?.(r, latestPicks.current.titles);
         if (keep) {
           update(latestPicks.current.locks, keep);
@@ -130,6 +133,7 @@ function useWhatIf<R>(initial: R, conference: string | null, teamId: number, ope
     if (Object.keys(next).length === 0 && Object.keys(nextTitles).length === 0) {
       latest.current++; // drop any pending result
       setResult(initial);
+      setRanks(initialRanks);
       setBusy(false);
       setFailed(false);
       return;
@@ -154,7 +158,7 @@ function useWhatIf<R>(initial: R, conference: string | null, teamId: number, ope
     else next[conf] = winner;
     update(locks, next);
   }
-  return { locks, titles, result, busy, failed, status, update, pick, pickTitle };
+  return { locks, titles, result, ranks, busy, failed, status, update, pick, pickTitle };
 }
 
 /** Every pick on the page, worded for the rail. Ids: "g<game id>" for a game, "t<conference>" for a title game. */
@@ -214,7 +218,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
   // A title-game pick stands while its matchup is the same two teams (in either order); then it clears, with a note.
   const titleKey = useRef<string | null>(null);
   const [note, setNote] = useState("");
-  const { locks, titles, result, busy, failed, status, update, pick, pickTitle } = useWhatIf<Result>(initial, conference, teamId, common.openGames, (r) =>
+  const { locks, titles, result, ranks, busy, failed, status, update, pick, pickTitle } = useWhatIf<Result>(initial, common.ranks, conference, teamId, common.openGames, (r) =>
     r.independent ? null : { outlook: r.outlook, path: r.path, tree: r.tree, playoffGames: r.playoffGames, board: r.board },
   (r, t) => {
     if (t[conference] === undefined) return null;
@@ -272,6 +276,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
   return (
     <Frame
       {...common}
+      ranks={ranks}
       record={formatRecord(me.record, conference)}
       tags={statusTags(me, `${conferenceShort(conference)} title game`)}
       picks={picks.length}
@@ -314,7 +319,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
 /** An FBS independent's page: no conference, so no title game; its own games and the playoff. */
 export function IndependentExplorer({ initial, ...common }: Common & { initial: IndependentResult }) {
   const { teamId, teams, names } = common;
-  const { locks, result, busy, failed, status, update, pick } = useWhatIf<IndependentResult>(initial, null, teamId, common.openGames, (r) =>
+  const { locks, result, ranks, busy, failed, status, update, pick } = useWhatIf<IndependentResult>(initial, common.ranks, null, teamId, common.openGames, (r) =>
     r.independent ? { outlook: r.outlook, games: r.games, playoffGames: r.playoffGames, board: r.board } : null);
   const me = result.outlook.find((o) => o.teamId === teamId)!;
   const team = teams.find((t) => t.id === teamId)!;
@@ -328,6 +333,7 @@ export function IndependentExplorer({ initial, ...common }: Common & { initial: 
   return (
     <Frame
       {...common}
+      ranks={ranks}
       record={formatRecord(me.record, common.conference)}
       tags={statusTags(me, null)}
       picks={picks.length}

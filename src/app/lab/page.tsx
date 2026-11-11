@@ -1,7 +1,7 @@
 // Season Lab: pick any game left, or a playoff game, and see the field, bracket and ranking follow. The no-picks
 // view is built at build time; picks run in the Lab worker.
 import type { Metadata } from "next";
-import { committeeRanks, conferenceShort, formatOdds, gameWinProbability, labTeamOdds } from "@/core";
+import { conferenceShort, formatOdds, gameWinProbability, labTeamOdds } from "@/core";
 import { asOf, baseLab, season, supportedTeams, through } from "@/app/season";
 import { Lab, type LabGame } from "./Lab";
 
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 // The national run stays on the server: it is large and the page only shows what the Lab words.
-const initial = { summary: baseLab.summary, picks: baseLab.picks, open: baseLab.open, bigGames: baseLab.bigGames, playoff: baseLab.playoff, conferences: baseLab.conferences, ranking: baseLab.ranking, changes: null, focus: null };
+const initial = { summary: baseLab.summary, picks: baseLab.picks, open: baseLab.open, bigGames: baseLab.bigGames, playoff: baseLab.playoff, conferences: baseLab.conferences, ranking: baseLab.ranking, live: baseLab.live, changes: null, focus: null };
 const names = Object.fromEntries(season.teams.map((t) => [t.id, t.name]));
 /** Short names where space is tight (phones): the abbreviation, else the first four letters. */
 const abbrs = Object.fromEntries(season.teams.map((t) => [t.id, t.abbreviation ?? t.name.slice(0, 4).toUpperCase()]));
@@ -48,5 +48,5 @@ const games: LabGame[] = season.games
 
 export default function LabPage() {
   const teams = supportedTeams.map((t) => ({ id: t.id, name: t.name })).sort((a, b) => a.name.localeCompare(b.name));
-  return <Lab initial={initial} games={games} names={names} abbrs={abbrs} teams={teams} paged={supportedTeams.map((t) => t.id)} baseOdds={baseOdds} ranks={committeeRanks(season)} through={through} asOf={asOf} />;
+  return <Lab initial={initial} games={games} names={names} abbrs={abbrs} teams={teams} paged={supportedTeams.map((t) => t.id)} baseOdds={baseOdds} through={through} asOf={asOf} />;
 }

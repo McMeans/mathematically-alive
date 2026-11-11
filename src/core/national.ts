@@ -11,6 +11,7 @@
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { powerConferences, teamRating, titleGameIndex, type CommitteeFeatures } from "./committee";
 import { announcedField, bracketGames, championsNeeded, fieldPicker, findFormat, playoffRun, type AnnouncedField, type PlayoffRun } from "./playoff";
+import { ANCHORED_NOISE, liveModel, resultPoints } from "./live";
 import { isArmyNavy, type Game, type Season } from "./season";
 import { HOME_FIELD } from "./odds";
 import { COMMITTEE_SALT, PLAYOFF_SALT, mix, neutralOdds, simulateSeason, tiebreakDraw, titleRoll, type SimResult } from "./sim";
@@ -276,6 +277,24 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
     if (h >= 0) { oppSum[h] += teamRating(byId.get(g.awayId)); oppCount[h]++; }
     if (a >= 0) { oppSum[a] += teamRating(byId.get(g.homeId)); oppCount[a]++; }
   });
+  // Stage 3 starts from the committee's latest ranking when there is one (live.ts): each team's fixed offset puts the
+  // teams in its order on the results it saw, and results since then move ratings (`moved`, by season.teams index),
+  // which count in the team's own rating and in its opponents' strength of schedule.
+  const live = liveModel(season);
+  const anchored = live.release !== null;
+  const allIndex = new Map<number, number>(season.teams.map((t, j) => [t.id, j]));
+  const allOf = Int32Array.from(fbsIds, (id) => allIndex.get(id)!);
+  const moved = new Float64Array(season.teams.length);
+  const opps: number[][] = fbs.map(() => []);
+  const playedBy: number[][] = season.teams.map(() => []);
+  games.forEach((g, i) => {
+    const h = home[i];
+    const a = away[i];
+    if (h >= 0) { opps[h].push(allIndex.get(g.awayId)!); playedBy[allIndex.get(g.awayId)!].push(h); }
+    if (a >= 0) { opps[a].push(allIndex.get(g.homeId)!); playedBy[allIndex.get(g.homeId)!].push(a); }
+  });
+  // Games whose results move ratings: every counted game the ranking didn't see.
+  const fresh = Int32Array.from(anchored ? games.flatMap((_, i) => (live.counts[i] && !live.seen[i] ? [i] : [])) : []);
   const baseW = new Int32Array(F);
   const baseL = new Int32Array(F);
   games.forEach((g, i) => {
@@ -336,7 +355,14 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const raceOf = (id: number): number => races.findIndex((r) => r.data.ids.has(id));
   const gumbel = new Float64Array(F);
   // committeeScore, inlined: this runs for every FBS team in every simulated season.
-  const scoreOf = (k: number, shift: (id: number) => number): number =>
+  const anchoredScore = (k: number): number => {
+    let om = 0;
+    for (const j of opps[k]) om += moved[j];
+    const n = oppCount[k] + titleN[k];
+    return live.offset[k] + W.wins * w[k] + W.losses * l[k] + W.rating * (rating[k] + moved[allOf[k]]) +
+      W.strength * (n === 0 ? 0 : (oppSum[k] + om + titleSos[k]) / n) + W.champion * champ[k] + ANCHORED_NOISE * gumbel[k];
+  };
+  const scoreOf = (k: number, shift: (id: number) => number): number => anchored ? anchoredScore(k) :
     W.wins * w[k] + W.losses * l[k] + W.rating * (rating[k] + shift(fbsIds[k])) +
     W.strength * (oppCount[k] + titleN[k] === 0 ? 0 : (oppSum[k] + titleSos[k]) / (oppCount[k] + titleN[k])) + W.champion * champ[k] + gumbel[k];
   // Insertion sort, best first (ties to the lower team id): about twice as fast as a comparator sort at this size,
@@ -384,6 +410,17 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
     titleSos.fill(0);
     titleN.fill(0);
     champ.fill(0);
+    if (anchored) {
+      moved.fill(0);
+      for (let j = 0; j < fresh.length; j++) {
+        const i = fresh[j];
+        const g = games[i];
+        const homeWon = winnerAt(i) === g.homeId;
+        const pts = resultPoints(live.home[i], homeWon);
+        moved[allIndex.get(homeWon ? g.homeId : g.awayId)!] += pts;
+        moved[allIndex.get(homeWon ? g.awayId : g.homeId)!] -= pts;
+      }
+    }
 
     // Stage 2.
     for (let c = 0; c < C; c++) {
@@ -461,6 +498,18 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       }
       swap(wi, -1, 1);
       swap(oi, 1, -1);
+      // The flipped result moves both teams' ratings the other way, and with them their opponents' schedules.
+      const flipMoved = anchored && live.counts[o.i] && !live.seen[o.i];
+      const before = flipMoved ? resultPoints(live.home[o.i], was === g.homeId) : 0;
+      const after = flipMoved ? resultPoints(live.home[o.i], other === g.homeId) : 0;
+      const wa = allIndex.get(was)!;
+      const oa = allIndex.get(other)!;
+      if (flipMoved) {
+        moved[wa] -= before + after;
+        moved[oa] += before + after;
+        for (const k of playedBy[wa]) changed.push(fbsIds[k]);
+        for (const k of playedBy[oa]) changed.push(fbsIds[k]);
+      }
       const replayed = touched.map((c) => {
         const r = playTitleGame(races[c], seed, it, flipped, (id) => teams.rankIf(id, o.i), teams.shift, titleLocks[races[c].conference]);
         creditTitle(c, r[0], r[1], r[2]);
@@ -479,6 +528,10 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       touched.forEach((c, j) => uncredit(c, replayed[j][0], replayed[j][1], replayed[j][2]));
       swap(wi, 1, -1);
       swap(oi, -1, 1);
+      if (flipMoved) {
+        moved[wa] += before + after;
+        moved[oa] -= before + after;
+      }
       for (const c of touched) {
         const at = (it * C + c) * 3;
         creditTitle(c, titles[at], titles[at + 1], titles[at + 2]);
