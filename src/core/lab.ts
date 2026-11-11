@@ -2,11 +2,12 @@
 // conference title game or playoff game, and see every conference's title race, the stand-in ranking, the field and
 // the bracket. Picks travel in a URL, so the codec lives here too. All wording comes from here.
 import { liveRanking, type LiveRanked } from "./live";
+import { projectedField } from "./projected";
 import { simulateNational, titleRace, type NationalResult } from "./national";
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { conferenceName, conferenceShort, formatFine, formatOdds, formatSideOdds, shownChange } from "./paths";
 import { announcedField, bracketGames, findFormat } from "./playoff";
-import { INDEPENDENTS, type Game, type Season } from "./season";
+import { type Game, type Season } from "./season";
 import { gameWinProbability, mix, mulberry32, neutralOdds } from "./sim";
 import { pairKey } from "./steps";
 import { conferenceData, decidedTitleGame } from "./tiebreak";
@@ -143,8 +144,8 @@ export type SeasonLab = {
   /** The committee stand-in's ranking by average place, best first. Modelled, not the committee. */
   ranking: LabRanked[];
   /**
-   * The live ranking (live.ts): the committee's latest, moved only by the results since it and these picks (game
-   * picks, and title picks as champions). Its top 25 (or `top`), best first.
+   * The projected final ranking (projected.ts): every game played out over the simulated seasons, the picks kept.
+   * Its top 25 (or `top`), best first; `change` is the move from the current ranking (real results only, no picks).
    */
   live: LiveRanked[];
   /**
@@ -212,13 +213,17 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     .sort((a, b) => b.spots - a.spots || a.gameId - b.gameId)
     .slice(0, 15)
     .map((g) => ({ gameId: g.gameId, spots: g.spots, text: `Swings about ${g.spots.toFixed(1)} ${g.spots.toFixed(1) === "1.0" ? "spot" : "spots"} in the field` }));
-  const liveAll = liveRanking(season, { locks: locks.games, champions: Object.values(locks.titles) }).teams;
-  const live = liveAll.slice(0, opts.top ?? 25);
-  // The projected field is seeded from the live ranking. Champions: each conference's picked one, else its highest-ranked team.
-  const order = liveAll.map((t) => t.teamId);
-  const conferenceOf = new Map(season.teams.map((t) => [t.id, t.conference]));
-  const champions = [...new Set(season.teams.flatMap((t) => (t.classification === "fbs" && t.conference && t.conference !== INDEPENDENTS ? [t.conference] : [])))]
-    .flatMap((c) => locks.titles[c] ?? order.find((id) => conferenceOf.get(id) === c) ?? []);
+  // The projected ranking and field (projected.ts): the same the team view's race card shows. The top 25's moves
+  // are against where each team stands now (the live ranking on real results only, no picks).
+  const projected = projectedField(season, national);
+  const now = liveRanking(season).teams;
+  const nowPlace = new Map(now.map((t) => [t.teamId, t]));
+  const live: LiveRanked[] = projected.order.slice(0, opts.top ?? 25).map((teamId, k) => {
+    const cur = nowPlace.get(teamId)!;
+    return { teamId, rank: k + 1, committeeRank: cur.committeeRank, change: cur.rank - (k + 1) };
+  });
+  const order = projected.order;
+  const champions = [...projected.champions.keys()];
   return {
     national,
     live,

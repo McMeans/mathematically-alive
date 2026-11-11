@@ -2,7 +2,7 @@
 // The Season Lab, design B: the stadium board. Header with what the last pick changed; the playoff field, the games
 // left and the conference races side by side (tabs on phones); a pinned team followed as you pick.
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { conferenceShort, encodeLocks, labOddsChange, type BracketGame, type BracketSide, type LabConference, type LabFill, type LabLocks, type LabTeamOdds } from "@/core";
 import type { LabRequest, LabResponse, LabView } from "@/app/lab.worker";
 import { ShareButton } from "@/app/explorer/Share";
@@ -37,6 +37,8 @@ type Props = {
   /** Teams with a page, by name. */
   teams: { id: number; name: string }[];
   paged: number[];
+  /** The current ranking's top 25 by team ("#16"): the committee's latest, moved only by real results. Picks never change it. */
+  ranks: Record<number, string>;
   /** Each team with a page: its odds with no picks. */
   baseOdds: Record<number, LabTeamOdds>;
   through: string;
@@ -259,15 +261,15 @@ type FieldView = "seeds" | "bracket" | "top25";
 
 const PIN_ICON = <svg viewBox="0 0 16 16" aria-hidden className="h-3.5 w-3.5"><path d="M6 1.5h4l-.6 4.2 2.6 2.6v1.2H8.6V15H7.4V9.5H4V8.3l2.6-2.6z" fill="currentColor" /></svg>;
 
-export function Lab({ initial, games, names, abbrs, teams, paged, baseOdds, through, asOf }: Props) {
+export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdds, through, asOf }: Props) {
   const { locks, view, status, refining, note, focus, canUndo, pickGame, pickTitle, pickBracket, bracketPicks, fill, undo, pin, reset, resetBracket } = useLab(initial);
   const [tab, setTab] = useState<Tab>("field");
   const [fieldView, setFieldView] = useState<FieldView>("seeds");
   const [lastPinned, setLastPinned] = useState<number | null>(null);
   const pagedSet = useMemo(() => new Set(paged), [paged]);
   const name = (id: number) => names[id] ?? `Team ${id}`;
-  // Ranks by name: the live ranking's top 25 (the committee's latest, moved by the picks); none before its first ranking.
-  const ranks = useMemo(() => (view.live.some((t) => t.committeeRank !== null) ? Object.fromEntries(view.live.map((t) => [t.teamId, `#${t.rank}`])) : {}), [view.live]);
+  // Each team's seed in the projected field, shown by its name in the games and races. "#N" is the current rank (`ranks`).
+  const seeds = useMemo(() => new Map((view.playoff?.field ?? []).map((s) => [s.teamId, s.seed])), [view.playoff]);
   const picks = count(locks);
   const before = focus !== null ? baseOdds[focus] ?? null : null;
   const now = focus === null ? null : picks === 0 ? before : view.focus?.teamId === focus ? view.focus : before;
@@ -334,12 +336,16 @@ export function Lab({ initial, games, names, abbrs, teams, paged, baseOdds, thro
             picked={bracketPicks} onPick={(g, w) => view.playoff && pickBracket(view.playoff.bracket, g, w)} onResetBracket={resetBracket} />
         </section>
         <section aria-labelledby="games-h" className={`scroll-thin p-3.5 pb-10 md:p-5 lg:block lg:overflow-y-auto ${tab === "games" ? "" : "hidden"}`}>
+          <MarksContext.Provider value={{ ranks, seeds }}>
           <Games games={games} picked={locks.games} titles={locks.titles} conferences={view.conferences} name={name} abbr={(id) => abbrs[id] ?? name(id)}
             onPick={pickGame} onTitle={pickTitle} open={view.open} onFill={fill} big={view.bigGames} focus={focus} focusConference={focusConference}
             onPin={lastPinned !== null && focus === null ? () => pin(lastPinned) : null} pinName={lastPinned !== null ? name(lastPinned) : ""} teams={teams} />
+          </MarksContext.Provider>
         </section>
         <section aria-labelledby="races-h" className={`scroll-thin bg-paper p-3.5 pb-10 md:p-5 lg:block lg:overflow-y-auto lg:border-l lg:border-rule ${tab === "races" ? "" : "hidden"}`}>
-          <Races conferences={view.conferences} name={name} paged={pagedSet} focus={focus} />
+          <MarksContext.Provider value={{ ranks, seeds }}>
+            <Races conferences={view.conferences} name={name} paged={pagedSet} focus={focus} />
+          </MarksContext.Provider>
         </section>
       </div>
 
@@ -485,7 +491,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
       {fieldView === "bracket" && p && <Bracket games={p.bracket} picked={picked} abbr={abbr} name={name} onPick={onPick} onReset={onResetBracket} />}
       {fieldView === "top25" && (
         <>
-          <p className="mb-2 text-[13px] text-ink-muted">The committee&rsquo;s latest ranking, moved only by results since and your picks. Arrows show the move. Amber numbers are in the field.</p>
+          <p className="mb-2 text-[13px] text-ink-muted">Projected final ranking: every game played out, your picks kept. Arrows show the move from the current ranking. Amber numbers are in the field.</p>
           <div className="rounded bg-board-deep py-1.5">
             {view.live.map((r) => (
               <FieldRow key={r.teamId} seed={r.rank} lit={inField.has(r.teamId)} id={r.teamId} name={name(r.teamId)} me={r.teamId === focus}
@@ -701,6 +707,7 @@ function Games({ games, picked, titles, conferences, name, abbr, onPick, onTitle
       </div>
       {scope === "all" && !pinned && <p className="mt-2 flex items-center gap-2 text-[13px] text-ink-muted"><span className="h-3.5 w-[18px] rounded-[3px] border-2 border-lamp" />Amber outline: a big game, one that moves the field most</p>}
       {pinned && <p className="mt-2 text-[13px] text-ink-muted">{name(focus!)}&rsquo;s games left, and its conference title game.</p>}
+      <p className="mt-2 text-[13px] text-ink-muted">#: current rank, which your picks don&rsquo;t change. S: seed in the projected field, which they do.</p>
       {shown.length === 0 && finals.length === 0 && <p className="mt-3 text-sm text-ink-muted">{scope === "big" && bigCount === 0 ? "No open game moves the field much." : "No games left for this filter."}</p>}
       {[...weeks].map(([week, w]) => (
         <div key={week}>
@@ -761,6 +768,22 @@ function Chip({ on, lamp, onClick, children }: { on: boolean; lamp?: boolean; on
   );
 }
 
+/** The current rank and projected seed by team, for the games and races. */
+const MarksContext = createContext<{ ranks: Record<number, string>; seeds: Map<number, number> }>({ ranks: {}, seeds: new Map() });
+
+/** The team's current rank before its name ("#16"), when it has one. Picks never change it. */
+function Rank({ id }: { id: number }) {
+  const rank = useContext(MarksContext).ranks[id];
+  return rank ? <span className="mr-1 text-[0.74em] font-bold opacity-70">{rank}</span> : null;
+}
+
+/** The team's seed in the projected field, after its name ("S6"), when it's in. */
+function Seed({ id, on }: { id: number; on?: boolean }) {
+  const seed = useContext(MarksContext).seeds.get(id);
+  if (seed === undefined) return null;
+  return <span title={`Seed ${seed} in the projected field`} className={`shrink-0 text-[12px] font-bold tracking-[0.04em] ${on ? "text-plate-ink/80" : "text-lamp"}`}><span aria-hidden>S{seed}</span><span className="sr-only">seed {seed}</span></span>;
+}
+
 /** One side of a game: the team and its odds; picked fills amber and shows the pick mark; the beaten side fades. */
 function TeamButton({ id, name, abbr, odds, home, on, lost, onClick }: { id: number; name: string; abbr: string; odds: string; home: boolean; on: boolean; lost: boolean; onClick: () => void }) {
   return (
@@ -769,8 +792,9 @@ function TeamButton({ id, name, abbr, odds, home, on, lost, onClick }: { id: num
         on ? "border-lamp bg-lamp text-plate-ink" : `border-board-line bg-white/[0.04] text-white hover:border-board-muted [.big_&]:border-2 [.big_&]:border-lamp ${lost ? "opacity-40" : ""}`}`}>
       <b className={`cond flex min-w-0 items-center gap-1.5 text-base font-bold md:text-lg ${home ? "flex-row-reverse" : ""} ${lost ? "line-through" : ""}`}>
         <TeamLogo id={id} dark={!on} />
-        <span className="truncate md:hidden">{abbr}</span>
-        <span className="hidden truncate md:inline">{name}</span>
+        <span className="truncate md:hidden"><Rank id={id} />{abbr}</span>
+        <span className="hidden truncate md:inline"><Rank id={id} />{name}</span>
+        <Seed id={id} on={on} />
       </b>
       {on ? <span className="shrink-0 text-[19px] text-plate-ink md:text-[21px]"><PickMark /></span>
         : <span className="plate shrink-0 text-[15px] text-board-muted md:text-[17px]">{odds}</span>}
@@ -784,7 +808,7 @@ function Races({ conferences, name, paged, focus }: { conferences: LabConference
   return (
     <>
       <PaneHeading id="races-h">Conference races</PaneHeading>
-      <p className="-mt-1 mb-3 text-[13px] text-ink-muted">Title-game odds. Tap for standings.</p>
+      <p className="-mt-1 mb-3 text-[13px] text-ink-muted">Title-game odds. Tap for standings. #: current rank. S: projected seed.</p>
       <div className="flex flex-col gap-2">
         {conferences.map((c) => {
           const isOpen = open.has(c.conference);
@@ -804,7 +828,8 @@ function Races({ conferences, name, paged, focus }: { conferences: LabConference
                 </span>
                 {[...lead, ...extra].map((t, k) => (
                   <span key={t.teamId} className="contents">
-                    <span className={`cond flex min-w-0 items-center gap-1.5 truncate text-[17px] font-bold ${t.teamId === focus ? "text-lamp" : k === 0 ? "text-white" : "text-board-text"}`}><TeamLogo id={t.teamId} /> <span className="truncate">{name(t.teamId)}</span>
+                    <span className={`cond flex min-w-0 items-center gap-1.5 truncate text-[17px] font-bold ${t.teamId === focus ? "text-lamp" : k === 0 ? "text-white" : "text-board-text"}`}><TeamLogo id={t.teamId} /> <span className="truncate"><Rank id={t.teamId} />{name(t.teamId)}</span>
+                      <Seed id={t.teamId} />
                       {t.teamId === c.picked && <span className="shrink-0 text-[15px] text-lamp"><PickMark /></span>}</span>
                     <span className={`plate text-right text-[17px] ${t.teamId === focus ? "text-lamp" : k === 0 ? "text-white" : "text-board-text"}`}>{pct(t.titleGame)}</span>
                   </span>

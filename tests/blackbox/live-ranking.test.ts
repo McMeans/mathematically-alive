@@ -48,9 +48,9 @@ describe("live ranking", () => {
     expect(ids(played)).toEqual(ids(league, { locks: { 32: D } }));
   });
 
-  it("a loss by a team it beat drops a team a little, below one level with it", () => {
-    // Ash and Birch are even (each beat a team now 0-1); Cedar, the team Ash beat, losing again costs Ash the tie.
-    expect(ids(league, { locks: { 31: F } }).slice(0, 2)).toEqual([B, A]);
+  it("a result in a game its team isn't in leaves a team where it was", () => {
+    // Cedar, the team Ash beat, losing again doesn't cost Ash its place: the committee ranks on a team's own results.
+    expect(ids(league, { locks: { 31: F } }).slice(0, 2)).toEqual([A, B]);
   });
 
   it("a pick that names neither team in the game moves nothing", () => {
@@ -118,18 +118,24 @@ describe("live ranking on a real season", () => {
     expect(focus.fieldIfLose).toBeCloseTo(field({ [next.id]: loses }), 10);
   });
 
-  it("the Season Lab lists the live ranking's top 25: the committee's with no picks, moved by a pick", () => {
+  it("the Season Lab's top 25 is the projected final ranking, each move measured from the current ranking", () => {
     const opts = { iterations: 50, seed: 3, conferences: ["ACC", "Big 12", "SEC", "Big Ten"] };
-    expect(seasonLab(season, opts).live.map((t) => t.teamId)).toEqual(committee);
+    const top = seasonLab(season, opts).live;
+    expect(top).toHaveLength(25);
+    const now = liveRanking(season).teams;
+    for (const t of top) {
+      const cur = now.find((x) => x.teamId === t.teamId)!;
+      expect(t.committeeRank).toBe(cur.committeeRank);
+      expect(t.change).toBe(cur.rank - t.rank);
+    }
     const one = committee[0];
     const next = season.games.find((g) => !g.completed && (g.homeId === one || g.awayId === one))!;
     const loses = next.homeId === one ? next.awayId : next.homeId;
     const picked = seasonLab(season, { ...opts, locks: { games: { [next.id]: loses }, titles: {}, bracket: {} } }).live;
-    expect(picked).toHaveLength(25);
-    expect(picked.find((t) => t.teamId === one)?.rank ?? 26).toBeGreaterThan(1);
+    expect(picked.find((t) => t.teamId === one)?.rank ?? 26).toBeGreaterThan(top.find((t) => t.teamId === one)!.rank);
   });
 
-  it("the Season Lab seeds its projected field and bracket from the live ranking, and a pick reseeds them", () => {
+  it("the Season Lab seeds its projected field and bracket from the projected ranking, and a pick reseeds them", () => {
     const opts = { iterations: 50, seed: 3, conferences: ["ACC", "Big 12", "SEC", "Big Ten"] };
     const base = seasonLab(season, opts);
     const field = base.playoff!.field.map((f) => f.teamId);

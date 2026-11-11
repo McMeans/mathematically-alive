@@ -11,7 +11,7 @@
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { powerConferences, teamRating, titleGameIndex, type CommitteeFeatures } from "./committee";
 import { announcedField, bracketGames, championsNeeded, fieldPicker, findFormat, playoffRun, type AnnouncedField, type PlayoffRun } from "./playoff";
-import { ANCHORED_NOISE, liveModel, resultPoints } from "./live";
+import { liveModel, movedScore, resultPoints } from "./live";
 import { isArmyNavy, type Game, type Season } from "./season";
 import { HOME_FIELD } from "./odds";
 import { COMMITTEE_SALT, PLAYOFF_SALT, mix, neutralOdds, simulateSeason, tiebreakDraw, titleRoll, type SimResult } from "./sim";
@@ -277,9 +277,9 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
     if (h >= 0) { oppSum[h] += teamRating(byId.get(g.awayId)); oppCount[h]++; }
     if (a >= 0) { oppSum[a] += teamRating(byId.get(g.homeId)); oppCount[a]++; }
   });
-  // Stage 3 starts from the committee's latest ranking when there is one (live.ts): each team's fixed offset puts the
-  // teams in its order on the results it saw, and results since then move ratings (`moved`, by season.teams index),
-  // which count in the team's own rating and in its opponents' strength of schedule.
+  // Stage 3 starts from the committee's latest ranking when there is one (live.ts): each team's anchored score puts
+  // the teams in its order on the results it saw, and results since then move it (`moved` holds each team's surprise,
+  // by season.teams index).
   const live = liveModel(season);
   const anchored = live.release !== null;
   const allIndex = new Map<number, number>(season.teams.map((t, j) => [t.id, j]));
@@ -355,13 +355,9 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const raceOf = (id: number): number => races.findIndex((r) => r.data.ids.has(id));
   const gumbel = new Float64Array(F);
   // committeeScore, inlined: this runs for every FBS team in every simulated season.
-  const anchoredScore = (k: number): number => {
-    let om = 0;
-    for (const j of opps[k]) om += moved[j];
-    const n = oppCount[k] + titleN[k];
-    return live.offset[k] + W.wins * w[k] + W.losses * l[k] + W.rating * (rating[k] + moved[allOf[k]]) +
-      W.strength * (n === 0 ? 0 : (oppSum[k] + om + titleSos[k]) / n) + W.champion * champ[k] + ANCHORED_NOISE * gumbel[k];
-  };
+  // The live ranking's score (live.ts) on the season's results, plus the standard Gumbel noise its fit implies.
+  const anchoredScore = (k: number): number =>
+    movedScore(live, k, w[k] - live.seenWins[k], l[k] - live.seenLosses[k], moved[allOf[k]], champ[k] === 1) + gumbel[k];
   const scoreOf = (k: number, shift: (id: number) => number): number => anchored ? anchoredScore(k) :
     W.wins * w[k] + W.losses * l[k] + W.rating * (rating[k] + shift(fbsIds[k])) +
     W.strength * (oppCount[k] + titleN[k] === 0 ? 0 : (oppSum[k] + titleSos[k]) / (oppCount[k] + titleN[k])) + W.champion * champ[k] + gumbel[k];

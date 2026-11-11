@@ -1,7 +1,7 @@
 // Season Lab: pick any game left, or a playoff game, and see the field, bracket and ranking follow. The no-picks
 // view is built at build time; picks run in the Lab worker.
 import type { Metadata } from "next";
-import { conferenceShort, formatOdds, gameWinProbability, labTeamOdds } from "@/core";
+import { conferenceShort, formatOdds, gameWinProbability, labTeamOdds, liveRanks } from "@/core";
 import { asOf, baseLab, season, supportedTeams, through } from "@/app/season";
 import { Lab, type LabGame } from "./Lab";
 
@@ -48,5 +48,5 @@ const games: LabGame[] = season.games
 
 export default function LabPage() {
   const teams = supportedTeams.map((t) => ({ id: t.id, name: t.name })).sort((a, b) => a.name.localeCompare(b.name));
-  return <Lab initial={initial} games={games} names={names} abbrs={abbrs} teams={teams} paged={supportedTeams.map((t) => t.id)} baseOdds={baseOdds} through={through} asOf={asOf} />;
+  return <Lab initial={initial} games={games} names={names} abbrs={abbrs} teams={teams} paged={supportedTeams.map((t) => t.id)} ranks={liveRanks(season)} baseOdds={baseOdds} through={through} asOf={asOf} />;
 }

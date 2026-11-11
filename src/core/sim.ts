@@ -1,5 +1,6 @@
 // Monte Carlo season simulator. Plays out every unplayed game many times and
 // records the outcomes compactly so standings/tiebreaker code can replay them.
+import { liveModel, movedScore } from "./live";
 import { HOME_FIELD, MARGIN_SD, normalCdf, winProbability } from "./odds";
 import { isArmyNavy, isFlexGame, type Game, type Season, type Team } from "./season";
 
@@ -14,6 +15,8 @@ const GAME_SD = Math.sqrt(MARGIN_SD * MARGIN_SD - 2 * SHOCK_SD * SHOCK_SD);
 // measure, so it rises with the simulated record, plus noise for how it's computed.
 const RANK_PER_NET_WIN = 2;
 const RANK_SD = 3;
+/** The standard Gumbel's spread (pi / sqrt 6): the live ranking's noise, as a normal. */
+const GUMBEL_SD = Math.PI / Math.sqrt(6);
 
 export type OddsOptions = { sd?: number };
 
@@ -275,8 +278,22 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
     return t;
   };
   const shiftAt = (t: number): number => SHOCK_SD * normalAt(seed, current, SHIFT_SALT + t);
+  // Once the committee has ranked, a tiebreak's ranking step uses the live ranking's score (live.ts): the committee's
+  // order, moved by the season's results since, with the noise its fit implies (a normal of the Gumbel's spread).
+  // Before then, or for a team it doesn't score, the older stand-in: rating, net wins and noise.
+  const live = season.committeeRankings?.length ? liveModel(season) : null;
+  const liveAt = live ? new Map(live.fbsIds.map((id, k) => [id, k])) : null;
   const rankAt = (id: number, flip: number): number => {
     const t = indexOf(id);
+    const k = liveAt?.get(id);
+    if (live && k !== undefined) {
+      let w = 0, l = 0;
+      for (const i of gamesOf[t]) {
+        if (live.seen[i] || !live.counts[i]) continue;
+        if ((homeWonAt(i) !== (i === flip)) === (homeIdx[i] === t)) w++; else l++;
+      }
+      return movedScore(live, k, w, l, 0, false) + GUMBEL_SD * normalAt(seed, current, RANK_SALT + t);
+    }
     let net = 0;
     for (const i of gamesOf[t]) net += ((homeWonAt(i) !== (i === flip)) === (homeIdx[i] === t)) ? 1 : -1;
     return rating[t] + shiftAt(t) + RANK_PER_NET_WIN * net + RANK_SD * normalAt(seed, current, RANK_SALT + t);

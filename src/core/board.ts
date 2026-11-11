@@ -1,10 +1,11 @@
 // The team page's board: the playoff odds by final record and the ways in, help from elsewhere grouped by the team
 // to root against, the likeliest title-game matchup, and the playoff race around the cut line. Read from one season
 // simulation and the national run over the same seasons. All wording the page shows is here.
+import { projectedField } from "./projected";
 import type { NationalResult } from "./national";
 import { conferenceName, formatOdds, formatRecord, formatSideOdds, shownChange } from "./paths";
 import { powerConferences } from "./committee";
-import { fieldPicker, playoffFormat } from "./playoff";
+import { playoffFormat } from "./playoff";
 import { INDEPENDENTS, teamRecord, type Game, type Season } from "./season";
 import { gameWinProbability, type SimResult } from "./sim";
 import { OVERALL, isClear } from "./signal";
@@ -335,15 +336,7 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
   const pairs = new Map<string, number>();
   const pairOf = new Array<string>(n);
   const champOf = new Int32Array(n);
-  // For the race: each team's final ranks (a histogram), and each power conference's champions.
-  const fbs = national.teams.map((t) => t.teamId);
-  const fbsAt = new Map(fbs.map((id, i) => [id, i]));
-  const rankHist = new Uint32Array(fbs.length * fbs.length);
-  const powers = powerConferences(season.year).filter((c) => national.conferences.includes(c));
-  const champCounts = new Map(powers.map((c) => [c, new Map<number, number>()]));
   national.forEachIteration((it, s) => {
-    s.ranking.forEach((id, k) => { const i = fbsAt.get(id); if (i !== undefined) rankHist[i * fbs.length + k]++; });
-    for (const [c, m] of champCounts) { const w = s.champion(c); m.set(w, (m.get(w) ?? 0) + 1); }
     if (s.field?.includes(teamId)) inField[it] = 1;
     if (!titled) return;
     const [a, b] = s.titleGame(conference!);
@@ -490,7 +483,7 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
     };
   }
 
-  const race = playoffRace(season, national, teamId, fbs, rankHist, champCounts);
+  const race = playoffRace(season, national, teamId);
 
   const ownChances = own.map(({ g }): OwnChance => {
     const pHome = gameWinProbability(season, g);
@@ -569,28 +562,14 @@ function when(g: Game): string {
 }
 
 /** The race card: the projected field around the page's team. Null when the team isn't ranked or no field can be picked. */
-function playoffRace(season: Season, national: NationalResult, teamId: number, fbs: number[], rankHist: Uint32Array, champCounts: Map<string, Map<number, number>>): PlayoffRace | null {
-  const n = national.iterations, F = fbs.length;
+function playoffRace(season: Season, national: NationalResult, teamId: number): PlayoffRace | null {
   const format = playoffFormat(season.year);
-  if (F <= format.teams) return null;
+  if (national.teams.length <= format.teams) return null;
   const name = (id: number) => season.teams.find((t) => t.id === id)!.name;
-  // Projected final ranking: by median rank over the seasons, then mean rank.
-  const mean = new Map(national.teams.map((t) => [t.teamId, t.meanRank]));
-  const median = (i: number) => {
-    let seen = 0;
-    for (let k = 0; k < F; k++) { seen += rankHist[i * F + k]; if (seen * 2 >= n) return k; }
-    return F;
-  };
-  const order = fbs.map((id, i) => ({ id, m: median(i) })).sort((a, b) => a.m - b.m || mean.get(a.id)! - mean.get(b.id)! || a.id - b.id).map((x) => x.id);
-  const projected = new Map(order.map((id, k) => [id, k + 1]));
+  // The projected final ranking, likeliest champions and field (projected.ts), shared with the Season Lab.
+  const { order, place: projected, champions, field } = projectedField(season, national);
   if (!projected.has(teamId)) return null;
-  // The likeliest champion of each power conference.
-  const champs = new Map<number, string>();
-  for (const [c, m] of champCounts) {
-    const best = [...m].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
-    if (best) champs.set(best[0], BID_TAGS[c] ?? c);
-  }
-  const field = national.announced?.seeds ?? fieldPicker(season)(order, (id) => champs.has(id));
+  const champs = new Map([...champions].map(([id, c]) => [id, BID_TAGS[c] ?? c]));
   const inField = new Set(field);
   // The automatic bids the field holds, and the last at-large team (the cut line goes under it).
   const conf = new Map(season.teams.map((t) => [t.id, t]));
