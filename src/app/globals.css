@@ -96,6 +96,31 @@ body {
   animation: bump 900ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* The loading lamps: three bulbs on the board that light one after another. */
+.chase > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-board-line);
+  animation: chase 900ms steps(1, end) infinite;
+}
+.chase > span:nth-child(2) {
+  animation-delay: 300ms;
+}
+.chase > span:nth-child(3) {
+  animation-delay: 600ms;
+}
+@keyframes chase {
+  0% {
+    background: var(--color-lamp);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--color-lamp) 70%, transparent);
+  }
+  33.4% {
+    background: var(--color-board-line);
+    box-shadow: none;
+  }
+}
+
 /* Thin scrollbars that sit flush with the page: no track, a slim rounded thumb that darkens on hover. */
 .scroll-thin {
   scrollbar-width: thin;
@@ -152,5 +177,12 @@ body {
   }
   .press:active {
     transform: none;
+  }
+  /* A 1ms loop would flicker: hold the lamps still, the middle one lit. */
+  .chase > span {
+    animation: none !important;
+  }
+  .chase > span:nth-child(2) {
+    background: var(--color-lamp);
   }
 }
