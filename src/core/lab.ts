@@ -450,9 +450,11 @@ export function fillLabLocks(season: Season, locks: Partial<LabLocks>, how: LabF
   const winnerOf = (g: Game): number => games[g.id] ?? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId);
   const odds = neutralOdds(season);
   conferences.forEach((c, k) => {
-    if (titles[c] !== undefined || titleFinal(season, c)) return;
+    if (titleFinal(season, c)) return;
     const m = standingsWithPicks(season, c, (g) => games[g.id] !== undefined, winnerOf, names).matchup;
     if (!m) return;
+    // A title pick stands while its team still plays in the title game; one the filled games put out is picked again.
+    if (titles[c] !== undefined && (!m.exact || m.teams.includes(titles[c]))) return;
     const [a, b] = m.teams;
     const p = odds(a, b, 0, 0);
     titles[c] = (how === "favorites" ? p >= 0.5 : mulberry32(mix(how.seed, 1, FILL_SALT + k))() < p) ? a : b;

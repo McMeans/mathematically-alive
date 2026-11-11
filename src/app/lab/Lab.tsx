@@ -117,7 +117,10 @@ function useLab(initial: LabView) {
       }
       if (r.kind === "filled") {
         // Only the latest request's fill: a pick made while it was on its way wins.
-        if (r.id === latest.current) update(r.locks);
+        if (r.id !== latest.current) return;
+        // The filled games settle the matchups: learn each title pick's matchup afresh from the next full run.
+        for (const c of Object.keys(r.locks.titles)) { delete titleKeys.current[c]; linkTitles.current.add(c); }
+        update(r.locks);
         return;
       }
       if (r.id !== latest.current) return; // a newer pick is on its way

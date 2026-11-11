@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { gameWinProbability, liveRanking, seasonFromCfbd, seasonLab, teamRecord, type CfbdSnapshot, type Season } from "@/core";
+import { fillLabLocks, gameWinProbability, liveRanking, seasonFromCfbd, seasonLab, teamRecord, type CfbdSnapshot, type Season } from "@/core";
 
 // 2026 through week 9, and the committee's first ranking (week 10), from fixtures/cfp-2026.json.
 const fx = JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot; rankings: { week: number; ranks: { teamId: number }[] }[] };
@@ -72,5 +72,17 @@ describe("projected ranking", () => {
     const rank = liveRanking(season, { locks }).teams.find((t) => t.teamId === id)!.rank;
     expect(losses).toBeGreaterThanOrEqual(3);
     expect(rank).toBeGreaterThanOrEqual(losses >= 4 ? 13 : 7);
+  });
+
+  it("filling the season re-picks a title game whose earlier pick the filled games put out of it", () => {
+    const fill = fillLabLocks(season, {}, "favorites", conferences);
+    const l = lab(season, fill.games);
+    const c = l.conferences.find((x) => x.final?.exact && fill.titles[x.conference] !== undefined)!;
+    // A pick for a conference team not in the filled title game.
+    const out = season.teams.find((t) => t.conference === c.conference && !c.final!.teams.includes(t.id))!.id;
+    const refill = fillLabLocks(season, { titles: { [c.conference]: out } }, "favorites", conferences);
+    expect(c.final!.teams).toContain(refill.titles[c.conference]);
+    const full = seasonLab(season, { ...opts, locks: refill });
+    expect(full.conferences.filter((x) => x.final).every((x) => x.picked !== null)).toBe(true);
   });
 });
