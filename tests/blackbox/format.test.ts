@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRecord, oddsLabels, teamRecord } from "@/core";
+import { formatRecord, goalStatus, oddsLabels, statusTags, teamRecord, type NationalPlayoff } from "@/core";
 import type { Game, Season } from "@/core";
 
 const team = (id: number) => ({
@@ -44,5 +44,39 @@ describe("oddsLabels", () => {
       projected: "Projected", projectedNote: "A projected matchup, not yet confirmed.",
     });
     expect(oddsLabels("Big Ten").champion).toBe("Win Big Ten");
+  });
+});
+
+describe("statusTags", () => {
+  const cfp = (seed: number | null): NationalPlayoff => ({
+    field: seed === null ? 0 : 1, bye: 0, seeds: [], quarterfinal: null, semifinal: 0, final: 0, champion: 0,
+    run: { seed, state: seed === null ? "out" : "in", text: "" },
+  });
+  const team = { playoff: 0.05, cfp: null, postseasonBan: false };
+
+  it("names how alive a team is for each goal, playoff first", () => {
+    expect(statusTags({ ...team, playoff: 0.0004, status: "eliminated", titleGame: 0 }, "ACC title game")).toEqual([
+      { label: "Playoff · Needs a miracle", live: true },
+      { label: "ACC title game · Out", live: false },
+    ]);
+    expect(statusTags({ ...team, playoff: 0.15, status: "alive", titleGame: 0.09 }, "ACC title game")).toEqual([
+      { label: "Playoff · In the hunt", live: true },
+      { label: "ACC title game · Long shot", live: true },
+    ]);
+    expect(statusTags({ ...team, playoff: 0.62, status: "clinched", titleGame: 1 }, "SEC title game").map((t) => t.label)).toEqual(["Playoff · In control", "SEC title game · Clinched"]);
+  });
+
+  it("gives an independent only the playoff", () => {
+    expect(statusTags(team, null)).toEqual([{ label: "Playoff · Long shot", live: true }]);
+  });
+
+  it("proves the playoff only once the field is announced, or for a team barred from it", () => {
+    expect(statusTags({ ...team, cfp: cfp(4) }, null)[0].label).toBe("Playoff · Clinched");
+    expect(statusTags({ ...team, cfp: cfp(null) }, null)).toEqual([{ label: "Playoff · Out", live: false }]);
+    expect(statusTags({ ...team, postseasonBan: true }, null)).toEqual([{ label: "Playoff · Barred", live: false }]);
+  });
+
+  it("uses the same words for any goal at each level of odds", () => {
+    expect([0.5, 0.1, 0.01, 0.009].map((p) => goalStatus(p, "alive"))).toEqual(["In control", "In the hunt", "Long shot", "Needs a miracle"]);
   });
 });

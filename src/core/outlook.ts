@@ -20,6 +20,8 @@ export type OutlookOptions = {
   teamId?: number;
   /** An earlier national run to copy untouched title races from (`NationalOptions.reuse`). */
   reuse?: NationalResult;
+  /** Forced title-game winners, for the national run (`NationalOptions.titleLocks`). */
+  titleLocks?: Record<string, number>;
 };
 
 export type TeamOutlook = {
@@ -110,7 +112,7 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
   const sim = shared ?? simulateSeason(season, { iterations, seed, locks: opts.locks });
   // The playoff odds: the national simulation over the same simulated seasons when the season can run one.
   const national: NationalResult | null = nationalReady(season)
-    ? simulateNational(season, { iterations, seed, locks: opts.locks, conferences: nationalConferences(season, conference, opts.reuse), teamId: opts.teamId, reuse: opts.reuse }, sim)
+    ? simulateNational(season, { iterations, seed, locks: opts.locks, titleLocks: opts.titleLocks, conferences: nationalConferences(season, conference, opts.reuse), teamId: opts.teamId, reuse: opts.reuse }, sim)
     : null;
   const format = findFormat(season.year);
   const groupOfSix = format?.autoBids === "power4G6" && !powerConferences(season.year).includes(conference);

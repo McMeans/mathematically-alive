@@ -1,0 +1,1043 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draft B · Season Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Draft B, Season Lab: the stadium board. The field is the main board, games are plates you light, and the
+   conference races run on an out-of-town scoreboard. The message board says what your last pick changed. */
+:root {
+  --board: #133f2e; --board-deep: #0c2c20; --board-deeper: #0a241a; --board-line: #2a5a46; --board-text: #d7e4dc; --board-muted: #9fbcae;
+  --plate: #f3f0e6; --plate-ink: #121a16; --lamp: #f2b134;
+  --ground: #e4e7e5; --paper: #f6f8f7; --ink: #15201b; --ink-soft: #3d4a43; --ink-muted: #5d6a63; --rule: #d6d4cc;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.45 "Public Sans", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+::selection { background: var(--lamp); color: var(--plate-ink); }
+:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+button, input { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+button:disabled { cursor: default; opacity: .4; }
+.cond { font-family: "Saira Condensed", sans-serif; }
+/* Numbers are lit digits on the board, never boxes. Only buttons get an outline, and a pick fills amber. */
+.plate { display: inline-block; font-family: "Saira Condensed", sans-serif; font-weight: 800; line-height: 1; color: inherit; }
+.plate.lit { color: var(--lamp); }
+.plate.hang { animation: hang 180ms steps(2) both; }
+@keyframes hang { 50% { transform: rotateX(90deg); } }
+.beta { display: inline-block; font-family: "Saira Condensed", sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 0 5px; border: 1px solid currentColor; border-radius: 2px; line-height: 15px; vertical-align: 3px; }
+
+.app { display: flex; flex-direction: column; min-height: 100dvh; }
+
+/* Board header */
+.board { background: var(--board); color: var(--board-text); position: sticky; top: 0; z-index: 6;
+  background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1.2px); background-size: 6px 6px; }
+.bar { display: flex; align-items: center; gap: 14px; height: 44px; padding: 0 24px; border-bottom: 1px solid var(--board-line); }
+.brand { display: flex; align-items: center; gap: 8px; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 18px; text-transform: uppercase; letter-spacing: .04em; color: #fff; text-decoration: none; }
+.brand svg { width: 22px; height: 22px; }
+.nav { display: flex; gap: 2px; margin-left: 12px; }
+.nav a, .nav span { height: 26px; display: inline-flex; align-items: center; padding: 0 10px; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(--board-muted); text-decoration: none; border-radius: 2px; }
+.nav a:hover { color: #fff; }
+.nav span { color: var(--plate-ink); background: var(--plate); }
+.asof { margin-left: auto; font-size: 13px; color: var(--board-muted); }
+.marquee { display: flex; align-items: center; gap: 24px; padding: 14px 24px 16px; }
+.mt h1 { margin: 0; font-family: "Saira Condensed", sans-serif; font-weight: 800; font-size: 36px; line-height: 1; text-transform: uppercase; color: #fff; display: flex; align-items: center; gap: 10px; }
+.mt h1 .beta { color: var(--board-muted); }
+.mt p { margin: 4px 0 0; font-size: 13px; color: var(--board-muted); }
+/* The message board: amber lamp text on the deep board. */
+/* What the last pick changed: plain board lettering, no box, so it never reads as a field to type in. */
+.msg { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+.msg small { flex: none; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--board-muted); }
+.msg b { font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 24px; line-height: 1.1; letter-spacing: .03em; text-transform: uppercase; color: var(--board-muted); }
+.msg:not(.on) small { display: none; }
+.msg:not(.on) b { font-family: "Public Sans", sans-serif; font-weight: 500; font-size: 15px; letter-spacing: 0; text-transform: none; }
+.msg.on b { color: var(--lamp); }
+.cnt { display: flex; align-items: center; gap: 10px; }
+.cnt .plate { font-size: 40px; color: #fff; }
+.cnt div { font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--board-muted); line-height: 1.2; }
+.cnt div span { display: block; font-family: "Public Sans", sans-serif; font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 12px; }
+.acts { display: flex; gap: 6px; }
+.acts button { height: 38px; padding: 0 14px; border: 1px solid var(--board-line); border-radius: 3px; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 16px; letter-spacing: .05em; text-transform: uppercase; color: #fff; }
+.acts button:not(:disabled):hover { border-color: var(--board-muted); }
+.acts .share { background: var(--plate); color: var(--plate-ink); border-color: var(--plate); min-width: 104px; }
+.acts .share:hover { background: #fff !important; }
+
+/* Body: field board, games, out-of-town scoreboard. */
+.body { flex: 1; display: grid; grid-template-columns: 420px minmax(0, 1fr) 320px; min-height: 0; }
+.left { display: contents; }
+.pane { padding: 22px 22px 40px; overflow-y: auto; min-height: 0; }
+#field { grid-column: 1; grid-row: 1; border-right: 1px solid var(--rule); background: var(--paper); }
+#games { grid-column: 2; grid-row: 1; }
+#races { grid-column: 3; grid-row: 1; border-left: 1px solid var(--rule); background: var(--paper); }
+h2 { font-family: "Saira Condensed", sans-serif; font-weight: 800; font-size: 24px; text-transform: uppercase; letter-spacing: .02em; margin: 0; line-height: 1.1; }
+h3 { font-family: "Saira Condensed", sans-serif; font-weight: 800; font-size: 16px; text-transform: uppercase; letter-spacing: .04em; margin: 22px 0 8px; color: var(--ink-soft); }
+.ph { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.note { margin: 4px 0 14px; font-size: 13px; color: var(--ink-muted); }
+.segc { display: inline-flex; gap: 4px; flex: none; }
+.segc button { height: 30px; padding: 0 11px; border: 1px solid var(--rule); border-radius: 2px; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 15px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); background: #fff; }
+.segc button i { font-style: normal; margin-left: 5px; color: var(--ink-muted); }
+.segc button[aria-pressed="true"] { background: var(--board); border-color: var(--board); color: #fff; }
+.segc button[aria-pressed="true"] i { color: var(--board-muted); }
+
+/* The field board: seeds 1–4 have their lamps lit (the byes). */
+.fb { background: var(--board-deep); border-radius: 4px; padding: 6px 0; color: var(--board-text); }
+.fb .lbl { display: flex; justify-content: space-between; padding: 8px 54px 4px 14px; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--board-muted); }
+.fr { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto 30px; align-items: center; gap: 10px; padding: 6px 14px; }
+.fr .sd { font-size: 24px; color: var(--board-muted); text-align: center; }
+.fr .n { min-width: 0; }
+.fr .n b { display: block; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 20px; line-height: 1.05; text-transform: uppercase; color: #fff; }
+.fr .o { font-size: 22px; color: #fff; text-align: right; }
+.fr .mv { font-family: "Saira Condensed", sans-serif; font-weight: 800; font-size: 13px; color: var(--lamp); text-align: center; letter-spacing: .04em; }
+.fr.flash { animation: flash 900ms ease-out; }
+@keyframes flash { from { background: color-mix(in srgb, var(--lamp) 22%, transparent); } to { background: transparent; } }
+.fb .div { height: 1px; margin: 6px 14px; background: var(--board-line); }
+.bb { background: var(--board-deep); border-radius: 4px; padding: 6px 0; }
+.br { display: grid; grid-template-columns: minmax(0, 1fr) auto 30px; align-items: center; gap: 10px; padding: 5px 14px; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 17px; text-transform: uppercase; color: var(--board-muted); }
+.br .plate { font-size: 18px; text-align: right; }
+.br .mv { font-size: 11px; color: var(--board-muted); text-align: center; }
+.br.out .mv::after { content: "OUT"; }
+.more { margin-top: 14px; font-size: 14px; font-weight: 600; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; }
+.more:hover { color: var(--ink); }
+.rank { list-style: none; margin: 10px 0 0; padding: 0; font-size: 14px; }
+.rank li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 8px; padding: 6px 0; border-top: 1px solid var(--rule); }
+.rank li span:first-child { color: var(--ink-muted); text-align: right; }
+.rank li i { font-style: normal; color: var(--ink-muted); }
+.rank li.inf b::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: 7px; border-radius: 50%; background: var(--board); vertical-align: 1px; }
+
+/* Bracket board */
+.rd { margin-top: 18px; }
+.rd:first-child { margin-top: 0; }
+.bg { margin-top: 8px; background: var(--board-deep); border-radius: 4px; padding: 4px; }
+.bg .gh { padding: 4px 8px 2px; font-size: 12px; color: var(--board-muted); }
+.side { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; padding: 4px 6px; border: 2px solid transparent; border-radius: 3px; text-align: left; color: #fff; }
+.side .plate { font-size: 18px; color: var(--board-muted); text-align: center; }
+.side b { font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 18px; text-transform: uppercase; }
+.side.tbd b { font-family: "Public Sans", sans-serif; font-weight: 500; font-size: 13px; text-transform: none; color: var(--board-muted); }
+.side.tbd .plate { visibility: hidden; }
+button.side { border: 1px solid var(--board-line); background: rgba(255,255,255,.04); margin-top: 4px; }
+button.side:hover { border-color: var(--board-muted); }
+.side[aria-pressed="true"] { background: var(--lamp); border-color: var(--lamp); color: var(--plate-ink); }
+.side[aria-pressed="true"] .plate { color: var(--plate-ink); }
+.side.lost { opacity: .45; }
+
+/* Drawn bracket: four columns, games placed on the bracket's rows, elbow lines between rounds. */
+.bkh { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--g); padding: 0 8px; margin-bottom: 6px; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); }
+.bk, .bkh { --g: 12px; }
+.bk { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--g); padding: 0 8px; background: var(--board-deep); border-radius: 4px; }
+.bkc { position: relative; }
+.bgm { position: absolute; left: 0; right: 0; height: 64px; display: flex; flex-direction: column; gap: 2px; }
+.bs { flex: 1; display: flex; align-items: center; gap: 3px; min-width: 0; padding: 0 4px; border: 1px solid var(--board-line); border-radius: 3px; background: rgba(255,255,255,.04); color: #fff; text-align: left; font-family: "Saira Condensed", sans-serif; }
+.bs .sd { flex: none; width: 1em; font-weight: 800; font-size: 12px; color: var(--board-muted); text-align: center; }
+.bs .lg { width: 15px; height: 15px; margin: 0; flex: none; }
+.bs .lgw { margin: 0; flex: none; vertical-align: 0; }
+.bs .chip { width: 20px; height: 20px; margin: 0; }
+.bs .chip .lg { width: 14px; height: 14px; }
+.bs b { min-width: 0; font-weight: 700; font-size: 14px; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+button.bs:hover { border-color: var(--board-muted); }
+.bs[aria-pressed="true"] { background: var(--lamp); border-color: var(--lamp); color: var(--plate-ink); }
+.bs[aria-pressed="true"] .sd { color: var(--plate-ink); }
+.bs.lost { opacity: .4; }
+.bs.tbd { justify-content: center; white-space: nowrap; overflow: hidden; border-style: dashed; background: none; font-family: "Public Sans", sans-serif; font-size: 11px; color: var(--board-muted); }
+.el { position: absolute; width: calc(var(--g) / 2); border: 0 solid var(--board-muted); pointer-events: none; }
+.el.a { left: calc(var(--g) * -1); border-right-width: 1px; }
+.el.b { left: calc(var(--g) / -2); }
+.el.a.dn { border-top-width: 1px; } .el.b.dn { border-bottom-width: 1px; }
+.el.a.up { border-bottom-width: 1px; } .el.b.up { border-top-width: 1px; }
+.champ { display: flex; align-items: baseline; gap: 10px; margin: 12px 0 0; }
+.champ small { font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-muted); }
+.champ b { font-family: "Saira Condensed", sans-serif; font-weight: 800; font-size: 22px; text-transform: uppercase; }
+.tr { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 4px 14px; }
+.tr .sd { font-size: 18px; color: var(--board-muted); text-align: center; }
+.tr .sd.lit { color: var(--lamp); }
+.tr .n b { font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 17px; text-transform: uppercase; color: #fff; }
+.tr .rec { font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 16px; color: var(--board-text); }
+.legend { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; font-size: 13px; color: var(--ink-muted); }
+.legend .sw { width: 22px; height: 14px; border: 2px solid var(--lamp); border-radius: 3px; background: var(--board-deep); }
+
+/* Games: each one a pair of plates to light. */
+.ctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.findw { position: relative; flex: 1; min-width: 160px; display: flex; }
+.findw svg { position: absolute; left: 11px; top: 50%; width: 16px; height: 16px; transform: translateY(-50%); color: var(--ink-muted); pointer-events: none; }
+.find { width: 100%; height: 36px; padding: 0 12px 0 34px; border: 1px solid var(--rule); border-radius: 3px; background: #fff; }
+.find::placeholder { color: var(--ink-muted); }
+.fillw { position: relative; }
+.fillb { height: 36px; padding: 0 16px; border-radius: 3px; background: var(--board); color: #fff; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 16px; text-transform: uppercase; letter-spacing: .05em; }
+.fillb:not(:disabled):hover { background: var(--board-deep); }
+.menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 4; width: 264px; background: #fff; border: 1px solid var(--rule); border-radius: 3px; box-shadow: 0 8px 24px rgba(0,0,0,.16); padding: 4px; }
+.menu[hidden] { display: none; }
+.menu button { display: block; width: 100%; text-align: left; padding: 9px 10px; border-radius: 2px; }
+.menu button:hover { background: var(--ground); }
+.menu b { display: block; font-weight: 600; }
+.menu span { display: block; font-size: 13px; color: var(--ink-muted); }
+.chips { display: flex; gap: 6px; margin-top: 10px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.chips button { flex: none; height: 28px; padding: 0 10px; border: 1px solid var(--rule); border-radius: 2px; background: #fff; font-family: "Saira Condensed", sans-serif; font-size: 15px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--ink-soft); }
+.chips button[aria-pressed="true"] { background: var(--board); border-color: var(--board); color: #fff; }
+.wk { display: flex; align-items: baseline; gap: 10px; margin: 22px 0 8px; font-family: "Saira Condensed", sans-serif; text-transform: uppercase; }
+.wk b { font-weight: 800; font-size: 19px; }
+.wk span { font-weight: 700; font-size: 15px; color: var(--ink-muted); letter-spacing: .04em; }
+.cf { margin: 12px 0 6px; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-muted); }
+.gl { background: var(--board-deep); border-radius: 4px; }
+.gm { display: grid; grid-template-columns: minmax(0, 1fr) 26px minmax(0, 1fr); align-items: center; padding: 4px 6px; }
+.gl { padding: 2px 0; }
+.tm { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; padding: 7px 10px; border: 1px solid var(--board-line); border-radius: 3px; background: rgba(255,255,255,.04); text-align: left; color: #fff; }
+.tm.home { flex-direction: row-reverse; text-align: right; }
+.tm .plate { flex: none; font-size: 17px; color: var(--board-muted); }
+.tm b { min-width: 0; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 18px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm:hover { border-color: var(--board-muted); }
+.tm[aria-pressed="true"] { background: var(--lamp); border-color: var(--lamp); color: var(--plate-ink); }
+.tm[aria-pressed="true"] .plate { color: var(--plate-ink); }
+.gm.tg { grid-template-columns: minmax(0, 1fr) 26px minmax(0, 1fr); }
+.tgc { grid-column: 1 / -1; padding: 4px 4px 2px; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--board-muted); }
+.cw { margin: -2px 0 8px; font-size: 13px; color: var(--ink-muted); }
+.gm.bigg .tm:not([aria-pressed="true"]) { border: 2px solid var(--lamp); padding: 6px 9px; }
+.tm b { display: flex; align-items: center; min-width: 0; }
+.tm b .tn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm.home b .lgw { order: 2; margin: 0 0 0 .35em; }
+.abv { display: none; }
+.tm.lost { opacity: .4; }
+.tm.lost b { text-decoration: line-through; }
+.at { text-align: center; font-size: 12px; color: var(--board-muted); }
+.empty { margin-top: 18px; color: var(--ink-muted); }
+
+/* Out-of-town scoreboard */
+.oot { background: var(--board-deep); border-radius: 4px; padding: 4px 0; color: var(--board-text); }
+.rc + .rc { border-top: 1px solid var(--board-line); }
+.rc > button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; width: 100%; padding: 9px 14px; text-align: left; }
+.rc > button:hover { background: rgba(255,255,255,.03); }
+.rc .cn { font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--board-muted); }
+.rc .cn em { font-style: normal; margin-left: 6px; color: var(--lamp); }
+.rc .chev { color: var(--board-muted); font-size: 12px; transition: transform 140ms; }
+.rc.open .chev { transform: rotate(180deg); }
+.rc .ld { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 17px; text-transform: uppercase; color: #fff; }
+.rc .ld span:nth-child(3) { color: var(--board-text); }
+.rc .ld .plate { font-size: 17px; text-align: right; }
+.rc .ld .plate.dim { color: var(--board-text); }
+.rc .st { display: none; padding: 0 14px 10px; font-size: 13px; }
+.rc.open .st { display: block; }
+.st table { width: 100%; border-collapse: collapse; }
+.st th { font-weight: 600; color: var(--board-muted); text-align: right; font-size: 11px; padding: 6px 0 2px; }
+.st th:first-child { text-align: left; }
+.st td { padding: 4px 0; text-align: right; border-top: 1px solid var(--board-line); }
+.st td:first-child { text-align: left; font-weight: 600; color: #fff; }
+.st th { white-space: nowrap; padding-left: 8px; }
+.st td:first-child i { display: block; font-size: 12px; font-style: normal; font-weight: 400; margin-left: 0 !important; color: var(--board-muted); margin-left: 6px; }
+.st p { margin: 8px 0 0; color: var(--board-muted); font-size: 12px; }
+
+.tabs { display: none; }
+
+@media (min-width: 900px) { .app { height: 100dvh; } .body { overflow: hidden; } }
+@media (max-width: 1439px) and (min-width: 900px) { .mt p { display: none; } .mt h1 { font-size: 30px; } }
+@media (max-width: 1279px) and (min-width: 900px) {
+  .body { grid-template-columns: 390px minmax(0, 1fr); }
+  .left { display: block; grid-column: 1; grid-row: 1; overflow-y: auto; border-right: 1px solid var(--rule); background: var(--paper); }
+  .left .pane { overflow: visible; border: 0; }
+  #races { padding-top: 0; }
+  #races h2 { padding-top: 18px; border-top: 1px solid var(--rule); }
+  .nav { display: none; }
+  #field .ph { flex-wrap: wrap; }
+  #field .segc { flex: 1 0 100%; }
+  #field .segc button { flex: 1; }
+}
+/* Short desktop: fold the marquee into one slim row. */
+@media (max-height: 700px) and (min-width: 900px) {
+  .bar { height: 38px; }
+  .marquee { padding: 8px 24px 10px; gap: 16px; }
+  .mt h1 { font-size: 24px; }
+  .msg { gap: 1px; }
+  .msg b { font-size: 19px; }
+  .cnt .plate { font-size: 30px; }
+  .acts button { height: 34px; }
+  .pane { padding-top: 16px; }
+  .fr { padding: 4px 14px; }
+}
+/* Phone: one pinned row, the message under it, tabs with the field first. */
+@media (max-width: 899px) {
+  .bar { display: none; }
+  .marquee { flex-wrap: wrap; gap: 10px; padding: 10px 14px; }
+  .mt { display: none; }
+  .cnt { flex: 1; min-width: 0; }
+  .cnt div { min-width: 0; }
+  .cnt div span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cnt .plate { font-size: 30px; }
+  .acts button { height: 36px; padding: 0 11px; font-size: 15px; }
+  .acts .share { min-width: 0; }
+  .msg { order: 5; flex: 1 0 100%; padding-top: 8px; border-top: 1px solid var(--board-line); }
+  .msg:not(.on) { display: none; }
+  .msg small { display: none; }
+  .msg b { font-size: 18px; }
+  .tabs { display: flex; position: sticky; top: var(--top-h, 0px); z-index: 5; background: var(--ground); padding: 10px 14px 8px; gap: 6px; }
+  .tabs button { flex: 1; height: 36px; border-radius: 3px; background: #fff; border: 1px solid var(--rule); font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 16px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); }
+  .tabs button[aria-selected="true"] { background: var(--board); border-color: var(--board); color: #fff; }
+  .body { display: block; }
+  .pane { padding: 8px 14px 40px; overflow: visible; border: 0 !important; background: transparent !important; }
+  .pane:not(.show) { display: none; }
+  .fillw { order: -1; }
+  .tm b { font-size: 16px; }
+  /* Games stack away over home, so names never get cut off. */
+  /* One row per game: abbreviations keep both teams on the line. */
+  .gm, .gm.tg { grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr); gap: 0; padding: 4px; }
+  .gm .at { font-size: 12px; text-align: center; }
+  .tm .fn { display: none; }
+  .tm .abv { display: inline; }
+  .tm { gap: 6px; }
+  /* Header: just the count; the seasons line shows only while refining. */
+  .cnt div span:not(.ref) { display: none; }
+  /* Field heading on its own line, the three views under it. */
+  #field .ph { flex-wrap: wrap; }
+  #field .segc { flex: 1 0 100%; }
+  #field .segc button { flex: 1; }
+  /* The draft's logo switch sits at the end of the page, not over content. */
+  html .logo-toggle { position: static; display: block; margin: 8px auto 28px; }
+  .tm .plate { font-size: 15px; }
+  .tm { padding: 6px 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .plate.hang, .fr.flash { animation: none; } }
+
+/* Draft control: compare with and without logos. */
+.lg { display: inline-block; width: 1.2em; height: 1.2em; object-fit: contain; vertical-align: -0.24em; margin-right: .35em; }
+.rk { font-size: max(11px, .74em); font-weight: 700; margin-right: .3em; letter-spacing: 0; }
+.lgw { display: inline-flex; vertical-align: -0.24em; margin-right: .35em; }
+.lgw .lg { margin: 0; }
+.chip { align-items: center; justify-content: center; width: 1.5em; height: 1.5em; margin-top: -.15em; border-radius: 50%; vertical-align: -0.4em; }
+.chip .lg { width: 1.05em; height: 1.05em; }
+.chip-c { background: var(--plate); }
+.chip-d { background: var(--board-deep); }
+.lg-l { display: none; }
+[aria-pressed="true"] .lg-d { display: none; }
+[aria-pressed="true"] .lg-l { display: inline-flex; }
+.nologos .lgw { display: none !important; }
+.logo-toggle { position: fixed; left: 14px; bottom: 14px; z-index: 50; height: 32px; padding: 0 14px; border-radius: 16px; background: #fff; color: #111; border: 1px solid #c9ccd2; font: 600 13px/1 system-ui, sans-serif; box-shadow: 0 2px 8px rgba(0,0,0,.15); cursor: pointer; }
+
+/* Draft control: compare the current layout with the proposed fix from the critique. */
+.cmp { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 50; display: flex; padding: 3px; gap: 3px; border-radius: 18px; background: #fff; border: 1px solid #c9ccd2; box-shadow: 0 2px 8px rgba(0,0,0,.15); font: 600 13px/1 system-ui, sans-serif; }
+.cmp button { height: 28px; padding: 0 14px; border-radius: 14px; color: #333; }
+.cmp button[aria-pressed="true"] { background: #111; color: #fff; }
+.v-old .new-only, .v-new .old-only { display: none !important; }
+/* Proposed Lab cleanups. */
+.slim { display: none; }
+.fieldchip { display: none; }
+.v-new .acts .share.idle { background: transparent; color: var(--board-text); border-color: var(--board-line); }
+.v-new .tm[aria-pressed="true"] .plate { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.v-new .chips { -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); mask-image: linear-gradient(to right, #000 88%, transparent); padding-right: 24px; }
+@media (max-width: 899px) {
+  .v-new .slim { display: block; flex: 1 0 100%; order: -1; margin: 0; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; color: var(--board-muted); }
+  .v-new .fieldchip:not([hidden]) { display: flex; width: 100%; margin-top: 12px; padding: 10px 12px; gap: 10px; align-items: center; justify-content: space-between; text-align: left; border: 1px solid var(--lamp); border-radius: 3px; background: var(--board-deep); color: var(--lamp); font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 15px; text-transform: uppercase; letter-spacing: .03em; }
+  .v-new .fieldchip b { flex: none; color: #fff; }
+  .v-new .tm { min-height: 44px; }
+  .v-new .tabs button, .v-new .acts button { height: 44px; }
+  .v-new .chips button { height: 36px; }
+  .v-new #field .segc button { height: 40px; }
+}
+
+@media (max-width: 899px) { html .cmp { position: static; transform: none; width: max-content; margin: 16px auto 0; } }
+
+
+/* Proposed: the pinned team. Desktop: one quiet row under the header. Phone: a ticket docked at the bottom. */
+.pin { display: flex; align-items: center; gap: 22px; padding: 7px 24px; border-top: 1px solid var(--board-line); background: var(--board-deep); color: var(--board-text); }
+.pin[hidden], .dock[hidden] { display: none; }
+.pi { display: inline-flex; color: var(--lamp); }
+.pi svg { width: 14px; height: 14px; }
+.pin .pt { display: flex; align-items: center; gap: 6px; font-family: "Saira Condensed", sans-serif; font-weight: 800; font-size: 18px; text-transform: uppercase; color: #fff; }
+.pin .po { display: flex; align-items: baseline; gap: 6px; font-family: "Saira Condensed", sans-serif; font-weight: 800; font-size: 19px; color: #fff; white-space: nowrap; }
+.pin .po small { font-weight: 700; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--board-muted); }
+.pin .po s { font-weight: 700; font-size: 15px; color: var(--board-muted); }
+.pin .po i { font-style: normal; font-size: 13px; color: var(--board-muted); }
+.pin .po b.up, .pin .po b.dn { color: var(--lamp); }
+.pin .sp { flex: 1; }
+.pin .pk { font-size: 13px; font-weight: 600; color: var(--board-text); text-decoration: none; white-space: nowrap; }
+.pin .pk:hover { color: #fff; }
+.pin .pk i { font-style: normal; color: var(--lamp); }
+.px { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 3px; color: var(--board-muted); }
+.px:hover { color: #fff; background: rgba(255,255,255,.07); }
+.px svg { width: 14px; height: 14px; }
+.v-old .pin, .v-old .dock, .v-old .pinchip { display: none; }
+.chips .pinchip { display: inline-flex; align-items: center; gap: 5px; border-color: var(--lamp); color: var(--ink); }
+.chips .pinchip[hidden] { display: none; }
+.chips .pinchip .lg { width: 16px; height: 16px; margin: 0; }
+.chips .pinchip .pi { color: #8a5d00; }
+.chips .pinchip[aria-pressed="true"] { background: var(--lamp); border-color: var(--lamp); color: var(--plate-ink); }
+.dock { display: none; }
+@media (max-width: 899px) {
+  .pin { display: none !important; }
+  .dock:not([hidden]) { display: block; position: fixed; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 40; border-radius: 6px; background: var(--board); color: #fff; box-shadow: 0 8px 24px rgba(10, 36, 26, .35), 0 1px 3px rgba(10, 36, 26, .3); overflow: hidden; }
+  .has-dock body { padding-bottom: 84px; }
+  .dk { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 56px; padding: 8px 12px; text-align: left; }
+  .dk .lg { width: 24px; height: 24px; margin: 0; }
+  .dk .dn { font-family: "Saira Condensed", sans-serif; font-weight: 800; font-size: 18px; letter-spacing: .02em; }
+  .dk .dv { display: grid; grid-template-columns: auto auto; column-gap: 5px; align-items: baseline; margin-left: 6px; }
+  .dk .dv small { grid-column: 1 / -1; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--board-muted); }
+  .dk .dv b { font-family: "Saira Condensed", sans-serif; font-weight: 800; font-size: 22px; line-height: 1; }
+  .dk .dv em { font-style: normal; font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 14px; color: var(--lamp); }
+  .dk .dv em.dn { color: #f08a7e; }
+  .dk .chev { margin-left: auto; display: inline-flex; color: var(--board-muted); transition: transform 240ms cubic-bezier(.16, 1, .3, 1); }
+  .dk .chev svg { width: 18px; height: 18px; }
+  .dk[aria-expanded="true"] .chev { transform: rotate(180deg); }
+  .dmore { padding: 0 12px 12px; border-top: 1px solid var(--board-line); }
+  .dmore p { margin: 10px 0; font-size: 13px; color: var(--board-text); }
+  .da { display: flex; gap: 8px; }
+  .da a, .da button { flex: 1; display: inline-flex; align-items: center; justify-content: center; height: 44px; border-radius: 3px; border: 1px solid var(--board-line); font-family: "Saira Condensed", sans-serif; font-weight: 700; font-size: 16px; letter-spacing: .04em; text-transform: uppercase; color: #fff; text-decoration: none; }
+  .da a i { font-style: normal; color: var(--lamp); margin-left: 6px; }
+  .dock.bump .dk { animation: bump 900ms cubic-bezier(.16, 1, .3, 1); }
+  .chips .pinchip { height: 36px; }
+}
+@keyframes bump { 0% { background: color-mix(in srgb, var(--lamp) 45%, var(--board)); } 100% { background: var(--board); } }
+@media (prefers-reduced-motion: reduce) { .dock.bump .dk { animation: none; } .dk .chev { transition: none; } }
+.pinlg button { margin-left: 4px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.pinmode #games-h + .segc button { opacity: .45; }
+.pinmode #games-h + .segc button[aria-pressed="true"] { background: #fff; border-color: var(--rule); color: var(--ink-soft); }
+.gm.pinned { background: color-mix(in srgb, var(--lamp) 9%, transparent); }
+.pinmode .gm.pinned { background: none; }
+.br.pinr { margin-top: 4px; padding-top: 7px; border-top: 1px dashed var(--board-line); color: #fff; }
+.br.pinr .plate { color: var(--lamp); }
+.br.pinr i { margin-left: 8px; font-family: "Public Sans", sans-serif; font-style: normal; font-weight: 600; font-size: 11px; letter-spacing: .06em; color: var(--lamp); }
+.ld .pinl { color: var(--lamp); }
+.st tr.pinned td { color: #fff; box-shadow: inset 0 -1px 0 var(--lamp); }
+.st tr.pinned td:first-child { box-shadow: inset 3px 0 0 var(--lamp), inset 0 -1px 0 var(--lamp); }
+@media (max-width: 1279px) and (min-width: 900px) { .pin { gap: 12px; } .pin .pk[href] { display: none; } }
+@media (max-width: 899px) {
+  .pin { flex-wrap: wrap; gap: 6px 14px; padding: 8px 14px; }
+  .pin .pt { flex: 1; font-size: 17px; }
+  .pin .pb { order: 1; }
+  .pin [data-unpin] { order: 2; }
+  .pin .po { order: 3; }
+  .pin .sp { display: none; }
+  .pin .pb { height: 36px; }
+  .pin .pk[href] { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="board" id="top">
+    <div class="bar">
+      <a class="brand" href="b-scoreboard.html">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="32" rx="28" ry="17" transform="rotate(-35 32 32)" fill="#f3f0e6"/><path d="M14 36 L24 36 L28 26 L34 42 L38 32 L50 32" style="stroke: var(--board)" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round" transform="rotate(-35 32 32)"/></svg>
+        Mathematically Alive
+      </a>
+      <nav class="nav" aria-label="Site"><a href="b-scoreboard.html">Teams</a><span aria-current="page">Season Lab</span></nav>
+      <span class="asof">Through Nov 7</span>
+    </div>
+    <div class="marquee">
+      <div class="mt"><h1>Season Lab <span class="beta">Beta</span></h1><p>Play out the rest of the season.</p></div>
+      <p class="slim new-only">Season Lab <span class="beta">Beta</span> · Through Nov 7</p>
+      <div class="msg" id="msg" aria-live="polite"><small>Last pick</small><b>Pick a game, or fill the rest.</b></div>
+      <div class="cnt"><span class="plate" id="cnt">0</span><div>Picks<span id="seasons">20,000 seasons simulated</span></div></div>
+      <div class="acts">
+        <button type="button" id="undo" disabled>Undo</button>
+        <button type="button" id="reset" disabled>Reset</button>
+        <button type="button" id="share" class="share">Share</button>
+      </div>
+    </div>
+    <div class="pin new-only" id="pin" hidden></div>
+  </header>
+  <div class="dock new-only" id="dock" hidden></div>
+
+  <div class="tabs" role="tablist" aria-label="Season Lab">
+    <button role="tab" aria-selected="true" data-tab="field">Field</button>
+    <button role="tab" aria-selected="false" data-tab="games">Games</button>
+    <button role="tab" aria-selected="false" data-tab="races">Races</button>
+  </div>
+
+  <div class="body">
+    <div class="left">
+      <section class="pane show" id="field" aria-labelledby="field-h">
+        <div class="ph"><h2 id="field-h">Playoff field</h2>
+          <div class="segc" role="group" aria-label="Show"><button type="button" aria-pressed="true" data-view="seeds">Seeds</button><button type="button" aria-pressed="false" data-view="bracket">Bracket</button><button type="button" aria-pressed="false" data-view="top25">Top 25</button></div></div>
+        <p class="note"><span class="beta">Beta</span> Modelled, not the committee. #N is this week’s committee ranking.</p>
+        <div id="seeds"></div>
+        <div id="bracket" hidden></div>
+        <div id="top25" hidden></div>
+      </section>
+      <section class="pane" id="races" aria-labelledby="races-h">
+        <h2 id="races-h">Conference races</h2>
+        <p class="note">Title-game odds. Tap for standings.</p>
+        <div class="oot" id="racelist"></div>
+      </section>
+    </div>
+    <section class="pane" id="games" aria-labelledby="games-h">
+      <div class="ph"><h2 id="games-h">Games left</h2>
+        <div class="segc" role="group" aria-label="Which games"><button type="button" aria-pressed="true" data-scope="big">Big games<i id="nbig"></i></button><button type="button" aria-pressed="false" data-scope="all">All<i id="nall"></i></button></div></div>
+      <div class="ctl">
+        <label class="findw"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 13l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input class="find" id="find" type="search" placeholder="Find a team" aria-label="Find a team"></label>
+        <div class="fillw">
+          <button type="button" class="fillb" id="fillb" aria-haspopup="menu" aria-expanded="false">Fill the rest ▾</button>
+          <div class="menu" id="menu" role="menu" hidden>
+            <button role="menuitem" data-fill="favorites"><b>Favorites win</b><span>Every open game goes to the favorite.</span></button>
+            <button role="menuitem" data-fill="random"><b>Play out one season</b><span>One season drawn from the odds. Try it twice, get two seasons.</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="chips" id="chips" role="group" aria-label="Conference"></div>
+      <button type="button" class="fieldchip new-only" id="fieldchip" data-tab="field" hidden><span></span><b>See it →</b></button>
+      <div id="glist"></div>
+    </section>
+  </div>
+</div>
+<script id="lab-data">
+/* Season Lab drafts: shared data and a tiny pick engine. Numbers come from the running app's /lab (through Nov 7).
+   Draft only: nothing is simulated. The one pick with a real before/after is Illinois over UCLA (week 11). */
+(function () {
+  // [week, group, away, awayOdds, home, homeOdds, neutral]
+  const RAW = [[11,"MAC","Western Michigan","82%","Akron","18%",0],[11,"MAC","Kent State","36%","Bowling Green","64%",0],[11,"MAC","Ohio","46%","Miami (OH)","54%",0],[11,"MAC","Buffalo","58%","Ball State","42%",0],[11,"MAC","Sacramento State","16%","Central Michigan","84%",0],[11,"MAC","Massachusetts","18%","Toledo","82%",0],[11,"American","Memphis","66%","South Florida","34%",0],[11,"American","East Carolina","77%","Charlotte","23%",0],[11,"American","UAB","44%","Temple","56%",0],[11,"American","Tulane","46%","Rice","54%",0],[11,"American","Florida Atlantic","36%","Tulsa","64%",0],[11,"American","North Texas","54%","UTSA","46%",0],[11,"SBC","Louisiana","77%","UL Monroe","23%",0],[11,"SBC","Arkansas State","46%","Coastal Carolina","54%",0],[11,"SBC","Georgia Southern","64%","Georgia State","36%",0],[11,"SBC","Southern Miss","12%","Louisiana Tech","88%",0],[11,"SBC","App State","56%","Marshall","44%",0],[11,"SBC","Troy","42%","South Alabama","58%",0],[11,"ACC","Florida State","41%","Pittsburgh","59%",0],[11,"ACC","Louisville","56%","North Carolina","44%",0],[11,"ACC","Stanford","14%","Virginia Tech","86%",0],[11,"ACC","Duke","17%","Miami","83%",0],[11,"ACC","Syracuse","56%","NC State","44%",0],[11,"ACC","Wake Forest","56%","SMU","44%",0],[11,"ACC","Georgia Tech","19%","Clemson","81%",0],[11,"ACC","California","21%","Virginia","79%",0],[11,"Big Ten","Illinois","26%","UCLA","74%",0],[11,"Big Ten","Wisconsin","69%","Maryland","31%",0],[11,"Big Ten","Northwestern","25%","Ohio State","75%",0],[11,"Big Ten","Nebraska","81%","Rutgers","19%",0],[11,"Big Ten","USC","33%","Indiana","67%",0],[11,"Big Ten","Michigan","25%","Oregon","75%",0],[11,"Big Ten","Washington","59%","Michigan State","41%",0],[11,"Big Ten","Minnesota","31%","Penn State","69%",0],[11,"Big Ten","Purdue","14%","Iowa","86%",0],[11,"Big 12","Houston","75%","Colorado","25%",0],[11,"Big 12","Arizona State","44%","UCF","56%",0],[11,"Big 12","Baylor","33%","BYU","67%",0],[11,"Big 12","Cincinnati","46%","Iowa State","54%",0],[11,"Big 12","Kansas","44%","West Virginia","56%",0],[11,"Big 12","Kansas State","27%","TCU","73%",0],[11,"Big 12","Texas Tech","42%","Oklahoma State","58%",0],[11,"Big 12","Utah","54%","Arizona","46%",0],[11,"SEC","Missouri","19%","Georgia","81%",0],[11,"SEC","Florida","44%","Kentucky","56%",0],[11,"SEC","Texas","40%","LSU","60%",0],[11,"SEC","Ole Miss","56%","Oklahoma","44%",0],[11,"SEC","Tennessee","58%","Texas A&M","42%",0],[11,"SEC","Auburn","59%","Mississippi State","41%",0],[11,"SEC","Alabama","90%","Vanderbilt","10%",0],[11,"SEC","South Carolina","71%","Arkansas","29%",0],[11,"Nonconference","James Madison","58%","UConn","42%",0],[11,"Nonconference","Boston College","2%","Notre Dame","98%",0],[11,"CUSA","Kennesaw State","71%","Sam Houston","29%",0],[11,"CUSA","New Mexico State","44%","Missouri State","56%",0],[11,"CUSA","Florida International","35%","Delaware","65%",0],[11,"CUSA","Jacksonville State","66%","Western Kentucky","34%",0],[11,"CUSA","Middle Tennessee","9%","Liberty","91%",0],[11,"MW","Nevada","73%","Northern Illinois","27%",0],[11,"MW","San José State","25%","Air Force","75%",0],[11,"MW","UNLV","19%","New Mexico","81%",0],[11,"MW","Wyoming","73%","UTEP","27%",0],[11,"MW","North Dakota State","71%","Hawai'i","29%",0],[11,"Pac 12","Fresno State","33%","Texas State","67%",0],[11,"Pac 12","Oregon State","27%","Boise State","73%",0],[11,"Pac 12","Utah State","56%","San Diego State","44%",0],[11,"Pac 12","Colorado State","34%","Washington State","66%",0],[12,"MAC","Ball State","17%","Ohio","83%",0],[12,"MAC","Eastern Michigan","19%","Western Michigan","81%",0],[12,"MAC","Miami (OH)","81%","Kent State","19%",0],[12,"MAC","Akron","20%","Massachusetts","80%",0],[12,"MAC","Central Michigan","43%","Buffalo","57%",0],[12,"MAC","Bowling Green","8%","Toledo","92%",0],[12,"American","Rice","32%","Temple","68%",0],[12,"American","Charlotte","6%","Tulsa","94%",0],[12,"American","South Florida","56%","Florida Atlantic","44%",0],[12,"American","North Texas","81%","Tulane","19%",0],[12,"American","UTSA","70%","UAB","30%",0],[12,"American","East Carolina","34%","Army","66%",0],[12,"American","Memphis","71%","Navy","29%",0],[12,"Big 12","Iowa State","39%","UCF","61%",0],[12,"Big 12","Arizona","70%","Kansas State","30%",0],[12,"Big 12","BYU","79%","Kansas","21%",0],[12,"Big 12","Colorado","30%","Cincinnati","70%",0],[12,"Big 12","Houston","73%","West Virginia","27%",0],[12,"Big 12","Oklahoma State","73%","Arizona State","27%",0],[12,"Big 12","Texas Tech","62%","Baylor","38%",0],[12,"Big 12","Utah","70%","TCU","30%",0],[12,"ACC","Clemson","33%","Duke","67%",0],[12,"ACC","Virginia Tech","14%","Miami","86%",0],[12,"ACC","NC State","33%","Florida State","67%",0],[12,"ACC","North Carolina","48%","Virginia","52%",0],[12,"ACC","Pittsburgh","28%","Louisville","72%",0],[12,"ACC","Stanford","39%","California","61%",0],[12,"ACC","Syracuse","49%","Boston College","51%",0],[12,"ACC","Wake Forest","87%","Georgia Tech","13%",0],[12,"Big Ten","Oregon","84%","Michigan State","16%",0],[12,"Big Ten","Iowa","54%","Illinois","46%",0],[12,"Big Ten","UCLA","54%","Michigan","46%",0],[12,"Big Ten","Northwestern","60%","Minnesota","40%",0],[12,"Big Ten","Ohio State","67%","Nebraska","33%",0],[12,"Big Ten","Rutgers","12%","Penn State","88%",0],[12,"Big Ten","Wisconsin","69%","Purdue","31%",0],[12,"Big Ten","Maryland","7%","USC","93%",0],[12,"Big Ten","Indiana","78%","Washington","22%",0],[12,"MW","UTEP","7%","Air Force","93%",0],[12,"MW","New Mexico","84%","Wyoming","16%",0],[12,"MW","Hawai'i","29%","Nevada","71%",0],[12,"MW","Northern Illinois","2%","North Dakota State","98%",0],[12,"MW","UNLV","61%","San José State","39%",0],[12,"SEC","Vanderbilt","30%","Florida","70%",0],[12,"SEC","Kentucky","29%","Missouri","71%",0],[12,"SEC","Texas A&M","44%","Oklahoma","56%",0],[12,"SEC","Georgia","80%","South Carolina","20%",0],[12,"SEC","LSU","54%","Tennessee","46%",0],[12,"SEC","Arkansas","5%","Texas","95%",0],[12,"SBC","UL Monroe","11%","App State","89%",0],[12,"SBC","Arkansas State","24%","Louisiana Tech","76%",0],[12,"SBC","Coastal Carolina","29%","Louisiana","71%",0],[12,"SBC","Georgia Southern","66%","Troy","34%",0],[12,"SBC","Georgia State","52%","Marshall","48%",0],[12,"SBC","South Alabama","53%","Southern Miss","47%",0],[12,"Nonconference","Wofford","3%","Ole Miss","97%",0],[12,"Nonconference","Tennessee Tech","18%","Mississippi State","82%",0],[12,"Nonconference","Chattanooga","2%","Alabama","98%",0],[12,"Nonconference","Samford","11%","Auburn","89%",0],[12,"Nonconference","Old Dominion","14%","UConn","86%",0],[12,"Nonconference","SMU","13%","Notre Dame","87%",0],[12,"CUSA","Western Kentucky","8%","Liberty","92%",0],[12,"CUSA","Missouri State","16%","Jacksonville State","84%",0],[12,"CUSA","Middle Tennessee","57%","Sam Houston","43%",0],[12,"CUSA","Delaware","49%","New Mexico State","51%",0],[12,"CUSA","Florida International","50%","Kennesaw State","50%",0],[12,"Pac 12","Washington State","12%","Texas State","88%",0],[12,"Pac 12","Colorado State","16%","Fresno State","84%",0],[12,"Pac 12","San Diego State","6%","Boise State","94%",0],[12,"Pac 12","Utah State","21%","Oregon State","79%",0],[13,"MAC","Miami (OH)","38%","Western Michigan","62%",0],[13,"MAC","Kent State","26%","Eastern Michigan","74%",0],[13,"MAC","Buffalo","66%","Akron","34%",0],[13,"MAC","Toledo","59%","Ohio","41%",0],[13,"MAC","Central Michigan","52%","Ball State","48%",0],[13,"MAC","Massachusetts","59%","Bowling Green","41%",0],[13,"Big 12","TCU","14%","Texas Tech","86%",0],[13,"Big 12","West Virginia","9%","Utah","91%",0],[13,"Big 12","Arizona State","39%","Arizona","61%",0],[13,"Big 12","Baylor","37%","Houston","63%",0],[13,"Big 12","UCF","53%","Colorado","47%",0],[13,"Big 12","Cincinnati","16%","BYU","84%",0],[13,"Big 12","Kansas","17%","Oklahoma State","83%",0],[13,"Big 12","Kansas State","48%","Iowa State","52%",0],[13,"American","Florida Atlantic","45%","East Carolina","55%",0],[13,"American","Temple","11%","Memphis","89%",0],[13,"American","Tulane","16%","South Florida","84%",0],[13,"American","Tulsa","38%","UTSA","62%",0],[13,"American","Army","73%","Rice","27%",0],[13,"American","Navy","86%","Charlotte","14%",0],[13,"American","UAB","14%","North Texas","86%",0],[13,"SEC","Mississippi State","17%","Ole Miss","83%",0],[13,"SEC","Texas","56%","Texas A&M","44%",0],[13,"SEC","Auburn","26%","Alabama","74%",0],[13,"SEC","LSU","94%","Arkansas","6%",0],[13,"SEC","Oklahoma","26%","Missouri","74%",0],[13,"SEC","Tennessee","58%","Vanderbilt","42%",0],[13,"Big Ten","Nebraska","40%","Iowa","60%",0],[13,"Big Ten","Minnesota","31%","Wisconsin","69%",0],[13,"Big Ten","Illinois","59%","Northwestern","41%",0],[13,"Big Ten","Purdue","6%","Indiana","94%",0],[13,"Big Ten","Penn State","68%","Maryland","32%",0],[13,"Big Ten","Washington","16%","Oregon","84%",0],[13,"Big Ten","Michigan State","63%","Rutgers","37%",0],[13,"Big Ten","USC","75%","UCLA","25%",0],[13,"Big Ten","Michigan","19%","Ohio State","81%",0],[13,"SBC","App State","57%","South Alabama","43%",0],[13,"SBC","Coastal Carolina","11%","James Madison","89%",0],[13,"SBC","Louisiana Tech","45%","Georgia Southern","55%",0],[13,"SBC","Louisiana","55%","Georgia State","45%",0],[13,"SBC","Marshall","70%","UL Monroe","30%",0],[13,"SBC","Southern Miss","44%","Old Dominion","56%",0],[13,"SBC","Troy","41%","Arkansas State","59%",0],[13,"Nonconference","Florida","61%","Florida State","39%",0],[13,"Nonconference","Georgia Tech","2%","Georgia","98%",0],[13,"Nonconference","Louisville","55%","Kentucky","45%",0],[13,"Nonconference","South Carolina","42%","Clemson","58%",0],[13,"Nonconference","Notre Dame","94%","Syracuse","6%",0],[13,"Nonconference","UConn","63%","Wyoming","37%",0],[13,"Nonconference","Oregon State","83%","Washington State","17%",0],[13,"Nonconference","San Diego State","19%","Fresno State","81%",0],[13,"Nonconference","Texas State","82%","Colorado State","18%",0],[13,"Nonconference","Boise State","80%","Utah State","20%",0],[13,"Nonconference","Sacramento State","13%","Hawai'i","87%",0],[13,"MW","North Dakota State","82%","San José State","18%",0],[13,"MW","Air Force","18%","New Mexico","82%",0],[13,"MW","UTEP","50%","Northern Illinois","50%",0],[13,"MW","Nevada","38%","UNLV","62%",0],[13,"ACC","Boston College","4%","Miami","96%",0],[13,"ACC","Duke","28%","Wake Forest","72%",0],[13,"ACC","NC State","54%","North Carolina","46%",0],[13,"ACC","Pittsburgh","80%","California","20%",0],[13,"ACC","SMU","92%","Stanford","8%",0],[13,"ACC","Virginia","46%","Virginia Tech","54%",0],[13,"CUSA","Kennesaw State","44%","Western Kentucky","56%",0],[13,"CUSA","Liberty","91%","Missouri State","9%",0],[13,"CUSA","Sam Houston","20%","Florida International","80%",0],[13,"CUSA","New Mexico State","49%","Middle Tennessee","51%",0],[13,"CUSA","Jacksonville State","63%","Delaware","37%",0],[15,"Nonconference","Navy","56%","Army","44%",1]];
+
+  const BIG = new Set(["11|Illinois|UCLA", "11|USC|Indiana", "11|Michigan|Oregon", "11|Baylor|BYU", "11|Texas Tech|Oklahoma State",
+    "11|Texas|LSU", "11|Alabama|Vanderbilt", "11|Wake Forest|SMU", "11|Oregon State|Boise State", "12|Oregon|Michigan State",
+    "12|LSU|Tennessee", "12|Texas Tech|Baylor", "13|Texas|Texas A&M", "13|USC|UCLA", "13|Boise State|Utah State"]);
+  const GROUP = { SBC: "Sun Belt", MW: "Mountain West", Nonconference: "Non-con" };
+  const games = RAW.map(([week, group, away, ao, home, ho, neutral]) => {
+    const key = `${week}|${away}|${home}`;
+    return { key, week, group: GROUP[group] || group, away, home, awayOdds: parseInt(ao), homeOdds: parseInt(ho), neutral: !!neutral, big: BIG.has(key) };
+  });
+  const WEEKS = { 11: "Nov 14", 12: "Nov 21", 13: "Nov 28", 15: "Dec 12" };
+
+  const COLORS = { Georgia: "#ba0c2f", Miami: "#f47321", Utah: "#cc0000", Indiana: "#990000", Alabama: "#9e1b32", "Notre Dame": "#0c2340",
+    UCLA: "#2d68c4", "Texas Tech": "#cc0000", Texas: "#bf5700", "Wake Forest": "#9e7e38", Oregon: "#154733", "Boise State": "#0033a0",
+    BYU: "#002e5d", USC: "#990000", "Ohio State": "#bb0000", Houston: "#c8102e", Tennessee: "#ff8200", "New Mexico": "#ba0c2f",
+    LSU: "#461d7c", Iowa: "#ffcd00", "Ole Miss": "#ce1126", Kentucky: "#0033a0", Liberty: "#0a254e", Arizona: "#cc0033", SMU: "#0033a0" };
+
+  const R = { a: "strong record, strong team rating", t: "tough schedule, strong team rating" };
+  // [name, In %, record, reason]
+  const FIELD = {
+    before: [["Georgia", 94, "11-2", R.a], ["Miami", 92, "11-2", R.a], ["Utah", 88, "12-1", R.a], ["Indiana", 85, "11-2", R.a],
+      ["Alabama", 83, "10-3", R.t], ["Notre Dame", 91, "11-1", R.a], ["UCLA", 66, "11-2", R.a], ["Texas Tech", 50, "10-2", "strong record, Big 12 title in 22%"],
+      ["Texas", 68, "9-3", R.t], ["Wake Forest", 45, "10-3", R.a], ["Oregon", 42, "9-3", "tough schedule"], ["Boise State", 63, "11-2", "strong record"]],
+    after: [["Georgia", 94, "11-2", R.a], ["Miami", 92, "11-2", R.a], ["Utah", 89, "12-1", R.a], ["Indiana", 85, "11-2", R.a],
+      ["Alabama", 84, "10-3", R.t], ["Notre Dame", 92, "11-1", R.a], ["Texas Tech", 52, "10-2", "strong record, Big 12 title in 22%"], ["Texas", 69, "9-3", R.t],
+      ["Wake Forest", 46, "10-3", R.a], ["Oregon", 43, "9-3", "tough schedule"], ["BYU", 41, "9-3", "tough schedule"], ["Boise State", 63, "11-2", "strong record"]],
+  };
+  const BUBBLE = {
+    before: [["BYU", 40], ["USC", 39], ["Ohio State", 32], ["Houston", 28], ["Tennessee", 26], ["New Mexico", 23]],
+    after: [["USC", 41], ["UCLA", 41], ["Ohio State", 35], ["Houston", 29], ["Tennessee", 27], ["LSU", 24]],
+  };
+  // [name, record, average rank, top-12 %]
+  const RANKING = [["Georgia", "11-2", 4.3, 95], ["Miami", "11-2", 5.1, 93], ["Utah", "12-1", 5.6, 90], ["Indiana", "11-2", 6.6, 87],
+    ["Notre Dame", "11-1", 6.9, 91], ["Alabama", "10-3", 7.5, 85], ["UCLA", "11-2", 9.8, 69], ["Texas", "9-3", 10.0, 71], ["Texas Tech", "10-2", 13.0, 53],
+    ["USC", "9-3", 14.1, 43], ["Oregon", "9-3", 14.3, 46], ["Wake Forest", "10-3", 14.5, 46], ["Boise State", "11-2", 15.1, 46], ["BYU", "9-3", 15.2, 43],
+    ["Ohio State", "8-4", 17.0, 35], ["Houston", "9-3", 17.7, 31], ["Tennessee", "9-3", 18.8, 28], ["LSU", "8-4", 19.0, 26], ["Iowa", "9-3", 20.2, 23],
+    ["Ole Miss", "8-4", 21.4, 14], ["Kentucky", "8-4", 22.3, 17], ["New Mexico", "11-2", 22.9, 14], ["Liberty", "11-2", 25.2, 5], ["Arizona", "9-3", 26.4, 10], ["SMU", "9-3", 28.9, 6]];
+
+  // Each conference: [team, conference record, games open, title-game %, champion %]; `more` = teams below these five.
+  const CONFS = [
+    { name: "ACC", more: 12, rows: [["Miami", "6-0", 3, "99%", "68%"], ["Wake Forest", "5-1", 3, "62%", "21%"], ["SMU", "5-2", 2, "25%", "8%"], ["Louisville", "5-2", 2, "9%", "3%"], ["Duke", "4-2", 3, "3%", "0.8%"]] },
+    { name: "Big Ten", more: 13, rows: [["UCLA", "6-0", 3, "67%", "22%"], ["Indiana", "5-1", 3, "61%", "40%"], ["USC", "4-2", 3, "20%", "12%"], ["Ohio State", "4-2", 3, "16%", "9%"], ["Wisconsin", "4-2", 3, "6%", "2%"]],
+      after: [["Indiana", "5-1", 3, "64%", "39%"], ["UCLA", "6-1", 2, "32%", "11%"], ["Oregon", "4-2", 3, "30%", "14%"], ["Ohio State", "4-2", 3, "29%", "16%"], ["USC", "4-2", 3, "22%", "12%"]] },
+    { name: "SEC", more: 11, rows: [["Georgia", "6-1", 2, "94%", "62%"], ["Alabama", "5-2", 2, "56%", "21%"], ["Texas", "4-2", 3, "17%", "7%"], ["Tennessee", "4-2", 3, "15%", "5%"], ["Kentucky", "5-2", 2, "9%", "2%"]] },
+    { name: "Big 12", more: 11, rows: [["Utah", "6-0", 3, "91%", "50%"], ["Texas Tech", "5-1", 3, "45%", "22%"], ["Houston", "4-2", 3, "20%", "7%"], ["BYU", "4-2", 3, "19%", "10%"], ["Oklahoma State", "4-2", 3, "12%", "5%"]] },
+    { name: "American", more: 9, rows: [["North Texas", "5-0", 3, "83%", "37%"], ["Memphis", "4-1", 3, "77%", "47%"], ["UTSA", "4-1", 3, "32%", "13%"], ["Army", "4-2", 2, "4%", "2%"], ["UAB", "3-2", 3, "0.7%", "0.2%"]] },
+    { name: "Pac 12", more: 3, rows: [["Boise State", "5-0", 2, "99%", "69%"], ["Texas State", "3-2", 2, "52%", "17%"], ["Oregon State", "3-2", 2, "22%", "9%"], ["Utah State", "3-2", 2, "14%", "3%"], ["San Diego State", "3-2", 2, "7%", "0.6%"]] },
+    { name: "Mountain West", more: 5, rows: [["New Mexico", "5-0", 3, "93%", "65%"], ["North Dakota State", "4-2", 3, "60%", "26%"], ["Wyoming", "5-1", 2, "41%", "6%"], ["Air Force", "3-2", 3, "3%", "2%"], ["UNLV", "3-2", 3, "1%", "0.5%"]] },
+    { name: "Sun Belt", more: 9, rows: [["Louisiana Tech", "5-0", 3, "99%", "35%"], ["James Madison", "5-2", 1, "69%", "48%"], ["Georgia Southern", "4-1", 3, "31%", "16%"], ["Louisiana", "3-2", 3, "0.7%", "0.2%"], ["South Alabama", "2-3", 3, "<0.1%", "<0.1%"]] },
+    { name: "MAC", more: 8, rows: [["Toledo", "4-1", 3, "62%", "41%"], ["Ohio", "5-0", 3, "57%", "27%"], ["Western Michigan", "4-1", 3, "46%", "23%"], ["Buffalo", "4-1", 3, "27%", "6%"], ["Miami (OH)", "3-2", 3, "7%", "3%"]] },
+    { name: "CUSA", more: 5, rows: [["Liberty", "5-0", 3, "99%", "74%"], ["Jacksonville State", "5-0", 3, "99%", "26%"], ["Middle Tennessee", "3-2", 3, "0.8%", "0.1%"], ["Delaware", "2-3", 3, "0.6%", "<0.1%"], ["Western Kentucky", "2-3", 3, "<0.1%", "<0.1%"]] },
+  ];
+
+  /* Pick engine. Two picks have real before/after numbers from the app: Illinois over UCLA and SMU over Wake Forest. */
+  const ILL = "11|Illinois|UCLA", SMU = "11|Wake Forest|SMU";
+  // Field and bubble for each combination of those two upsets ("" = neither).
+  const F = (rows) => rows.map(([n, p]) => [n, p]);
+  const STATES = {
+    "": { field: FIELD.before, bubble: BUBBLE.before },
+    ILL: { field: FIELD.after, bubble: BUBBLE.after },
+    SMU: { field: F([["Georgia", 94], ["Miami", 92], ["Utah", 89], ["Indiana", 85], ["Alabama", 84], ["Notre Dame", 92], ["UCLA", 67], ["Texas Tech", 51], ["Texas", 68], ["Oregon", 43], ["BYU", 40], ["Boise State", 63]]),
+      bubble: [["USC", 40], ["Ohio State", 33], ["Houston", 29], ["Tennessee", 26], ["LSU", 24], ["New Mexico", 23]] },
+    "ILL+SMU": { field: F([["Georgia", 94], ["Miami", 93], ["Utah", 89], ["Indiana", 86], ["Alabama", 85], ["Notre Dame", 92], ["Texas Tech", 52], ["Texas", 70], ["USC", 42], ["Oregon", 44], ["BYU", 42], ["Boise State", 63]]),
+      bubble: [["UCLA", 41], ["Ohio State", 35], ["Houston", 30], ["Tennessee", 27], ["LSU", 25], ["New Mexico", 24]] },
+  };
+  const ACC_SMU = [["Miami", "6-0", 3, "99%", "70%"], ["SMU", "6-2", 1, "55%", "15%"], ["Louisville", "5-2", 2, "18%", "5%"], ["Wake Forest", "5-2", 2, "24%", "8%"], ["Duke", "4-2", 3, "3%", "0.9%"]];
+  const keyOf = (picks) => [picks[ILL] === "Illinois" && "ILL", picks[SMU] === "SMU" && "SMU"].filter(Boolean).join("+");
+
+  const state = { picks: {}, titles: {}, bracket: {}, history: [], refining: false, prevKey: "", note: "" };
+  const subs = [];
+  const emit = () => subs.forEach((f) => f(view()));
+  const snapshot = () => ({ picks: { ...state.picks }, titles: { ...state.titles }, bracket: { ...state.bracket }, prevKey: state.prevKey, note: state.note });
+  const num = (s) => parseFloat(String(s).replace("<", ""));
+  function confRows(c, key) {
+    if (c.name === "Big Ten" && key.includes("ILL")) return c.after;
+    if (c.name === "ACC" && key.includes("SMU")) return ACC_SMU;
+    return c.rows;
+  }
+  // A conference's title game: its two likeliest teams, the likelier one first. `pair` ignores order.
+  function titleGame(c, key) {
+    const rows = confRows(c, key);
+    const two = [...rows].sort((x, y) => num(y[3]) - num(x[3])).slice(0, 2);
+    // Head-to-head estimate if they meet: each team's chance to win the title once it's in the game, normalised to 100.
+    const cond = two.map((r) => num(r[4]) / Math.max(num(r[3]), 0.1));
+    const pa = Math.round((100 * cond[0]) / (cond[0] + cond[1]));
+    return { conf: c.name, teams: two.map((r, i) => ({ name: r[0], odds: r[4], h2h: `${i === 0 ? pa : 100 - pa}%` })), pair: two.map((r) => r[0]).sort().join("|") };
+  }
+  const isNew = () => document.documentElement.classList.contains("v-new");
+  function commit(next, action = { kind: "game" }) {
+    state.last = action;
+    state.history.push(snapshot());
+    if (state.history.length > 50) state.history.shift();
+    state.prevKey = keyOf(state.picks);
+    Object.assign(state, next);
+    // A title pick stands only while its matchup is the same two teams; a flip in order keeps it.
+    const key = keyOf(state.picks), cleared = [];
+    for (const [conf, t] of Object.entries(state.titles)) {
+      const now = titleGame(CONFS.find((c) => c.name === conf), key);
+      if (now.pair !== t.pair) { cleared.push(conf); delete state.titles[conf]; }
+    }
+    state.titles = { ...state.titles };
+    state.note = cleared.length ? `${cleared.join(" and ")} title pick cleared: the matchup changed.` : "";
+    // Proposed: bracket and title-game picks don't re-run the season, so they don't flash "Refining…".
+    if (isNew() && (action.kind === "bracket" || action.kind === "title")) { state.refining = false; emit(); return; }
+    refine();
+  }
+  let timer;
+  function refine() {
+    state.refining = true;
+    emit();
+    clearTimeout(timer);
+    timer = setTimeout(() => { state.refining = false; emit(); }, 700);
+  }
+  function seeds() { return STATES[keyOf(state.picks)].field.map((r) => r[0]); }
+  // 0–3 first round (5v12, 6v11, 7v10, 8v9); 4–7 quarterfinals (1–4 vs a first-round winner); 8–9 semifinals; 10 final.
+  const SHAPE = [[[5], [12]], [[6], [11]], [[7], [10]], [[8], [9]], [[1], ["w", 3]], [[2], ["w", 2]], [[3], ["w", 1]], [[4], ["w", 0]],
+    [["w", 4], ["w", 7]], [["w", 5], ["w", 6]], [["w", 8], ["w", 9]]];
+  const ROUND = (i) => (i < 4 ? "First round" : i < 8 ? "Quarterfinals" : i < 10 ? "Semifinals" : "Final");
+  function bracket() {
+    const s = seeds();
+    const seedOf = (n) => s.indexOf(n) + 1;
+    const out = [];
+    SHAPE.forEach(([a, b], i) => {
+      const side = (x) => {
+        if (x[0] !== "w") return { name: s[x[0] - 1], seed: x[0] };
+        const p = state.bracket[x[1]];
+        const g = out[x[1]];
+        return p && g && [g.a, g.b].some((t) => t && t.name === p) ? { name: p, seed: seedOf(p) } : { from: x[1] };
+      };
+      const g = { index: i, round: ROUND(i), a: side(a), b: side(b) };
+      const p = state.bracket[i];
+      g.pick = p && [g.a, g.b].some((t) => t.name === p) ? p : null;
+      out.push(g);
+    });
+    return out;
+  }
+  // What the last pick did to the field, in the app's wording.
+  const ADVANCE = (i) => (i < 4 ? "to the quarterfinals" : i < 8 ? "to the semifinals" : i < 10 ? "to the final" : "wins the national title");
+  function headline(key, prevKey, n) {
+    // Proposed: a bracket or title-game pick says what it did, not "No change to the field."
+    const a = state.last || {};
+    if (a.kind === "import") {
+      const what = `${a.n} pick${a.n === 1 ? "" : "s"} from ${a.from}.`;
+      if (key === prevKey) return what;
+      const after = STATES[key].field.map((r) => r[0]), before = STATES[prevKey].field.map((r) => r[0]);
+      const inn = after.find((t) => !before.includes(t));
+      return inn ? `${what} ${inn} moves into the field.` : `${what} The field reshuffles.`;
+    }
+    if (isNew() && key === prevKey && a.kind === "bracket" && a.team) return `${a.team} ${ADVANCE(a.index)}.`;
+    if (isNew() && key === prevKey && a.kind === "title" && a.team) return `${a.team} wins the ${a.conf}.`;
+    if (key === prevKey) return n > 0 ? "No change to the field." : "";
+    const before = STATES[prevKey].field.map((r) => r[0]), after = STATES[key].field.map((r) => r[0]);
+    const inn = after.find((t) => !before.includes(t)), out = before.find((t) => !after.includes(t));
+    if (inn && out) return `${inn} into the field as the ${after.indexOf(inn) + 1} seed; ${out} out.`;
+    return "The field reshuffles.";
+  }
+  function view() {
+    const key = keyOf(state.picks), prev = STATES[state.prevKey].field.map((r) => r[0]);
+    const moved = key !== state.prevKey;
+    const field = STATES[key].field.map(([name, pct], i) => {
+      const was = prev.indexOf(name);
+      return { seed: i + 1, name, pct, color: COLORS[name] || "#5a6780", bye: i < 4,
+        move: !moved ? null : was === -1 ? "new" : was > i ? "up" : was < i ? "down" : null };
+    });
+    const outNow = moved ? prev.filter((t) => !field.some((f) => f.name === t)) : [];
+    const bubble = STATES[key].bubble.map(([name, pct]) => ({ name, pct, color: COLORS[name] || "#5a6780", out: outNow.includes(name) }));
+    const confs = CONFS.map((c) => {
+      const rows = confRows(c, key);
+      const lead = [...rows].sort((x, y) => num(y[3]) - num(x[3])).slice(0, 2);
+      const champ = [...rows].sort((x, y) => num(y[4]) - num(x[4]))[0];
+      return { name: c.name, rows, more: c.more, lead, champ, moved: rows !== c.rows };
+    });
+    const titleGames = CONFS.map((c) => ({ ...titleGame(c, key), pick: state.titles[c.name]?.team ?? null }));
+    const n = Object.keys(state.picks).length + Object.keys(state.titles).length + Object.keys(state.bracket).length;
+    const open = games.filter((g) => !state.picks[g.key]).length + titleGames.filter((t) => !t.pick).length;
+    const head = headline(key, state.prevKey, n);
+    return {
+      picks: state.picks, count: n, open, refining: state.refining, canUndo: state.history.length > 0,
+      summary: n === 0 ? "No picks yet" : `${n} pick${n === 1 ? "" : "s"}`,
+      seasons: state.refining ? "Refining…" : "20,000 seasons simulated",
+      headline: state.note ? `${head ? head + " " : ""}${state.note}` : head,
+      field, bubble, confs, titleGames, bracket: bracket(), fieldMoved: key !== state.prevKey,
+      ranking: RANKING.map(([name, rec, avg, top], i) => ({ rank: i + 1, name, rec, avg, top, inField: field.some((f) => f.name === name) })),
+    };
+  }
+
+  // Team ids (for logos) and this week's committee ranking, from data/season-2026.json.
+  const TID = {"Auburn":2,"UAB":5,"South Alabama":6,"Arkansas":8,"Arizona State":9,"Arizona":12,"Sacramento State":16,"San Diego State":21,"San José State":23,"Stanford":24,"California":25,"UCLA":26,"USC":30,"Colorado State":36,"Colorado":38,"UConn":41,"Delaware":48,"Florida State":52,"Jacksonville State":55,"Florida":57,"South Florida":58,"Georgia Tech":59,"Georgia":61,"Hawai'i":62,"Iowa State":66,"Boise State":68,"Northwestern":77,"Indiana":84,"Notre Dame":87,"Kentucky":96,"Louisville":97,"Western Kentucky":98,"LSU":99,"Boston College":103,"Massachusetts":113,"Maryland":120,"Michigan State":127,"Michigan":130,"Minnesota":135,"Missouri":142,"Ole Miss":145,"Duke":150,"East Carolina":151,"NC State":152,"North Carolina":153,"Wake Forest":154,"Nebraska":158,"Rutgers":164,"New Mexico State":166,"New Mexico":167,"Syracuse":183,"Bowling Green":189,"Miami (OH)":193,"Ohio State":194,"Ohio":195,"Oklahoma State":197,"Oklahoma":201,"Tulsa":202,"Oregon State":204,"Penn State":213,"Temple":218,"Pittsburgh":221,"Clemson":228,"Memphis":235,"Vanderbilt":238,"Baylor":239,"Rice":242,"Texas A&M":245,"Houston":248,"North Texas":249,"Texas":251,"BYU":252,"Utah":254,"James Madison":256,"Virginia":258,"Virginia Tech":259,"Washington":264,"Washington State":265,"Wisconsin":275,"Marshall":276,"West Virginia":277,"Fresno State":278,"Georgia Southern":290,"Old Dominion":295,"Louisiana":309,"Coastal Carolina":324,"Texas State":326,"Utah State":328,"Alabama":333,"Kennesaw State":338,"Mississippi State":344,"Army":349,"Illinois":356,"Air Force":2005,"Akron":2006,"App State":2026,"Arkansas State":2032,"Ball State":2050,"Buffalo":2084,"UCF":2116,"Central Michigan":2117,"Cincinnati":2132,"Eastern Michigan":2199,"Florida Atlantic":2226,"Florida International":2229,"Georgia State":2247,"Iowa":2294,"Kansas":2305,"Kansas State":2306,"Kent State":2309,"Liberty":2335,"Louisiana Tech":2348,"Miami":2390,"Middle Tennessee":2393,"Navy":2426,"Charlotte":2429,"UL Monroe":2433,"UNLV":2439,"Nevada":2440,"North Dakota State":2449,"Northern Illinois":2459,"Oregon":2483,"Purdue":2509,"Sam Houston":2534,"SMU":2567,"Southern Miss":2572,"South Carolina":2579,"Missouri State":2623,"TCU":2628,"Tennessee":2633,"UTSA":2636,"UTEP":2638,"Texas Tech":2641,"Toledo":2649,"Troy":2653,"Tulane":2655,"Western Michigan":2711,"Wyoming":2751};
+  const ABBR = {"Auburn":"AUB","UAB":"UAB","South Alabama":"USA","Arkansas":"ARK","Arizona State":"ASU","Arizona":"ARIZ","Sacramento State":"SAC","San Diego State":"SDSU","San José State":"SJSU","Stanford":"STAN","California":"CAL","UCLA":"UCLA","USC":"USC","Colorado State":"CSU","Colorado":"COLO","UConn":"CONN","Delaware":"DEL","Florida State":"FSU","Jacksonville State":"JXST","Florida":"FLA","South Florida":"USF","Georgia Tech":"GT","Georgia":"UGA","Hawai'i":"HAW","Iowa State":"ISU","Boise State":"BOIS","Northwestern":"NU","Indiana":"IU","Notre Dame":"ND","Kentucky":"UK","Louisville":"LOU","Western Kentucky":"WKU","LSU":"LSU","Boston College":"BC","Massachusetts":"MASS","Maryland":"MD","Michigan State":"MSU","Michigan":"MICH","Minnesota":"MINN","Missouri":"MIZ","Ole Miss":"MISS","Duke":"DUKE","East Carolina":"ECU","NC State":"NCSU","North Carolina":"UNC","Wake Forest":"WAKE","Nebraska":"NEB","Rutgers":"RUTG","New Mexico State":"NMSU","New Mexico":"UNM","Syracuse":"SYR","Bowling Green":"BGSU","Miami (OH)":"M-OH","Ohio State":"OSU","Ohio":"OHIO","Oklahoma State":"OKST","Oklahoma":"OU","Tulsa":"TLSA","Oregon State":"ORST","Penn State":"PSU","Temple":"TEM","Pittsburgh":"PITT","Clemson":"CLEM","Memphis":"MEM","Vanderbilt":"VAN","Baylor":"BAY","Rice":"RICE","Texas A&M":"TA&M","Houston":"HOU","North Texas":"UNT","Texas":"TEX","BYU":"BYU","Utah":"UTAH","James Madison":"JMU","Virginia":"UVA","Virginia Tech":"VT","Washington":"WASH","Washington State":"WSU","Wisconsin":"WIS","Marshall":"MRSH","West Virginia":"WVU","Fresno State":"FRES","Georgia Southern":"GASO","Old Dominion":"ODU","Louisiana":"UL","Coastal Carolina":"CCU","Texas State":"TXST","Utah State":"USU","Alabama":"ALA","Kennesaw State":"KENN","Mississippi State":"MSST","Army":"ARMY","Illinois":"ILL","Air Force":"AF","Akron":"AKR","App State":"APP","Arkansas State":"ARST","Ball State":"BALL","Buffalo":"BUF","UCF":"UCF","Central Michigan":"CMU","Cincinnati":"CIN","Eastern Michigan":"EMU","Florida Atlantic":"FAU","Florida International":"FIU","Georgia State":"GAST","Iowa":"IOWA","Kansas":"KU","Kansas State":"KSU","Kent State":"KENT","Liberty":"LIB","Louisiana Tech":"LT","Miami":"MIA","Middle Tennessee":"MTSU","Navy":"NAVY","Charlotte":"CLT","UL Monroe":"ULM","UNLV":"UNLV","Nevada":"NEV","North Dakota State":"NDSU","Northern Illinois":"NIU","Oregon":"ORE","Purdue":"PUR","Sam Houston":"SHSU","SMU":"SMU","Southern Miss":"USM","South Carolina":"SC","Missouri State":"MOST","TCU":"TCU","Tennessee":"TENN","UTSA":"UTSA","UTEP":"UTEP","Texas Tech":"TTU","Toledo":"TOL","Troy":"TROY","Tulane":"TULN","Western Michigan":"WMU","Wyoming":"WYO"};
+  // Logo versions: dark-background on the board, light-background on an amber pick. The one exception is Toledo,
+  // whose light logo is mostly gold and disappears on amber, so its pick shows the dark logo on a small dark disc.
+  const LOGO = {"Toledo":"dcd"};
+  const RANK = {"Miami":1,"Georgia":2,"Utah":3,"Indiana":4,"Alabama":5,"Kentucky":6,"Texas":7,"UCLA":8,"BYU":9,"Ole Miss":10,"Notre Dame":11,"Ohio State":12,"Tennessee":13,"LSU":14,"Texas Tech":15,"Wake Forest":16,"Houston":17,"Missouri":18,"Iowa":19,"USC":20,"South Carolina":21,"Arizona":22,"Oregon":23,"Florida":24,"Boise State":25};
+
+  window.LAB = {
+    games, WEEKS, COLORS, TID, RANK, ABBR, LOGO, view,
+    subscribe(f) { subs.push(f); f(view()); },
+    /** Draft: picks handed over from a team page, in one step (one Undo takes them all back). */
+    load(picks, from) {
+      const known = Object.fromEntries(Object.entries(picks).filter(([k]) => games.some((g) => g.key === k)));
+      commit({ picks: { ...state.picks, ...known } }, { kind: "import", n: Object.keys(known).length, from });
+    },
+    pick(key, team) {
+      const picks = { ...state.picks };
+      if (picks[key] === team) delete picks[key]; else picks[key] = team;
+      commit({ picks });
+    },
+    /** Pick a title-game winner; picking it again clears it. Remembers the matchup it was made on. */
+    pickTitle(conf, team) {
+      const titles = { ...state.titles };
+      const on = titles[conf]?.team !== team;
+      if (!on) delete titles[conf];
+      else titles[conf] = { team, pair: titleGame(CONFS.find((c) => c.name === conf), keyOf(state.picks)).pair };
+      commit({ titles }, { kind: "title", conf, team: on ? team : null });
+    },
+    pickBracket(i, team) {
+      const b = { ...state.bracket };
+      const old = b[i];
+      if (old === team) delete b[i]; else b[i] = team;
+      if (old !== undefined) SHAPE.forEach(([x, y], j) => { if ([x, y].some((s) => s[0] === "w" && s[1] === i) && b[j] === old) delete b[j]; });
+      commit({ bracket: b }, { kind: "bracket", index: i, team: b[i] ?? null });
+    },
+    fill(how) {
+      const picks = { ...state.picks };
+      let seed = how === "favorites" ? 0 : (Date.now() % 2147483647) || 1;
+      const rand = () => (seed = (seed * 48271) % 2147483647) / 2147483647;
+      games.forEach((g) => {
+        if (picks[g.key]) return;
+        const pa = g.awayOdds / (g.awayOdds + g.homeOdds);
+        picks[g.key] = how === "favorites" ? (g.awayOdds > g.homeOdds ? g.away : g.home) : rand() < pa ? g.away : g.home;
+      });
+      // Then each open title game, on the matchup those picks leave.
+      const key = keyOf(picks), titles = { ...state.titles };
+      CONFS.forEach((c) => {
+        if (titles[c.name]) return;
+        const t = titleGame(c, key), [a, b] = t.teams, pa = num(a.odds) / (num(a.odds) + num(b.odds));
+        titles[c.name] = { team: how === "favorites" ? (num(a.odds) >= num(b.odds) ? a.name : b.name) : rand() < pa ? a.name : b.name, pair: t.pair };
+      });
+      commit({ picks, titles });
+    },
+    undo() { const p = state.history.pop(); if (p) { Object.assign(state, p); refine(); } },
+    /** Clear every pick. The last-pick line clears too: a reset isn't a pick. */
+    reset() {
+      if (!Object.keys(state.picks).length && !Object.keys(state.titles).length && !Object.keys(state.bracket).length) return;
+      state.history.push(snapshot());
+      Object.assign(state, { picks: {}, titles: {}, bracket: {}, prevKey: "", note: "" });
+      refine();
+    },
+  };
+})();
+</script>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+// A team as shown everywhere: logo, this week's committee ranking, name. `dark` picks the logo for dark backgrounds.
+// On the board a team carries two logos: the one that reads best on the board, and the one for an amber (picked)
+// button, which shows when its button is pressed. Each was chosen per team by measured contrast (LAB.LOGO);
+// a team whose logo reads on neither background gets a small disc behind it.
+const logo = (n, dark = true) => {
+  const id = LAB.TID[n];
+  if (!id) return "";
+  const img = (v) => `<img class="lg" src="https://cdn.collegefootballdata.com/${v === "d" ? "logos-dark" : "logos"}/64/${id}.png" alt="">`;
+  if (!dark) return `<span class="lgw">${img("l")}</span>`;
+  const [onBoard, onAmber] = (LAB.LOGO[n] || "dl").match(/c?[ld]/g);
+  const wrap = (code, cls, chip) => `<span class="lgw ${cls}${code[0] === "c" ? " chip " + chip : ""}">${img(code.at(-1))}</span>`;
+  return wrap(onBoard, "lg-d", "chip-c") + wrap(onAmber, "lg-l", "chip-d");
+};
+const T = (n, dark = true, ranked = true) => {
+  const r = ranked && LAB.RANK[n];
+  return `${logo(n, dark)}<span class="tn">${r ? `<span class="rk">#${r}</span>` : ""}<span class="fn">${esc(n)}</span><span class="abv">${esc(LAB.ABBR[n] || n.slice(0, 4).toUpperCase())}</span></span>`;
+};
+const isNew = () => document.documentElement.classList.contains("v-new");
+/*
+ * Proposed: a pinned team. Its odds follow your picks; its games are marked; it's lit wherever it shows.
+ * Draft data, from src/core (100,000 seasons): Louisville's playoff and ACC title-game odds for each combination of the six
+ * games that move them ("-" open, "H" home team wins, "A" away team wins, in KEYS order). Null: too rare to say.
+ */
+const PIN = { team: "Louisville", conf: "ACC", oddsRank: 27, base: [5, 9.4], keys: ["11|Louisville|North Carolina", "12|Pittsburgh|Louisville", "13|Louisville|Kentucky", "11|Wake Forest|SMU", "12|Wake Forest|Georgia Tech", "13|Duke|Wake Forest"],
+  odds: {"------":[5,9.4],"H-----":[0.41,0.15],"A-----":[8.6,16],"-H----":[6.9,13],"HH----":[0.57,0.21],"AH----":[11,22],"-A----":[0.3,0.11],"HA----":[0.03,0],"AA----":[0.54,0.2],"--H---":[2.4,7.4],"H-H---":[0.06,0.06],"A-H---":[4.4,14],"-HH---":[3.4,11],"HHH---":[0.09,0.09],"AHH---":[6.1,19],"-AH---":[0.02,0.03],"HAH---":[0,0],"AAH---":[0.04,0.06],"--A---":[7.2,11],"H-A---":[0.73,0.23],"A-A---":[12,19],"-HA---":[10,15],"HHA---":[1,0.32],"AHA---":[15,25],"-AA---":[0.57,0.18],"HAA---":[0.06,0],"AAA---":[0.98,0.33],"---H--":[7.6,19],"H--H--":[0.48,0.16],"A--H--":[13,33],"-H-H--":[11,26],"HH-H--":[0.67,0.23],"AH-H--":[18,45],"-A-H--":[0.29,0.09],"HA-H--":[0.03,0],"AA-H--":[0.51,0.17],"--HH--":[4.6,15],"H-HH--":[0.09,0.07],"A-HH--":[8.4,28],"-HHH--":[6.5,22],"HHHH--":[0.13,0.1],"AHHH--":[12,39],"-AHH--":[0.02,0.03],"HAHH--":[0,0],"AAHH--":[0.03,0.07],"--AH--":[10,22],"H-AH--":[0.83,0.24],"A-AH--":[17,38],"-HAH--":[14,30],"HHAH--":[1.1,0.34],"AHAH--":[22,50],"-AAH--":[0.54,0.14],"HAAH--":[0.07,0],"AAAH--":[0.93,0.26],"---A--":[3,2],"H--A--":[0.35,0.14],"A--A--":[5,3.5],"-H-A--":[4,2.8],"HH-A--":[0.5,0.2],"AH-A--":[6.6,4.7],"-A-A--":[0.31,0.12],"HA-A--":[0.03,0],"AA-A--":[0.56,0.22],"--HA--":[0.71,1.4],"H-HA--":[0.03,0.06],"A-HA--":[1.3,2.6],"-HHA--":[1,2.1],"HHHA--":[0.05,0.09],"AHHA--":[1.8,3.7],"-AHA--":[0.03,0.03],"HAHA--":[0,0],"AAHA--":[0.05,0.05],"--AA--":[4.9,2.5],"H-AA--":[0.65,0.22],"A-AA--":[7.9,4.1],"-HAA--":[6.4,3.3],"HHAA--":[0.89,0.31],"AHAA--":[10,5.4],"-AAA--":[0.58,0.21],"HAAA--":[0.05,0],"AAAA--":[1,0.37],"----H-":[9.5,26],"H---H-":[0.49,0.87],"A---H-":[16,45],"-H--H-":[13,35],"HH--H-":[0.71,1.3],"AH--H-":[22,60],"-A--H-":[0.42,0.7],"HA--H-":[0,0],"AA--H-":[0.79,1.3],"--H-H-":[7,23],"H-H-H-":[0.19,0.38],"A-H-H-":[13,42],"-HH-H-":[10,33],"HHH-H-":[0.28,0.56],"AHH-H-":[18,59],"-AH-H-":[0.06,0.17],"HAH-H-":[0,0],"AAH-H-":[0.11,0.34],"--A-H-":[12,28],"H-A-H-":[0.77,1.3],"A-A-H-":[19,46],"-HA-H-":[15,37],"HHA-H-":[1.1,1.9],"AHA-H-":[25,61],"-AA-H-":[0.75,1.2],"HAA-H-":[0,0],"AAA-H-":[1.4,2.1],"---HH-":[14,41],"H--HH-":[0.57,0.57],"A--HH-":[24,72],"-H-HH-":[19,56],"HH-HH-":[0.81,0.81],"AH-HH-":[32,96],"-A-HH-":[0.24,0.36],"HA-HH-":[0,0],"AA-HH-":[0.46,0.69],"--HHH-":[11,38],"H-HHH-":[0.24,0.32],"A-HHH-":[20,69],"-HHHH-":[16,53],"HHHHH-":[0.35,0.47],"AHHHH-":[28,95],"-AHHH-":[0,0.13],"HAHHH-":[0,0],"AAHHH-":[0,0.25],"--AHH-":[16,43],"H-AHH-":[0.87,0.79],"A-AHH-":[27,74],"-HAHH-":[21,58],"HHAHH-":[1.2,1.1],"AHAHH-":[35,97],"-AAHH-":[0.47,0.58],"HAAHH-":[0,0],"AAAHH-":[0.87,1.1],"---AH-":[5.6,12],"H--AH-":[0.42,1.2],"A--AH-":[10,20],"-H-AH-":[7.7,16],"HH-AH-":[0.61,1.7],"AH-AH-":[13,27],"-A-AH-":[0.57,0.98],"HA-AH-":[0,0],"AA-AH-":[1.1,1.8],"--HAH-":[3.1,10],"H-HAH-":[0.14,0.43],"A-HAH-":[5.7,18],"-HHAH-":[4.5,14],"HHHAH-":[0.21,0.64],"AHHAH-":[7.9,25],"-AHAH-":[0.11,0.22],"HAHAH-":[0,0],"AAHAH-":[0.21,0.42],"--AAH-":[7.7,14],"H-AAH-":[0.68,1.8],"A-AAH-":[12,22],"-HAAH-":[10,18],"HHAAH-":[0.96,2.6],"AHAAH-":[16,29],"-AAAH-":[1,1.7],"HAAAH-":[0,0],"AAAAH-":[1.8,3],"----A-":[4.4,7],"H---A-":[0.4,0.04],"A---A-":[7.4,12],"-H--A-":[6,10],"HH--A-":[0.55,0.06],"AH--A-":[10,17],"-A--A-":[0.28,0.02],"HA--A-":[0.03,0],"AA--A-":[0.5,0.04],"--H-A-":[1.7,5.1],"H-H-A-":[0.04,0.02],"A-H-A-":[3.2,9.4],"-HH-A-":[2.5,7.3],"HHH-A-":[0.06,0.02],"AHH-A-":[4.4,13],"-AH-A-":[0.02,0.01],"HAH-A-":[0,0],"AAH-A-":[0.03,0.02],"--A-A-":[6.6,8.6],"H-A-A-":[0.72,0.07],"A-A-A-":[11,15],"-HA-A-":[8.7,12],"HHA-A-":[0.98,0.1],"AHA-A-":[14,20],"-AA-A-":[0.54,0.03],"HAA-A-":[0.07,0],"AAA-A-":[0.92,0.06],"---HA-":[6.7,15],"H--HA-":[0.46,0.09],"A--HA-":[11,27],"-H-HA-":[9.2,21],"HH-HA-":[0.65,0.13],"AH-HA-":[15,37],"-A-HA-":[0.29,0.05],"HA-HA-":[0.04,0],"AA-HA-":[0.52,0.09],"--HHA-":[3.5,11],"H-HHA-":[0.06,0.03],"A-HHA-":[6.4,21],"-HHHA-":[5,16],"HHHHA-":[0.09,0.04],"AHHHA-":[9,30],"-AHHA-":[0.02,0.02],"HAHHA-":[0,0],"AAHHA-":[0.04,0.04],"--AHA-":[9.3,19],"H-AHA-":[0.83,0.15],"A-AHA-":[15,32],"-HAHA-":[12,25],"HHAHA-":[1.1,0.21],"AHAHA-":[20,42],"-AAHA-":[0.55,0.07],"HAAHA-":[0.08,0],"AAAHA-":[0.94,0.13],"---AA-":[2.6,0.69],"H--AA-":[0.35,0.01],"A--AA-":[4.4,1.2],"-H-AA-":[3.6,0.96],"HH-AA-":[0.48,0.01],"AH-AA-":[5.8,1.7],"-A-AA-":[0.28,0],"HA-AA-":[0.03,0],"AA-AA-":[0.49,0],"--HAA-":[0.39,0.31],"H-HAA-":[0.02,0.01],"A-HAA-":[0.71,0.57],"-HHAA-":[0.56,0.45],"HHHAA-":[0.03,0.01],"AHHAA-":[0.99,0.8],"-AHAA-":[0.01,0],"HAHAA-":[0,0],"AAHAA-":[0.03,0],"--AAA-":[4.5,1],"H-AAA-":[0.64,0.01],"A-AAA-":[7.3,1.7],"-HAAA-":[5.9,1.4],"HHAAA-":[0.88,0.01],"AHAAA-":[9.4,2.3],"-AAAA-":[0.53,0],"HAAAA-":[0.06,0],"AAAAA-":[0.91,0],"-----H":[3.8,4.9],"H----H":[0.39,0.02],"A----H":[6.5,8.6],"-H---H":[5.2,6.8],"HH---H":[0.54,0.03],"AH---H":[8.7,12],"-A---H":[0.3,0.02],"HA---H":[0.03,0],"AA---H":[0.53,0.05],"--H--H":[1.2,3.1],"H-H--H":[0.05,0.01],"A-H--H":[2.2,5.7],"-HH--H":[1.7,4.4],"HHH--H":[0.07,0.01],"AHH--H":[3.1,8],"-AH--H":[0.02,0.01],"HAH--H":[0,0],"AAH--H":[0.04,0.02],"--A--H":[6,6.3],"H-A--H":[0.7,0.04],"A-A--H":[10,11],"-HA--H":[8,8.6],"HHA--H":[0.95,0.05],"AHA--H":[13,15],"-AA--H":[0.56,0.04],"HAA--H":[0.06,0],"AAA--H":[0.97,0.07],"---H-H":[5.6,11],"H--H-H":[0.44,0.04],"A--H-H":[10,19],"-H-H-H":[7.7,15],"HH-H-H":[0.62,0.05],"AH-H-H":[13,26],"-A-H-H":[0.27,0.06],"HA-H-H":[0.02,0],"AA-H-H":[0.49,0.11],"--HH-H":[2.4,7],"H-HH-H":[0.08,0],"A-HH-H":[4.4,13],"-HHH-H":[3.4,10],"HHHH-H":[0.12,0],"AHHH-H":[6,18],"-AHH-H":[0,0.02],"HAHH-H":[0,0],"AAHH-H":[0,0.05],"--AH-H":[8.3,14],"H-AH-H":[0.78,0.07],"A-AH-H":[14,24],"-HAH-H":[11,19],"HHAH-H":[1.1,0.1],"AHAH-H":[18,32],"-AAH-H":[0.52,0.09],"HAAH-H":[0.05,0],"AAAH-H":[0.9,0.16],"---A-H":[2.5,0.54],"H--A-H":[0.35,0.01],"A--A-H":[4.2,0.95],"-H-A-H":[3.4,0.76],"HH-A-H":[0.48,0.02],"AH-A-H":[5.6,1.3],"-A-A-H":[0.32,0],"HA-A-H":[0.04,0],"AA-A-H":[0.57,0],"--HA-H":[0.38,0.27],"H-HA-H":[0.02,0.01],"A-HA-H":[0.69,0.49],"-HHA-H":[0.54,0.39],"HHHA-H":[0.03,0.02],"AHHA-H":[0.94,0.7],"-AHA-H":[0.03,0],"HAHA-H":[0,0],"AAHA-H":[0.07,0],"--AA-H":[4.3,0.76],"H-AA-H":[0.64,0.01],"A-AA-H":[7,1.3],"-HAA-H":[5.7,1],"HHAA-H":[0.87,0.01],"AHAA-H":[9,1.7],"-AAA-H":[0.6,0],"HAAA-H":[0.07,0],"AAAA-H":[1,0],"----HH":[7.8,19],"H---HH":[0.24,0.13],"A---HH":[14,34],"-H--HH":[11,27],"HH--HH":[0.34,0.19],"AH--HH":[18,47],"-A--HH":[0.24,0.2],"HA--HH":[0,0],"AA--HH":[0.46,0.38],"--H-HH":[5.1,18],"H-H-HH":[0,0],"A-H-HH":[10,33],"-HH-HH":[7.3,25],"HHH-HH":[0,0],"AHH-HH":[13,46],"-AH-HH":[0.08,0.08],"HAH-HH":[0,0],"AAH-HH":[0.17,0.17],"--A-HH":[10,21],"H-A-HH":[0.46,0.25],"A-A-HH":[17,35],"-HA-HH":[14,28],"HHA-HH":[0.65,0.36],"AHA-HH":[22,47],"-AA-HH":[0.39,0.31],"HAA-HH":[0,0],"AAA-HH":[0.71,0.57],"---HHH":[14,42],"H--HHH":[0.4,0.28],"A--HHH":[24,74],"-H-HHH":[19,57],"HH-HHH":[0.57,0.41],"AH-HHH":[32,99],"-A-HHH":[0.09,0.45],"HA-HHH":[0,0],"AA-HHH":[0.18,0.88],"--HHHH":[11,39],"H-HHHH":[0,0],"A-HHHH":[20,73],"-HHHHH":[15,55],"HHHHHH":[0,0],"AHHHHH":[27,99],"-AHHHH":[0,0.19],"HAHHHH":[0,0],"AAHHHH":[0,0.38],"--AHHH":[16,44],"H-AHHH":[0.77,0.55],"A-AHHH":[27,76],"-HAHHH":[22,60],"HHAHHH":[1.1,0.78],"AHAHHH":[36,99],"-AAHHH":[0.18,0.71],"HAAHHH":[0,0],"AAAHHH":[0.33,1.3],"---AHH":[2.8,0.55],"H--AHH":[0.1,0],"A--AHH":[4.9,0.97],"-H-AHH":[3.8,0.77],"HH-AHH":[0.14,0],"AH-AHH":[6.5,1.3],"-A-AHH":[0.36,0],"HA-AHH":[0,0],"AA-AHH":[0.68,0],"--HAHH":[0.42,0.23],"H-HAHH":[0,0],"A-HAHH":[0.78,0.43],"-HHAHH":[0.53,0.33],"HHHAHH":[0,0],"AHHAHH":[0.97,0.6],"-AHAHH":[0.15,0],"HAHAHH":[0,0],"AAHAHH":[0.3,0],"--AAHH":[4.9,0.82],"H-AAHH":[0.19,0],"A-AAHH":[8.1,1.4],"-HAAHH":[6.5,1.1],"HHAAHH":[0.27,0],"AHAAHH":[11,1.9],"-AAAHH":[0.56,0],"HAAAHH":[0,0],"AAAAHH":[1,0],"----AH":[3.3,2.9],"H---AH":[0.41,0.01],"A---AH":[5.5,5.1],"-H--AH":[4.5,4],"HH--AH":[0.57,0.01],"AH--AH":[7.3,6.9],"-A--AH":[0.31,0],"HA--AH":[0.04,0],"AA--AH":[0.54,0],"--H-AH":[0.69,1.1],"H-H-AH":[0.05,0.01],"A-H-AH":[1.2,1.9],"-HH-AH":[0.98,1.5],"HHH-AH":[0.08,0.01],"AHH-AH":[1.7,2.7],"-AH-AH":[0.01,0],"HAH-AH":[0,0],"AAH-AH":[0.02,0],"--A-AH":[5.5,4.4],"H-A-AH":[0.73,0.01],"A-A-AH":[8.9,7.5],"-HA-AH":[7.2,6],"HHA-AH":[1,0.01],"AHA-AH":[12,10],"-AA-AH":[0.59,0],"HAA-AH":[0.07,0],"AAA-AH":[1,0],"---HAH":[4.4,6.1],"H--HAH":[0.45,0],"A--HAH":[7.5,11],"-H-HAH":[6,8.5],"HH-HAH":[0.63,0],"AH-HAH":[10,15],"-A-HAH":[0.3,0],"HA-HAH":[0.03,0],"AA-HAH":[0.53,0],"--HHAH":[1.1,2.2],"H-HHAH":[0.09,0],"A-HHAH":[2,4],"-HHHAH":[1.6,3.1],"HHHHAH":[0.13,0],"AHHHAH":[2.8,5.5],"-AHHAH":[0,0],"HAHHAH":[0,0],"AAHHAH":[0,0],"--AHAH":[7.1,9.4],"H-AHAH":[0.78,0],"A-AHAH":[12,16],"-HAHAH":[9.5,13],"HHAHAH":[1.1,0],"AHAHAH":[15,22],"-AAHAH":[0.57,0],"HAAHAH":[0.06,0],"AAAHAH":[0.98,0],"---AAH":[2.5,0.54],"H--AAH":[0.38,0.01],"A--AAH":[4.1,0.95],"-H-AAH":[3.4,0.75],"HH-AAH":[0.53,0.02],"AH-AAH":[5.5,1.3],"-A-AAH":[0.32,0],"HA-AAH":[0.04,0],"AA-AAH":[0.55,0],"--HAAH":[0.38,0.28],"H-HAAH":[0.03,0.01],"A-HAAH":[0.68,0.5],"-HHAAH":[0.54,0.4],"HHHAAH":[0.04,0.02],"AHHAAH":[0.94,0.71],"-AHAAH":[0.02,0],"HAHAAH":[0,0],"AAHAAH":[0.04,0],"--AAAH":[4.3,0.76],"H-AAAH":[0.7,0.01],"A-AAAH":[6.9,1.3],"-HAAAH":[5.6,1],"HHAAAH":[0.95,0.02],"AHAAAH":[8.8,1.7],"-AAAAH":[0.6,0],"HAAAAH":[0.08,0],"AAAAAH":[1,0],"-----A":[8,21],"H----A":[0.46,0.48],"A----A":[14,37],"-H---A":[11,29],"HH---A":[0.65,0.69],"AH---A":[19,50],"-A---A":[0.3,0.32],"HA---A":[0.03,0],"AA---A":[0.55,0.6],"--H--A":[5.4,19],"H-H--A":[0.09,0.21],"A-H--A":[10,34],"-HH--A":[7.8,27],"HHH--A":[0.13,0.31],"AHH--A":[14,48],"-AH--A":[0.03,0.08],"HAH--A":[0,0],"AAH--A":[0.05,0.15],"--A--A":[10,23],"H-A--A":[0.8,0.72],"A-A--A":[17,39],"-HA--A":[14,31],"HHA--A":[1.1,1],"AHA--A":[22,51],"-AA--A":[0.57,0.54],"HAA--A":[0.05,0],"AAA--A":[0.99,0.99],"---H-A":[12,38],"H--H-A":[0.56,0.44],"A--H-A":[21,66],"-H-H-A":[17,53],"HH-H-A":[0.79,0.63],"AH-H-A":[29,90],"-A-H-A":[0.32,0.16],"HA-H-A":[0.06,0],"AA-H-A":[0.57,0.31],"--HH-A":[10,34],"H-HH-A":[0.11,0.22],"A-HH-A":[18,63],"-HHH-A":[14,50],"HHHH-A":[0.17,0.33],"AHHH-A":[25,89],"-AHH-A":[0.05,0.05],"HAHH-A":[0,0],"AAHH-A":[0.11,0.11],"--AH-A":[15,41],"H-AH-A":[0.96,0.63],"A-AH-A":[24,69],"-HAH-A":[19,55],"HHAH-A":[1.3,0.89],"AHAH-A":[32,91],"-AAH-A":[0.59,0.27],"HAAH-A":[0.11,0],"AAAH-A":[1,0.5],"---A-A":[4.2,6.2],"H--A-A":[0.37,0.51],"A--A-A":[7.2,11],"-H-A-A":[5.8,8.4],"HH-A-A":[0.54,0.74],"AH-A-A":[10,14],"-A-A-A":[0.29,0.45],"HA-A-A":[0,0],"AA-A-A":[0.54,0.86],"--HA-A":[1.7,4.8],"H-HA-A":[0.06,0.19],"A-HA-A":[3,8.8],"-HHA-A":[2.4,6.8],"HHHA-A":[0.1,0.29],"AHHA-A":[4.2,12],"-AHA-A":[0,0.1],"HAHA-A":[0,0],"AAHA-A":[0,0.2],"--AA-A":[6.3,7.3],"H-AA-A":[0.66,0.81],"A-AA-A":[10,12],"-HAA-A":[8.4,10],"HHAA-A":[0.92,1.1],"AHAA-A":[13,15],"-AAA-A":[0.55,0.78],"HAAA-A":[0,0],"AAAA-A":[0.99,1.4],"----HA":[13,40],"H---HA":[1.1,2.6],"A---HA":[22,67],"-H--HA":[18,54],"HH--HA":[1.5,3.7],"AH--HA":[30,90],"-A--HA":[0.81,1.8],"HA--HA":[0,0],"AA--HA":[1.5,3.3],"--H-HA":[11,35],"H-H-HA":[0.65,1.3],"A-H-HA":[19,62],"-HH-HA":[16,50],"HHH-HA":[0.94,1.9],"AHH-HA":[28,88],"-AH-HA":[0,0.38],"HAH-HA":[0,0],"AAH-HA":[0,0.7],"--A-HA":[15,43],"H-A-HA":[1.4,3.7],"A-A-HA":[24,70],"-HA-HA":[20,57],"HHA-HA":[2,5.1],"AHA-HA":[31,92],"-AA-HA":[1.6,3.1],"HAA-HA":[0,0],"AAA-HA":[2.8,5.6],"---HHA":[14,39],"H--HHA":[0.92,1.2],"A--HHA":[24,67],"-H-HHA":[19,53],"HH-HHA":[1.3,1.6],"AH-HHA":[31,90],"-A-HHA":[0.54,0.18],"HA-HHA":[0,0],"AA-HHA":[1,0.33],"--HHHA":[12,36],"H-HHHA":[0.78,1],"A-HHHA":[21,62],"-HHHHA":[17,51],"HHHHHA":[1.1,1.5],"AHHHHA":[29,87],"-AHHHA":[0,0],"HAHHHA":null,"AAHHHA":null,"--AHHA":[15,41],"H-AHHA":[1,1.2],"A-AHHA":[26,70],"-HAHHA":[20,55],"HHAHHA":[1.4,1.7],"AHAHHA":[33,92],"-AAHHA":[1,0.34],"HAAHHA":null,"AAAHHA":[1.9,0.65],"---AHA":[12,40],"H--AHA":[1.2,4.1],"A--AHA":[21,67],"-H-AHA":[17,56],"HH-AHA":[1.8,5.9],"AH-AHA":[28,91],"-A-AHA":[1.1,3.4],"HA-AHA":[0,0],"AA-AHA":[1.9,6.1],"--HAHA":[10,35],"H-HAHA":[0.52,1.6],"A-HAHA":[18,62],"-HHAHA":[15,50],"HHHAHA":[0.77,2.3],"AHHAHA":[26,89],"-AHAHA":[0,0.75],"HAHAHA":null,"AAHAHA":null,"--AAHA":[14,45],"H-AAHA":[1.9,6.4],"A-AAHA":[23,71],"-HAAHA":[19,60],"HHAAHA":[2.7,9.1],"AHAAHA":[30,92],"-AAAHA":[2.1,5.9],"HAAAHA":null,"AAAAHA":[3.6,10],"----AA":[7.2,18],"H---AA":[0.36,0.14],"A---AA":[12,32],"-H--AA":[10,25],"HH--AA":[0.51,0.21],"AH--AA":[17,43],"-A--AA":[0.22,0.07],"HA--AA":[0.03,0],"AA--AA":[0.39,0.14],"--H-AA":[4.5,16],"H-H-AA":[0,0.04],"A-H-AA":[8.4,30],"-HH-AA":[6.5,23],"HHH-AA":[0,0.06],"AHH-AA":[12,42],"-AH-AA":[0.03,0.03],"HAH-AA":[0,0],"AAH-AA":[0.06,0.06],"--A-AA":[9.4,20],"H-A-AA":[0.7,0.24],"A-A-AA":[16,33],"-HA-AA":[13,27],"HHA-AA":[0.95,0.33],"AHA-AA":[20,44],"-AA-AA":[0.4,0.12],"HAA-AA":[0.06,0],"AAA-AA":[0.69,0.21],"---HAA":[12,38],"H--HAA":[0.5,0.31],"A--HAA":[21,66],"-H-HAA":[17,52],"HH-HAA":[0.69,0.45],"AH-HAA":[28,90],"-A-HAA":[0.29,0.16],"HA-HAA":[0.07,0],"AA-HAA":[0.49,0.3],"--HHAA":[9.2,34],"H-HHAA":[0,0.09],"A-HHAA":[17,63],"-HHHAA":[13,50],"HHHHAA":[0,0.13],"AHHHAA":[24,89],"-AHHAA":[0.06,0.06],"HAHHAA":[0,0],"AAHHAA":[0.12,0.12],"--AHAA":[14,41],"H-AHAA":[0.95,0.51],"A-AHAA":[24,69],"-HAHAA":[19,55],"HHAHAA":[1.3,0.72],"AHAHAA":[31,91],"-AAHAA":[0.51,0.25],"HAAHAA":[0.14,0],"AAAHAA":[0.83,0.47],"---AAA":[3,1.1],"H--AAA":[0.25,0],"A--AAA":[5.1,2],"-H-AAA":[4.1,1.6],"HH-AAA":[0.36,0],"AH-AAA":[6.9,2.7],"-A-AAA":[0.16,0],"HA-AAA":[0,0],"AA-AAA":[0.31,0],"--HAAA":[0.43,0.41],"H-HAAA":[0,0],"A-HAAA":[0.81,0.78],"-HHAAA":[0.62,0.59],"HHHAAA":[0,0],"AHHAAA":[1.1,1.1],"-AHAAA":[0,0],"HAHAAA":[0,0],"AAHAAA":[0,0],"--AAAA":[5.1,1.7],"H-AAAA":[0.48,0],"A-AAAA":[8.3,2.9],"-HAAAA":[6.8,2.3],"HHAAAA":[0.67,0],"AHAAAA":[11,3.8],"-AAAAA":[0.32,0],"HAAAAA":[0,0],"AAAAAA":[0.57,0]} };
+const pinOdds = (picks) => {
+  const code = PIN.keys.map((k) => { const t = picks[k]; return !t ? "-" : t === k.split("|")[2] ? "H" : "A"; });
+  // A combination too rare to read: drop the latest picks until one is common enough.
+  for (let i = code.length - 1; i >= 0 && !PIN.odds[code.join("")]; i--) code[i] = "-";
+  return PIN.odds[code.join("")] || PIN.base;
+};
+const pinned = () => isNew() && ui.pin;
+const ui = { pin: PIN.team, pinGames: false, view: "seeds", scope: "big", conf: "All", find: "", open: new Set(), tab: "field" };
+let hangKey = null;
+
+const CONF_CHIPS = ["All", "ACC", "Big Ten", "SEC", "Big 12", "American", "Pac 12", "Mountain West", "Sun Belt", "MAC", "CUSA", "Non-con"];
+$("#chips").innerHTML = CONF_CHIPS.map((c) => `<button type="button" aria-pressed="${c === "All"}" data-conf="${esc(c)}">${esc(c)}</button>`).join("");
+// Proposed: the pinned team's games are a filter like any conference, so they sit in the same row.
+$("#chips").firstElementChild.insertAdjacentHTML("afterend", `<button type="button" class="pinchip" id="pinchip" aria-pressed="false" hidden></button>`);
+$("#nbig").textContent = LAB.games.filter((g) => g.big).length;
+$("#nall").textContent = LAB.games.length;
+
+function seedsHTML(v) {
+  const row = (f) => `<div class="fr${f.move && v.refining ? " flash" : ""}"><span class="plate sd${f.bye ? " lit" : ""}">${f.seed}</span>
+    <span class="n"><b>${T(f.name)}</b></span>
+    <span class="plate o">${f.pct}%</span><span class="mv">${f.move === "new" ? "NEW" : f.move === "up" ? "▲" : f.move === "down" ? "▼" : ""}</span></div>`;
+  let h = `<div class="fb"><div class="lbl">Byes<span>Chance in</span></div>${v.field.slice(0, 4).map(row).join("")}<div class="div"></div><div class="lbl">First round</div>${v.field.slice(4).map(row).join("")}</div>`;
+  h += `<h3>On the bubble</h3><div class="bb">${v.bubble.map((b) => `<div class="br${b.out ? " out" : ""}"><span>${T(b.name)}</span><span class="plate">${b.pct}%</span><span class="mv">${b.out ? "▼" : ""}</span></div>`).join("")}`;
+  if (pinned()) { const x = pinOdds(v.picks)[0]; h += `<div class="br pinr"><span>${T(PIN.team)}<i>Pinned</i></span><span class="plate">${x >= 5 ? Math.round(x) : +x.toFixed(1)}%</span><span class="mv"></span></div>`; }
+  h += `</div>`;
+  return h;
+}
+
+/** The model's projected top 25 at season's end. Lit numbers are teams in your field. */
+function top25HTML(v) {
+  return `<p class="note">Projected final ranking. Amber numbers are in the field.</p><div class="fb"><div class="lbl">Rank<span>Record</span></div>${v.ranking.map((r) =>
+    `<div class="tr"><span class="plate sd${r.inField ? " lit" : ""}">${r.rank}</span><span class="n"><b>${T(r.name, true, false)}</b></span><span class="rec">${r.rec}</span></div>`).join("")}</div>`;
+}
+
+/**
+ * A drawn bracket: first round, quarterfinals, semifinals, final, left to right. Rows follow the bracket's real
+ * paths (1 meets the 8/9 winner, 4 the 5/12 winner, and so on), with connector lines between rounds.
+ */
+const U = 84, H = 64; // row height and game height, px
+function bracketHTML(v) {
+  const g = v.bracket;
+  const ab = (n) => LAB.ABBR[n] || n.slice(0, 4).toUpperCase();
+  const feed = (s) => { const f = g[s.from]; if (!(f.a.name && f.b.name)) return "TBD"; return `${ab(f.a.name)}/${ab(f.b.name)}`; };
+  const slot = (game, s, o) => {
+    if (!s.name) return `<div class="bs tbd">${feed(s)}</div>`;
+    const inner = `<span class="sd">${s.seed}</span>${logo(s.name)}<b>${esc(ab(s.name))}</b>`;
+    if (!o.name || game.result) return `<div class="bs" title="${esc(s.name)}">${inner}</div>`;
+    const on = game.pick === s.name, lost = game.pick && !on;
+    return `<button type="button" class="bs${lost ? " lost" : ""}" aria-pressed="${on}" data-br="${game.index}" data-team="${esc(s.name)}" title="${on ? "Picked. Tap again to clear." : "Advance " + esc(s.name)}">${inner}</button>`;
+  };
+  // Column, centre row (in units of U) and feeders for each game.
+  const layout = { 3: [0, 0], 0: [0, 1], 2: [0, 2], 1: [0, 3], 4: [1, 0, [3]], 7: [1, 1, [0]], 5: [1, 2, [2]], 6: [1, 3, [1]],
+    8: [2, 0.5, [4, 7]], 9: [2, 2.5, [5, 6]], 10: [3, 1.5, [8, 9]] };
+  const cy = (row) => row * U + U / 2;
+  const cols = [[], [], [], []];
+  for (const [i, [c, row, from]] of Object.entries(layout)) {
+    const game = g[i];
+    let lines = "";
+    // Elbows from each feeder's centre to the slot it fills (bottom slot if there's one feeder).
+    (from || []).forEach((f, k) => {
+      const y0 = cy(layout[f][1]) - (cy(row) - H / 2), y1 = from.length === 1 ? H * 0.75 : k === 0 ? H * 0.25 : H * 0.75;
+      const top = Math.min(y0, y1), h = Math.abs(y1 - y0), down = y1 >= y0;
+      lines += `<i class="el a${down ? " dn" : " up"}" style="top:${top}px;height:${h}px"></i><i class="el b${down ? " dn" : " up"}" style="top:${top}px;height:${h}px"></i>`;
+    });
+    cols[c].push(`<div class="bgm" style="top:${cy(row) - H / 2}px">${lines}${slot(game, game.a, game.b)}${slot(game, game.b, game.a)}</div>`);
+  }
+  const champ = g[10].pick;
+  return `<div class="bkh"><span>First round</span><span>Quarters</span><span>Semis</span><span>Final</span></div>
+    <div class="bk" style="height:${4 * U}px">${cols.map((c) => `<div class="bkc">${c.join("")}</div>`).join("")}</div>
+    ${champ ? `<p class="champ"><small>Your champion</small><b>${T(champ, false)}</b></p>` : ""}
+    <p class="note" style="margin-top:12px">Tap a team to advance it. First round at the higher seed; then neutral sites.</p>`;
+}
+
+function gamesHTML(v) {
+  const q = ui.find.trim().toLowerCase();
+  const mine = pinned() && ui.pinGames;
+  const shown = LAB.games.filter((g) => (mine ? PIN.keys.includes(g.key) : (ui.scope === "all" || g.big) && (ui.conf === "All" || g.group === ui.conf))
+    && (!q || g.away.toLowerCase().includes(q) || g.home.toLowerCase().includes(q)));
+  const weeks = new Map();
+  shown.forEach((g) => { const w = weeks.get(g.week) ?? weeks.set(g.week, new Map()).get(g.week); (w.get(g.group) ?? w.set(g.group, []).get(g.group)).push(g); });
+  const team = (g, t, odds, other, home) => {
+    const p = v.picks[g.key], on = p === t, lost = p && p === other;
+    const hang = on && hangKey === g.key ? " hang" : "";
+    return `<button type="button" class="tm${home ? " home" : ""}${lost ? " lost" : ""}" aria-pressed="${on}" data-key="${esc(g.key)}" data-team="${esc(t)}" title="${on ? "Picked. Tap again to clear." : "Pick " + esc(t) + " to win"}"><b>${T(t)}</b><span class="plate">${on && isNew() ? "Picked" : odds + "%"}</span></button>`;
+  };
+  const game = (g) => `<div class="gm${g.big && ui.scope === "all" ? " bigg" : ""}${pinned() && PIN.keys.includes(g.key) ? " pinned" : ""}">${team(g, g.away, g.awayOdds, g.home, false)}<span class="at">${g.neutral ? "vs" : "at"}</span>${team(g, g.home, g.homeOdds, g.away, true)}</div>`;
+  let h = mine ? `<p class="legend pinlg">${esc(PIN.team)}’s games, and the three that move its odds most. <button type="button" data-pingames>Show every game</button></p>` : ui.scope === "all" ? `<p class="legend"><span class="sw"></span>Amber outline: a big game, one that moves the field most</p>` : "";
+  // Championship week: each conference's title game between its two likeliest teams.
+  const titles = v.titleGames.filter((t) => (mine ? t.conf === PIN.conf : ui.conf === "All" || t.conf === ui.conf) && (!q || t.teams.some((x) => x.name.toLowerCase().includes(q))));
+  const tteam = (t, x, other, second) => {
+    const on = t.pick === x.name, lost = t.pick === other.name;
+    return `<button type="button" class="tm${second ? " home" : ""}${lost ? " lost" : ""}" aria-pressed="${on}" data-tconf="${esc(t.conf)}" data-team="${esc(x.name)}" title="${on ? "Picked. Tap again to clear." : "Pick " + esc(x.name) + " to win the " + esc(t.conf)}"><b>${T(x.name)}</b><span class="plate">${on && isNew() ? "Picked" : x.h2h}</span></button>`;
+  };
+  const champWeek = () => !titles.length ? "" : `<div class="wk"><b>Championship week</b><span>Dec 5</span></div>
+    <p class="cw">The two likeliest teams in each title game, with each one's chance to win if they meet. A pick clears if the matchup changes.</p>
+    <div class="gl">${titles.map((t) => `<div class="gm tg"><span class="tgc">${esc(t.conf)}</span>${tteam(t, t.teams[0], t.teams[1])}<span class="at">vs</span>${tteam(t, t.teams[1], t.teams[0], true)}</div>`).join("")}</div>`;
+  let champDone = false;
+  for (const [w, groups] of weeks) {
+    if (w > 13 && !champDone) { h += champWeek(); champDone = true; }
+    h += `<div class="wk"><b>Week ${w}</b><span>${LAB.WEEKS[w]}</span></div>`;
+    if (ui.scope === "big") h += `<div class="gl">${[...groups.values()].flat().map(game).join("")}</div>`;
+    else for (const [c, list] of groups) h += `<div class="cf">${esc(c)}</div><div class="gl">${list.map(game).join("")}</div>`;
+  }
+  if (!champDone) h += champWeek();
+  return shown.length || titles.length ? h : `<p class="empty">No games left for this filter.</p>`;
+}
+
+function racesHTML(v) {
+  return v.confs.map((c) => `<div class="rc${ui.open.has(c.name) ? " open" : ""}"><button type="button" aria-expanded="${ui.open.has(c.name)}" data-race="${esc(c.name)}">
+      <span class="cn">${esc(c.name)}${c.moved ? "<em>● Moved</em>" : ""}</span><span class="chev" aria-hidden="true">▼</span>
+      <span class="ld"><span>${T(c.lead[0][0])}</span><span class="plate">${c.lead[0][3]}</span><span>${T(c.lead[1][0])}</span><span class="plate dim">${c.lead[1][3]}</span>${pinned() && c.name === PIN.conf && !c.lead.slice(0, 2).some((r) => r[0] === PIN.team) ? (() => { const r = c.rows.find((x) => x[0] === PIN.team); return r ? `<span class="pinl">${T(PIN.team)}</span><span class="plate pinl">${r[3]}</span>` : ""; })() : ""}</span></button>
+    <div class="st"><table><thead><tr><th>Team</th><th>Title game</th><th>Wins it</th></tr></thead><tbody>
+      ${c.rows.map((r) => `<tr${pinned() && r[0] === PIN.team ? ' class="pinned"' : ""}><td>${T(r[0])}<i>${r[1]} · ${r[2]} open</i></td><td>${r[3]}</td><td>${r[4]}</td></tr>`).join("")}</tbody></table>
+      <p>${isNew() ? `and ${c.more} more teams` : `+${c.more} more`}</p></div></div>`).join("");
+}
+
+const ICON = {
+  pin: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 1.5h4l-.6 4.2 2.6 2.6v1.2H8.6V15H7.4V9.5H4V8.3l2.6-2.6z" fill="currentColor"/></svg>',
+  x: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  up: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+// Same rounding as the team page: whole numbers from 5%, one decimal below.
+const pct = (x) => (x >= 5 ? Math.round(x) : x >= 0.1 ? +x.toFixed(1) : "<0.1") + "%";
+let pinLast = null, dockOpen = false;
+/**
+ * The pinned team, in two shapes. Desktop: one quiet row under the header. Phone: a ticket docked at the bottom, in
+ * thumb reach and out of the sticky header; it opens upward for the before/after and the team's page.
+ */
+function pinHTML(v) {
+  if (!pinned()) return { strip: "", dock: "" };
+  const [p, a] = pinOdds(v.picks), [p0, a0] = PIN.base;
+  const back = `b-scoreboard.html#p=${encodeURIComponent(Object.entries(v.picks).map(([k, t]) => `${k}|${t}`).join(";"))}`;
+  const move = (now, was) => pct(now) === pct(was) ? "" : now > was ? "up" : "dn";
+  const num = (now, was) => move(now, was) ? `<s>${pct(was)}</s><i aria-hidden="true">→</i><b class="${move(now, was)}">${pct(now)}</b>` : `<b>${pct(now)}</b>`;
+  const strip = `<span class="pt"><span class="pi">${ICON.pin}</span>${T(PIN.team)}</span>
+    <span class="po"><small>Playoff</small>${num(p, p0)}</span>
+    <span class="po"><small>${esc(PIN.conf)} title game</small>${num(a, a0)}</span>
+    <span class="sp"></span>
+    <a class="pk" href="${back}">${esc(PIN.team)}’s page <i>→</i></a>
+    <button type="button" class="px" data-unpin aria-label="Unpin ${esc(PIN.team)}">${ICON.x}</button>`;
+  // The change in the numbers as shown, in points, so 5% to 9% reads +4.
+  const shown = (x) => parseFloat(pct(x)) || 0;
+  const delta = (now, was) => { const d = +(shown(now) - shown(was)).toFixed(1); return d ? `<em class="${d > 0 ? "up" : "dn"}">${d > 0 ? "+" : "−"}${Math.abs(d)} pts</em>` : ""; };
+  const dock = `<button type="button" class="dk" data-dock aria-expanded="${dockOpen}" aria-controls="dockmore">
+      <span class="pi">${ICON.pin}</span>${logo(PIN.team)}<span class="dn">${esc(LAB.ABBR[PIN.team])}</span>
+      <span class="dv"><small>Playoff</small><b>${pct(p)}</b>${delta(p, p0)}</span>
+      <span class="dv"><small>Title game</small><b>${pct(a)}</b>${delta(a, a0)}</span>
+      <span class="chev">${ICON.up}</span></button>
+    <div class="dmore" id="dockmore"${dockOpen ? "" : " hidden"}>
+      <p>${esc(PIN.team)} before your picks: playoff ${pct(p0)}, ${esc(PIN.conf)} title game ${pct(a0)}.</p>
+      <div class="da"><a href="${back}">${esc(PIN.team)}’s page <i>→</i></a><button type="button" data-unpin>Unpin</button></div>
+    </div>`;
+  return { strip, dock };
+}
+
+function render(v) {
+  const cnt = $("#cnt");
+  if (cnt.textContent !== String(v.count)) { cnt.textContent = v.count; cnt.classList.remove("hang"); void cnt.offsetWidth; cnt.classList.add("hang"); }
+  const s = $("#seasons"); s.textContent = v.seasons; s.classList.toggle("ref", v.refining);
+  const msg = $("#msg");
+  msg.classList.toggle("on", !!v.headline);
+  msg.querySelector("b").textContent = v.headline || "Pick a game, or fill the rest.";
+  $("#share").classList.toggle("idle", v.count === 0);
+  const fc = $("#fieldchip");
+  fc.hidden = !(v.fieldMoved && v.headline);
+  fc.querySelector("span").textContent = "The field changed.";
+  $("#undo").disabled = !v.canUndo;
+  $("#reset").disabled = v.count === 0;
+  $("#fillb").disabled = v.open === 0;
+  $("#seeds").innerHTML = seedsHTML(v);
+  $("#bracket").innerHTML = bracketHTML(v);
+  $("#top25").innerHTML = top25HTML(v);
+  $("#racelist").innerHTML = racesHTML(v);
+  $("#glist").innerHTML = gamesHTML(v);
+  const ph = pinHTML(v);
+  $("#pin").innerHTML = ph.strip; $("#pin").hidden = !ph.strip;
+  const dock = $("#dock"); dock.innerHTML = ph.dock; dock.hidden = !ph.dock;
+  const now = pinned() ? pinOdds(v.picks).join() : null;
+  if (pinLast !== null && now !== null && now !== pinLast) { dock.classList.remove("bump"); void dock.offsetWidth; dock.classList.add("bump"); }
+  pinLast = now;
+  document.documentElement.classList.toggle("has-dock", !!ph.dock);
+  const pc = $("#pinchip");
+  pc.innerHTML = pinned() ? `${logo(PIN.team, false)}${esc(PIN.team)}’s games` : `<span class="pi">${ICON.pin}</span>Pin ${esc(PIN.team)}`;
+  pc.dataset.mode = pinned() ? "games" : "pin";
+  pc.hidden = !isNew();
+  pc.setAttribute("aria-pressed", String(!!(pinned() && ui.pinGames)));
+  const mine = pinned() && ui.pinGames;
+  document.querySelectorAll("#chips [data-conf]").forEach((b) => b.setAttribute("aria-pressed", String(!mine && b.dataset.conf === ui.conf)));
+  $("#games").classList.toggle("pinmode", !!(pinned() && ui.pinGames));
+  hangKey = null;
+  document.documentElement.style.setProperty("--top-h", $("#top").offsetHeight + "px");
+}
+LAB.subscribe(render);
+// Draft: arriving from a team page (#from=Team&p=week|away|home|winner;...). Its picks load as one step, and a strip
+// links back to the team with every pick the Lab now holds, so the team page shows the ones it has.
+(() => {
+  const h = new URLSearchParams(location.hash.slice(1)), from = h.get("from");
+  if (!from) return;
+  const picks = Object.fromEntries((h.get("p") || "").split(";").filter(Boolean).map((x) => { const q = x.split("|"); return [q.slice(0, 3).join("|"), q[3]]; }));
+  const n = Object.keys(picks).length;
+  if (from === PIN.team) ui.pin = from;
+  if (n) LAB.load(picks, from);
+})();
+new ResizeObserver(() => document.documentElement.style.setProperty("--top-h", $("#top").offsetHeight + "px")).observe($("#top"));
+const rerender = () => render(LAB.view());
+
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("button");
+  if (!t) { if (!e.target.closest(".fillw")) $("#menu").hidden = true; return; }
+  if (t.dataset.key) { hangKey = t.dataset.key; return LAB.pick(t.dataset.key, t.dataset.team); }
+  if (t.dataset.tconf) return LAB.pickTitle(t.dataset.tconf, t.dataset.team);
+  if (t.dataset.br) return LAB.pickBracket(+t.dataset.br, t.dataset.team);
+  if (t.dataset.view) {
+    ui.view = t.dataset.view;
+    document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-pressed", b === t));
+    for (const id of ["seeds", "bracket", "top25"]) $("#" + id).hidden = ui.view !== id; return;
+  }
+  if (t.dataset.conf || t.dataset.scope) ui.pinGames = false;
+  if (t.dataset.scope) { ui.scope = t.dataset.scope; document.querySelectorAll("[data-scope]").forEach((b) => b.setAttribute("aria-pressed", b === t)); return rerender(); }
+  if (t.dataset.conf) { ui.conf = t.dataset.conf; document.querySelectorAll("[data-conf]").forEach((b) => b.setAttribute("aria-pressed", b === t)); return rerender(); }
+  if (t.id === "pinchip") {
+    if (t.dataset.mode === "pin") { ui.pin = PIN.team; ui.pinGames = false; return rerender(); }
+    ui.pinGames = !ui.pinGames; return rerender();
+  }
+  if (t.hasAttribute("data-dock")) { dockOpen = !dockOpen; return rerender(); }
+  if (t.hasAttribute("data-pingames")) { ui.pinGames = !ui.pinGames; if (ui.pinGames) { ui.tab = "games"; document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === "games")); document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("show", p.id === "games")); } return rerender(); }
+  if (t.hasAttribute("data-unpin")) { ui.pin = null; ui.pinGames = false; dockOpen = false; return rerender(); }
+  if (t.dataset.pin) { ui.pin = t.dataset.pin; return rerender(); }
+  if (t.dataset.race) { ui.open.has(t.dataset.race) ? ui.open.delete(t.dataset.race) : ui.open.add(t.dataset.race); return rerender(); }
+  if (t.dataset.tab) {
+    ui.tab = t.dataset.tab;
+    document.querySelectorAll("[data-tab]").forEach((b) => b.setAttribute("aria-selected", b === t));
+    document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("show", p.id === ui.tab)); window.scrollTo(0, 0); return;
+  }
+  if (t.id === "fillb") { const m = $("#menu"); m.hidden = !m.hidden; t.setAttribute("aria-expanded", !m.hidden); return; }
+  if (t.dataset.fill) { $("#menu").hidden = true; $("#fillb").setAttribute("aria-expanded", "false"); return LAB.fill(t.dataset.fill); }
+  if (t.id === "undo") return LAB.undo();
+  if (t.id === "reset") return LAB.reset();
+  if (t.id === "share") { t.textContent = "Copied"; setTimeout(() => (t.textContent = "Share"), 1600); }
+});
+$("#find").addEventListener("input", (e) => { ui.find = e.target.value; rerender(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("#menu").hidden = true; });
+</script>
+<button type="button" class="logo-toggle" id="logoToggle" aria-pressed="true">Logos: on</button>
+<script>
+// Draft control: logos on or off, remembered across the four drafts.
+(() => {
+  const k = "ma-draft-logos", b = document.getElementById("logoToggle");
+  let on = true;
+  try { on = localStorage.getItem(k) !== "off"; } catch {}
+  const set = (v) => {
+    on = v;
+    document.documentElement.classList.toggle("nologos", !on);
+    b.setAttribute("aria-pressed", String(on));
+    b.textContent = on ? "Logos: on" : "Logos: off";
+    try { localStorage.setItem(k, on ? "on" : "off"); } catch {}
+  };
+  set(on);
+  b.addEventListener("click", (e) => { e.stopPropagation(); set(!on); });
+})();
+</script>
+<div class="cmp" role="group" aria-label="Compare versions"><button type="button" data-v="old">Current</button><button type="button" data-v="new">Proposed</button></div>
+<script>
+// Draft control: switch between the current version and the proposed fix. Remembered per page.
+(() => {
+  const k = "ma-draft-lab-version", root = document.documentElement;
+  let v = "new";
+  try { v = localStorage.getItem(k) || "new"; } catch {}
+  const set = (next) => {
+    v = next;
+    root.classList.toggle("v-new", v === "new"); root.classList.toggle("v-old", v === "old");
+    document.querySelectorAll(".cmp [data-v]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+    try { localStorage.setItem(k, v); } catch {}
+    if (typeof rerender === "function") rerender();
+  };
+  set(v);
+  document.querySelectorAll(".cmp [data-v]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); set(b.dataset.v); }));
+})();
+</script>
+</body>
+</html>

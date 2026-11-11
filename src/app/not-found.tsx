@@ -8,13 +8,13 @@ const list = (xs: readonly string[]) => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.
 // Missing pages, including a team the app has no page for (/team/<id> for an FCS team).
 export default function NotFound() {
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-white px-4 text-center">
-      <Logo size={64} decorative />
-      <h1 className="font-display text-2xl font-bold text-navy">No page here</h1>
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-ground px-4 text-center">
+      <Logo size={64} color="#133F2E" pulse="#F3F0E6" decorative />
+      <h1 className="cond text-3xl font-extrabold text-ink">No page here</h1>
       <p className="max-w-md text-sm text-ink-soft">
         That team or page isn&rsquo;t on Mathematically Alive. It covers FBS teams: the {list([...SUPPORTED_CONFERENCES.map(conferenceName), "independents"])}.
       </p>
-      <Link href="/" className="min-h-11 rounded-full bg-navy px-5 py-2.5 text-sm font-bold text-white hover:bg-navy/90">
+      <Link href="/" className="min-h-11 cond flex items-center rounded-[3px] bg-board px-5 text-base font-bold tracking-[0.05em] text-white hover:bg-board-deep">
         Pick a team
       </Link>
     </main>

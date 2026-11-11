@@ -35,14 +35,14 @@ export const baseOutlooks = SUPPORTED_CONFERENCES.map((conference) => {
 
 /** Outlook, path and tree for one team from one shared simulation in its conference, with no locks (no national run: not serializable). */
 export const baseExplore = (teamId: number, conference: string) => {
-  const { outlook, path, tree, playoffGames } = explore(season, { conference, teamId, iterations: ITERATIONS, seed: SEED, reuse: baseNational });
-  return { outlook, path, tree, playoffGames };
+  const { outlook, path, tree, playoffGames, board } = explore(season, { conference, teamId, iterations: ITERATIONS, seed: SEED, reuse: baseNational });
+  return { outlook, path, tree, playoffGames, board };
 };
 
 /** An independent's odds, games and results elsewhere, with no locks (no national run: not serializable). */
 export const baseExploreIndependent = (teamId: number) => {
-  const { outlook, games, playoffGames } = exploreIndependent(season, { teamId, iterations: ITERATIONS, seed: SEED, reuse: baseNational });
-  return { outlook, games, playoffGames };
+  const { outlook, games, playoffGames, board } = exploreIndependent(season, { teamId, iterations: ITERATIONS, seed: SEED, reuse: baseNational });
+  return { outlook, games, playoffGames, board };
 };
 
 export { asOf, through } from "./dates";

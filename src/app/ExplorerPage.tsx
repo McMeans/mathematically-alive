@@ -1,5 +1,5 @@
 // Server side of the one-page view: base (no what-if) numbers for a team, handed to the client Explorer.
-import { INDEPENDENTS } from "@/core";
+import { INDEPENDENTS, committeeRanks } from "@/core";
 import { Explorer, IndependentExplorer, type ConferenceList, type TeamInfo } from "./explorer/Explorer";
 import { conferenceRows, independentRows } from "./explorer/rows";
 import { asOf, baseExplore, baseExploreIndependent, baseIndependents, baseOutlooks, conferenceOf, conferenceTeams, season, through } from "./season";
@@ -11,7 +11,7 @@ export function ExplorerPage({ teamId }: { teamId: number }) {
   const info = (c: string): TeamInfo[] => conferenceTeams(c).map((t) => ({ id: t.id, name: t.name, color: t.color, altColor: t.altColor }));
   const teams = info(conference);
   const openGames = season.games.filter((g) => !g.completed).map(({ id, homeId, awayId }) => ({ id, homeId, awayId }));
-  const common = { teamId, conference, teams, names, asOf, through, openGames };
+  const common = { teamId, conference, teams, names, ranks: committeeRanks(season), asOf, through, openGames };
 
   if (conference === INDEPENDENTS) {
     const base = baseExploreIndependent(teamId);

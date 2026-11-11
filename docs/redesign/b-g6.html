@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draft B · Group of Six race</title>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Group of Six pages on the playoff race card. The 2026 rule: the highest-ranked Group of Six team gets a bid, conference
+   champion or not; any other Group of Six team needs an at-large spot. Built on draft 5, layout C (seed, team, proj., field). */
+:root {
+  --board: #133f2e; --board-deep: #0c2c20; --board-line: #2a5a46; --board-text: #d7e4dc; --board-muted: #9fbcae;
+  --plate: #f3f0e6; --plate-ink: #121a16; --lamp: #f2b134; --lamp-ink: #8a5d00;
+  --ground: #e4e7e5; --paper: #f6f8f7; --ink: #15201b; --ink-muted: #5d6a63; --rule: #d6d4cc;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.45 "Public Sans", system-ui, sans-serif; }
+.wrap { max-width: 1060px; margin: 0 auto; padding: 28px 16px 80px; }
+h1 { font: 800 36px/1 "Saira Condensed"; text-transform: uppercase; margin: 0 0 6px; }
+h2 { font: 800 24px/1 "Saira Condensed"; text-transform: uppercase; margin: 40px 0 6px; }
+.lede { color: var(--ink-muted); margin: 0 0 8px; max-width: 80ch; }
+.lede b, li b { color: var(--ink); }
+ul.rules { margin: 6px 0 0; padding-left: 18px; color: var(--ink-muted); max-width: 82ch; }
+ul.rules li { margin: 5px 0; }
+.logo { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
+
+.ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 10px 0 0; }
+.ctl > span { font: 700 12px/1 "Saira Condensed"; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-muted); width: 76px; }
+.chip { font: 700 14px/1 "Saira Condensed"; letter-spacing: .05em; text-transform: uppercase; border: 1px solid var(--rule); background: #fff; color: var(--ink); padding: 7px 10px; border-radius: 3px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--lamp); border-color: var(--lamp); color: var(--plate-ink); }
+.why { font-size: 14px; color: var(--ink-muted); min-height: 3em; max-width: 82ch; margin: 12px 0 4px; }
+.why b { color: var(--ink); }
+.lnote { font-size: 14px; color: var(--ink); max-width: 82ch; margin: 0 0 4px; min-height: 3em; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, 300px); gap: 18px; align-items: start; margin-top: 10px; }
+@media (max-width: 680px) { .grid { grid-template-columns: minmax(0, 300px); } }
+.opt > b { font: 800 17px/1 "Saira Condensed"; text-transform: uppercase; display: block; margin-bottom: 6px; }
+.opt > b small { font: 600 13px "Public Sans"; text-transform: none; color: var(--ink-muted); }
+.paper { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 16px; }
+.rh { font: 800 18px/1.1 "Saira Condensed"; text-transform: uppercase; letter-spacing: .03em; margin: 0 0 2px; }
+.rs { font: 600 14px/1.2 "Saira Condensed"; color: var(--ink-muted); margin: 0 0 10px; }
+.more { display: inline-block; margin-top: 8px; font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+
+.race { background: var(--board-deep); color: var(--board-text); border-radius: 4px; padding: 6px 0; }
+.race + .race { margin-top: 8px; }
+.r, .ch { display: grid; grid-template-columns: 1.9rem minmax(0,1fr) 2rem 2.6rem; align-items: center; gap: 6px; padding: 7px 12px; min-height: 38px; }
+.ch { min-height: 0; padding: 4px 12px 6px; border-bottom: 1px solid var(--board-line); margin-bottom: 2px; font: 700 10.5px/1 "Saira Condensed"; letter-spacing: .08em; color: var(--board-muted); text-transform: uppercase; }
+.ch span:nth-child(3) { text-align: center; }
+.ch span:nth-child(4) { text-align: right; }
+.bt { padding: 4px 12px 2px; font: 800 13px/1 "Saira Condensed"; letter-spacing: .07em; color: #fff; text-transform: uppercase; }
+.r.me { box-shadow: inset 3px 0 var(--lamp); }
+.r.dim .t .nm, .r.dim .od, .r.dim .pl { color: var(--board-muted); }
+.r.dim.me .t .nm, .r.dim.me .od { color: var(--lamp); }
+.pl { font: 800 14px/1 "Saira Condensed"; color: #fff; display: flex; flex-direction: column; gap: 2px; }
+.pl i { font: 700 9.5px/1 "Saira Condensed"; font-style: normal; letter-spacing: .06em; color: var(--board-text); }
+.pl i.soft { color: var(--board-muted); }
+.t { display: flex; align-items: center; gap: 6px; font: 700 16px/1 "Saira Condensed"; text-transform: uppercase; color: #fff; min-width: 0; white-space: nowrap; }
+.t .nm { overflow: hidden; text-overflow: ellipsis; }
+.t .rk { color: var(--board-muted); font-size: 13px; }
+.pj { font: 800 15px/1 "Saira Condensed"; color: var(--board-muted); text-align: center; }
+.od { font: 800 18px/1 "Saira Condensed"; text-align: right; color: #fff; }
+.me .t, .me .od { color: var(--lamp); }
+.line { margin: 6px 12px; border-top: 1px dashed var(--lamp); position: relative; height: 0; }
+.line span { position: absolute; right: 0; top: -8px; background: var(--board-deep); padding-left: 6px; font: 700 11px/1 "Saira Condensed"; letter-spacing: .08em; color: var(--lamp); text-transform: uppercase; }
+.line.bye, .line.g6 { border-top-color: var(--board-line); }
+.line.bye span, .line.g6 span { color: var(--board-muted); }
+.hd { padding: 6px 12px 0; font: 700 11px/1 "Saira Condensed"; letter-spacing: .09em; color: var(--board-muted); text-transform: uppercase; }
+.gap { padding: 0 12px; color: var(--board-muted); line-height: .6; }
+.r.bid { box-shadow: inset 3px 0 var(--board-line); background: rgba(255,255,255,.035); }
+.r.bid.me { box-shadow: inset 3px 0 var(--lamp); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Group of Six race · draft 1</h1>
+  <p class="lede">In 2026 the <b>highest-ranked Group of Six team</b> gets a bid, conference champion or not. Every other Group of Six team needs one of the seven <b>at-large</b> spots, like anyone else. Most years that's one Group of Six team, seeded 12 under the line. But a second (or third) can get in at large, and a Group of Six team's real race is usually against the other Group of Six teams, not the at-large bubble.</p>
+  <p class="lede">The card here is the one we built (layout C: seed, team, projected rank, field odds). Pick a scenario, a layout, and how the G6 tag works.</p>
+
+  <div class="ctl" role="group" aria-label="Layout" id="lay"></div>
+  <p class="lnote" id="lnote"></p>
+  <div class="ctl" role="group" aria-label="G6 tag" id="tagc"></div>
+  <div class="ctl" role="group" aria-label="Scenario" id="scen"></div>
+  <p class="why" id="why"></p>
+  <div class="grid" id="opts"></div>
+
+  <h2>Rules in the draft</h2>
+  <ul class="rules">
+    <li><b>The bid:</b> the Group of Six team with the best projected final rank. It counts as an automatic bid even when it would have made the field at large, so a second Group of Six team never takes the bid's spot; it takes an at-large one.</li>
+    <li><b>G6 tag, always:</b> on the bid team wherever it's seeded (what we built). <b>Only when needed:</b> like Notre Dame's ND tag, only when the bid is what gets it in, that is, when it's ranked below the last at-large team.</li>
+    <li><b>At-large Group of Six teams</b> get no tag: they're in like any other at-large team.</li>
+    <li><b>"Next for the G6 bid" / the Group of Six block</b> only shows on a Group of Six team's page. Power and independent pages get the card as built.</li>
+  </ul>
+</main>
+
+<script>
+const L = (id) => `<img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/${id}.png" alt="">`;
+// key: [name, logo id, committee rank now, odds, kind]. kind: "P" power, "G" Group of Six, "N" Notre Dame.
+const T = {
+  OSU: ["Ohio State", 194, 1, "In", "P"], IND: ["Indiana", 84, 3, "99%", "P"], MIA: ["Miami", 2390, 2, "97%", "P"],
+  UGA: ["Georgia", 61, 4, "93%", "P"], TEX: ["Texas", 251, 8, "86%", "P"], BAMA: ["Alabama", 333, 6, "82%", "P"],
+  ND: ["Notre Dame", 87, 7, "88%", "N"], OU: ["Oklahoma", 201, 10, "74%", "P"], MISS: ["Ole Miss", 145, 5, "66%", "P"],
+  WF: ["Wake Forest", 154, 16, "45%", "P"], ORE: ["Oregon", 2483, 23, "42%", "P"], BYU: ["BYU", 252, 9, "40%", "P"],
+  USC: ["USC", 30, 20, "39%", "P"], TTU: ["Texas Tech", 2641, 15, "50%", "P"], VAN: ["Vanderbilt", 238, 17, "31%", "P"],
+  LOU: ["Louisville", 97, null, "15%", "P"],
+  BSU: ["Boise State", 68, 25, "63%", "G"], UNLV: ["UNLV", 2439, null, "18%", "G"], MEM: ["Memphis", 235, null, "14%", "G"],
+  TUL: ["Tulane", 2655, null, "6%", "G"], JMU: ["James Madison", 256, null, "3%", "G"], KENT: ["Kent State", 2309, null, "&lt;1%", "G"],
+};
+const FAR = { KENT: 96 };
+const CHAMPS = { OSU: "B1G", MIA: "ACC", UGA: "SEC", TTU: "B12" };
+const SCEN = {
+  one: { label: "One G6 (likeliest)",
+    rank: ["OSU", "IND", "MIA", "UGA", "TEX", "BAMA", "ND", "OU", "MISS", "WF", "ORE", "BYU", "USC", "TTU", "VAN", "LOU", "BSU", "UNLV", "MEM", "TUL", "JMU"],
+    why: "Boise State, projected 17th, is the top Group of Six team: seed 12 under the line. UNLV (18th) and Memphis (19th) are a spot or two behind for the bid, and nowhere near an at-large spot (the last one is projected 10th)." },
+  close: { label: "Bid changes hands",
+    rank: ["OSU", "IND", "MIA", "UGA", "TEX", "BAMA", "ND", "OU", "MISS", "WF", "ORE", "BYU", "USC", "TTU", "VAN", "LOU", "MEM", "BSU", "UNLV", "TUL", "JMU"],
+    odds: { MEM: "51%", BSU: "38%", UNLV: "9%" },
+    why: "With Memphis winning out, it's projected 17th and Boise State 18th: one spot moves the bid. On the card as built, Boise's page shows Memphis at 12 and Boise after a gap, with nothing saying they're racing each other." },
+  two: { label: "Two G6 in",
+    rank: ["OSU", "IND", "MIA", "UGA", "TEX", "BAMA", "ND", "BSU", "OU", "MISS", "MEM", "WF", "ORE", "BYU", "USC", "TTU", "VAN", "LOU", "UNLV", "TUL", "JMU"],
+    odds: { BSU: "95%", MEM: "58%", WF: "38%", UNLV: "9%", TUL: "4%", JMU: "1%" },
+    why: "Boise State, projected 8th, holds the bid (seed 8); it would have made it at large anyway. Memphis, projected 11th, takes the last at-large spot: seed 11, no tag. Texas Tech (Big 12) is seeded 12 under the line." },
+  three: { label: "Three G6 in (long shot)",
+    rank: ["OSU", "IND", "BSU", "MIA", "UGA", "TEX", "MEM", "BAMA", "ND", "TUL", "OU", "MISS", "WF", "ORE", "BYU", "TTU", "USC", "VAN", "LOU", "UNLV", "JMU"],
+    odds: { BSU: "99%", MEM: "84%", TUL: "52%", OU: "50%", MISS: "41%", WF: "30%", UNLV: "4%", JMU: "1%" },
+    why: "Undefeated Boise State projected 3rd (a bye, seed 3), Memphis 7th and Tulane 10th, both at large. Oklahoma is the last at-large team; Texas Tech is the 12 seed under the line." },
+};
+const PAGES = { BSU: "Boise State", MEM: "Memphis", UNLV: "UNLV", TUL: "Tulane", KENT: "Kent State", WF: "Wake Forest" };
+const isG6 = (k) => T[k][4] === "G";
+
+function pick(rank, tagMode) {
+  const autos = new Set();
+  let g6 = null;
+  rank.forEach((k, i) => {
+    if (CHAMPS[k]) autos.add(k);
+    else if (!g6 && isG6(k)) { autos.add(k); g6 = k; }
+    else if (T[k][4] === "N" && i < 12) autos.add(k);
+  });
+  let atLarge = 12 - autos.size, last = null;
+  const field = [];
+  for (const k of rank) {
+    if (autos.has(k)) field.push(k);
+    else if (atLarge > 0) { field.push(k); atLarge--; last = k; }
+  }
+  const lastRank = rank.indexOf(last);
+  const below = (k) => rank.indexOf(k) > lastRank;
+  const tag = (k) => CHAMPS[k] ?? (k === g6 && (tagMode === "always" || below(k)) ? "G6" : T[k][4] === "N" && autos.has(k) && below(k) ? "ND" : "");
+  const g6s = [...rank.filter(isG6), ...Object.keys(FAR).filter(isG6)];
+  return { field, last, lastRank, rank, out: rank.filter((k) => !field.includes(k)), tag, g6, g6s, autos };
+}
+const proj = (p, k) => FAR[k] ?? p.rank.indexOf(k) + 1;
+const seedOf = (p, k) => p.field.indexOf(k) + 1;
+
+// The card as built: rows {k, seed, tag, under, out} and markers {m}.
+function seedOrder(p) {
+  const it = [], cut = p.field.indexOf(p.last);
+  p.field.forEach((k, i) => {
+    if (i === 4) it.push({ m: "bye" });
+    it.push({ k, seed: i + 1, tag: p.tag(k), under: i > cut && p.autos.has(k) });
+    if (i === cut) it.push({ m: "line" });
+  });
+  it.push({ m: "head" });
+  p.out.forEach((k) => it.push({ k, out: true }));
+  return it;
+}
+function visible(items, me) {
+  const rows = items.map((x, i) => (x.k ? i : -1)).filter((i) => i >= 0);
+  const pos = rows.findIndex((i) => items[i].k === me);
+  const lineAt = items.findIndex((x) => x.m === "line");
+  const above = rows.filter((i) => i < lineAt).length;
+  const show = new Set();
+  if (pos >= 0 && pos < above - 2) {
+    const lo = Math.max(0, Math.min(pos - 2, above - 5));
+    for (let j = lo; j < lo + 5; j++) show.add(rows[j]);
+    return show;
+  }
+  show.add(rows[above - 2]); show.add(rows[above - 1]);
+  let outs = 0;
+  const mine = rows[pos];
+  for (const i of rows.filter((i) => i > lineAt)) {
+    if (!items[i].out) { show.add(i); continue; }
+    if (outs < 2 || (mine > lineAt && i <= mine && outs < 5)) { show.add(i); outs++; }
+  }
+  if (mine !== undefined) show.add(mine);
+  return show;
+}
+
+const HEAD = `<div class="ch"><span>Seed</span><span>Team · now</span><span>Proj.</span><span>Field</span></div>`;
+function rowHtml(p, odds, x, page, extra = "") {
+  const [n, id, rk] = T[x.k];
+  const seed = seedOf(p, x.k), tag = seed ? p.tag(x.k) : "";
+  const lead = seed ? `${seed}${tag ? `<i>${tag}</i>` : ""}` : x.lead ?? "";
+  const cls = [x.k === page ? "me" : "", seed ? "" : "dim", tag && p.autos.has(x.k) && seed - 1 > p.field.indexOf(p.last) ? "bid" : "", extra].join(" ");
+  return `<div class="r ${cls}"><span class="pl">${lead}</span><span class="t">${L(id)}${rk ? `<span class="rk">#${rk}</span>` : ""}<span class="nm">${n}</span></span><span class="pj">${proj(p, x.k)}</span><span class="od">${odds[x.k] ?? T[x.k][3]}</span></div>`;
+}
+
+// The card as built, with `drop` left out of its window (B and C show it in their own block).
+function built(p, odds, page, drop) {
+  const items = seedOrder(p);
+  const show = visible(items, drop ? null : page);
+  let h = HEAD, prev = -1;
+  items.forEach((x, i) => {
+    if (x.m) {
+      const next = [...show].filter((j) => j > i);
+      if (!next.length || prev < 0) return;
+      if (x.m === "bye") h += `<div class="line bye"><span>First-round byes</span></div>`;
+      if (x.m === "line") h += `<div class="line"><span>Last at-large</span></div>`;
+      if (x.m === "head" && next.some((j) => items[j].out)) h += `<div class="hd">Next in line</div>`;
+      return;
+    }
+    if (!show.has(i)) return;
+    if (prev >= 0 && items.slice(prev + 1, i).some((y) => y.k)) h += `<div class="gap">⋯</div>`;
+    h += rowHtml(p, odds, x, page);
+    prev = i;
+  });
+  if (FAR[page] && !drop) h += `<div class="gap">⋯</div>` + rowHtml(p, odds, { k: page }, page);
+  return { html: h, shown: new Set([...show].map((i) => items[i].k)) };
+}
+
+// The Group of Six teams to list for a page: the first `n` (from `from`), then a gap and the page's team if further down.
+function g6Rows(list, page, n) {
+  const at = list.indexOf(page);
+  if (at < 0 || at < n) return list.slice(0, Math.max(n, at + 1));
+  return [...list.slice(0, n - 1), null, page];
+}
+
+const LAYOUTS = {
+  A: { label: "A · As built",
+    note: "What the build shows today. A Group of Six team out of the field sees the bid team (seed 12, G6) and itself after a gap, but not the Group of Six teams in between, or that it's racing them.",
+    card: (p, odds, page) => `<div class="race">${built(p, odds, page, false).html}</div>` },
+  B: { label: "B · Next for the G6 bid",
+    note: "The card as built, plus a short section on Group of Six pages: the Group of Six teams out of the field, by projected rank, down to the page's team. The bid team stays where it's seeded, above. Its own page lists the two teams chasing it.",
+    card: (p, odds, page) => {
+      const out = isG6(page) && !p.field.includes(page);
+      const b = built(p, odds, page, out);
+      let h = b.html;
+      if (isG6(page)) {
+        const chasing = p.g6s.filter((k) => !p.field.includes(k) && !b.shown.has(k));
+        const list = out ? g6Rows(chasing, page, 3) : chasing.slice(0, 2);
+        if (list.length) {
+          h += `<div class="hd">Next for the G6 bid</div>`;
+          for (const k of list) h += k ? rowHtml(p, odds, { k }, page) : `<div class="gap">⋯</div>`;
+        }
+      }
+      return `<div class="race">${h}</div>`;
+    } },
+  C: { label: "C · Group of Six block",
+    note: "On Group of Six pages the card leads with its own race: every Group of Six team by projected rank, the bid team first, then a line. Teams under the line that are in got there at large (they show their seed). Below, the at-large line as a second, short block: the last team in and the first out.",
+    card: (p, odds, page) => {
+      if (!isG6(page)) return `<div class="race">${built(p, odds, page, false).html}</div>`;
+      let h = `<div class="bt">Group of Six bid</div>` + HEAD;
+      const list = g6Rows(p.g6s, page, 4);
+      list.forEach((k, i) => {
+        h += k ? rowHtml(p, odds, { k, lead: "" }, page) : `<div class="gap">⋯</div>`;
+        if (i === 0) h += `<div class="line g6"><span>Top G6 gets the bid</span></div>`;
+      });
+      const firstOut = p.out[0], last = p.last;
+      let a = `<div class="bt">At-large line</div>` + HEAD;
+      a += list.includes(last) ? "" : rowHtml(p, odds, { k: last }, page);
+      a += `<div class="line"><span>Last at-large</span></div>`;
+      a += list.includes(firstOut) ? "" : rowHtml(p, odds, { k: firstOut }, page);
+      return `<div class="race">${h}</div><div class="race">${a}</div>`;
+    } },
+};
+
+let lay = "B", scen = "one", tagMode = "always";
+function render() {
+  const s = SCEN[scen], p = pick(s.rank, tagMode), odds = s.odds ?? {}, L_ = LAYOUTS[lay];
+  const chips = (id, label, all, cur, attr) => document.getElementById(id).innerHTML = `<span>${label}</span>` + Object.entries(all).map(([k, v]) => `<button type="button" class="chip" aria-pressed="${k === cur}" data-${attr}="${k}">${v.label ?? v}</button>`).join("");
+  chips("lay", "Layout", LAYOUTS, lay, "l");
+  chips("tagc", "G6 tag", { always: "Always (built)", needed: "Only when the bid gets it in" }, tagMode, "t");
+  chips("scen", "Scenario", SCEN, scen, "s");
+  document.getElementById("lnote").textContent = L_.note;
+  document.getElementById("why").innerHTML = s.why;
+  document.getElementById("opts").innerHTML = Object.entries(PAGES).map(([k, n]) => {
+    const seed = seedOf(p, k);
+    return `<div class="opt"><b>${n} page <small>· proj. ${proj(p, k)}${seed ? ` · seed ${seed}` : " · out"}</small></b>
+      <div class="paper"><div class="rh">Playoff race</div><div class="rs">Projected seeds and final ranking</div>${L_.card(p, odds, k)}<a class="more">The whole field in the Lab →</a></div></div>`;
+  }).join("");
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.l) lay = b.dataset.l;
+  if (b.dataset.s) scen = b.dataset.s;
+  if (b.dataset.t) tagMode = b.dataset.t;
+  render();
+});
+render();
+</script>
+</body>
+</html>

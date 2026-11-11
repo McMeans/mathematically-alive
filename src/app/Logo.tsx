@@ -1,7 +1,9 @@
 type LogoProps = {
   size?: number;
-  /** Ball color. Defaults to brand navy. */
+  /** Ball color. Defaults to the cream of the board's plates. */
   color?: string;
+  /** Pulse and lace color. Defaults to the board green. */
+  pulse?: string;
   /** Drop the lace ticks and thicken the pulse; use below ~48px. */
   simple?: boolean;
   /** Hide from screen readers when the name is already in adjacent text. */
@@ -9,7 +11,7 @@ type LogoProps = {
 };
 
 /** The football mark: its laces form a pulse line. */
-export function Logo({ size = 48, color = "#14213D", simple = size < 48, decorative = false }: LogoProps) {
+export function Logo({ size = 48, color = "#F3F0E6", pulse = "#133F2E", simple = size < 48, decorative = false }: LogoProps) {
   return (
     <svg
       width={size}
@@ -23,7 +25,7 @@ export function Logo({ size = 48, color = "#14213D", simple = size < 48, decorat
           <path
             d="M30 70 H54 L62 50 L76 90 L84 70 H110"
             fill="none"
-            stroke="#FFFFFF"
+            stroke={pulse}
             strokeWidth={14}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -33,7 +35,7 @@ export function Logo({ size = 48, color = "#14213D", simple = size < 48, decorat
             <path
               d="M22 54 Q24 70 22 86 M118 54 Q116 70 118 86"
               fill="none"
-              stroke="#FFFFFF"
+              stroke={pulse}
               strokeWidth={4}
               strokeLinecap="round"
               opacity={0.9}
@@ -41,12 +43,12 @@ export function Logo({ size = 48, color = "#14213D", simple = size < 48, decorat
             <path
               d="M34 70 H54 L60 57 L68 86 L76 48 L83 70 H106"
               fill="none"
-              stroke="#FFFFFF"
+              stroke={pulse}
               strokeWidth={6}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            <path d="M40 63 V77 M47 63 V77 M90 63 V77 M98 63 V77" stroke="#FFFFFF" strokeWidth={4} strokeLinecap="round" />
+            <path d="M40 63 V77 M47 63 V77 M90 63 V77 M98 63 V77" stroke={pulse} strokeWidth={4} strokeLinecap="round" />
           </>
         )}
       </g>

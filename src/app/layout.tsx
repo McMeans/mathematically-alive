@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk } from "next/font/google";
+import { Public_Sans, Saira_Condensed } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const publicSans = Public_Sans({
+  variable: "--font-public-sans",
   subsets: ["latin"],
 });
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+// Board lettering and numbers.
+const saira = Saira_Condensed({
+  variable: "--font-saira",
   subsets: ["latin"],
-  weight: "700",
+  weight: ["600", "700", "800"],
 });
 
 /** The site's address for absolute links; localhost when none is set or it doesn't parse. */
@@ -40,7 +41,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${spaceGrotesk.variable} antialiased`}>{children}</body>
+      <body className={`${publicSans.variable} ${saira.variable} antialiased`}>{children}</body>
     </html>
   );
 }

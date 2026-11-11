@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draft B · Best shot rework</title>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Reworking "Best shot": say which goal the path is for, and show what each step buys. Numbers are illustrative. */
+:root {
+  --board: #133f2e; --board-deep: #0c2c20; --board-deeper: #0a241a; --board-line: #2a5a46; --board-text: #d7e4dc; --board-muted: #9fbcae;
+  --plate: #f3f0e6; --plate-ink: #121a16; --lamp: #f2b134; --lamp-ink: #8a5d00; --root: #5fd08f;
+  --ground: #e4e7e5; --paper: #f6f8f7; --ink: #15201b; --ink-soft: #3d4a43; --ink-muted: #5d6a63; --rule: #d6d4cc;
+  --help: #1d6b46; --hurt: #a3281c;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.45 "Public Sans", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.cond { font-family: "Saira Condensed", sans-serif; text-transform: uppercase; }
+.plate { font-family: "Saira Condensed", sans-serif; font-weight: 800; line-height: 1; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 60px; }
+h1 { font: 800 34px/1 "Saira Condensed"; text-transform: uppercase; margin: 0 0 6px; }
+.lede { color: var(--ink-muted); margin: 0 0 6px; max-width: 70ch; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 22px; margin-top: 22px; align-items: start; }
+.opt > .tag { font: 800 20px/1 "Saira Condensed"; text-transform: uppercase; margin: 0 0 4px; }
+.opt > .why { font-size: 13px; color: var(--ink-muted); margin: 0 0 12px; }
+.h2 { font: 800 22px/1 "Saira Condensed"; text-transform: uppercase; margin: 0 0 4px; }
+.sub { font-size: 13px; color: var(--ink-muted); margin: 0 0 10px; }
+
+.card { background: var(--board-deep); color: var(--board-text); border-radius: 4px; padding: 14px 16px; }
+.muted { color: var(--board-muted); }
+.btns { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.btn { font: 700 14px/1 "Saira Condensed"; letter-spacing: .05em; text-transform: uppercase; height: 34px; padding: 0 12px; border-radius: 3px; display: inline-flex; align-items: center; gap: 6px; }
+.btn.lamp { background: var(--lamp); color: var(--plate-ink); }
+.btn.line { border: 1px solid var(--board-line); color: var(--board-text); }
+.logo { width: 18px; height: 18px; object-fit: contain; vertical-align: -3px; }
+
+/* Current card */
+.cur .big { display: flex; align-items: baseline; gap: 8px; margin: 6px 0 12px; }
+.cur .big .plate { font-size: 40px; color: #fff; }
+.cur .step { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--board-line); }
+.dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--board-muted); flex-shrink: 0; }
+
+/* The ladder */
+.goal { font: 700 12px/1 "Saira Condensed"; letter-spacing: .1em; text-transform: uppercase; color: var(--board-muted); }
+.headline { font: 800 26px/1.05 "Saira Condensed"; text-transform: uppercase; color: #fff; margin: 4px 0 2px; }
+.lad { display: grid; grid-template-columns: 1fr 64px 64px; column-gap: 10px; margin-top: 10px; }
+.lad .hd { font: 700 11px/1 "Saira Condensed"; letter-spacing: .08em; text-transform: uppercase; color: var(--board-muted); text-align: right; padding-bottom: 6px; }
+.lad .hd:first-child { text-align: left; }
+.lad .r { display: contents; }
+.lad .r > * { padding: 9px 0; border-top: 1px solid var(--board-line); }
+.lad .what { display: flex; gap: 10px; align-items: flex-start; }
+.lad .n { font: 800 15px/1 "Saira Condensed"; color: var(--plate-ink); background: var(--board-muted); width: 20px; height: 20px; border-radius: 2px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.lad .r.now .n { background: transparent; color: var(--board-muted); border: 1px solid var(--board-line); }
+.lad .r.end .n { background: var(--lamp); }
+.lad .what b { display: block; font: 700 17px/1.15 "Saira Condensed"; text-transform: uppercase; color: #fff; }
+.lad .what i { display: block; font-style: normal; font-size: 12px; color: var(--board-muted); margin-top: 2px; }
+.lad .v { text-align: right; font: 800 20px/1 "Saira Condensed"; color: #fff; }
+.lad .v small { display: block; font: 600 11px/1.2 "Public Sans"; color: var(--root); margin-top: 3px; }
+.lad .r.now .v { color: var(--board-muted); }
+.lad .r.end .v { color: var(--lamp); }
+.foot { font-size: 12px; color: var(--board-muted); margin-top: 10px; border-top: 1px solid var(--board-line); padding-top: 9px; }
+
+/* Ways with paths */
+.way { border-top: 1px solid var(--board-line); }
+.way:first-of-type { border-top: 0; }
+.way > button { width: 100%; display: grid; grid-template-columns: 1fr auto 16px; gap: 10px; align-items: center; text-align: left; padding: 11px 0; }
+.way > button b { font: 800 19px/1 "Saira Condensed"; text-transform: uppercase; color: #fff; }
+.way > button i { display: block; font-style: normal; font-size: 12px; color: var(--board-muted); margin-top: 3px; }
+.way > button .plate { font-size: 26px; color: #fff; }
+.way .chev { transition: transform .15s; color: var(--board-muted); }
+.way[open] .chev { transform: rotate(180deg); }
+.way .body { display: none; padding: 0 0 14px; }
+.way[open] .body { display: block; }
+.mini { display: grid; grid-template-columns: 1fr auto; gap: 0 10px; background: var(--board-deeper); border-radius: 3px; padding: 4px 10px; }
+.mini > * { padding: 7px 0; border-top: 1px solid var(--board-line); }
+.mini > :nth-child(-n+2) { border-top: 0; }
+.mini b { font: 700 16px/1.15 "Saira Condensed"; text-transform: uppercase; color: #fff; }
+.mini span { font: 800 17px/1 "Saira Condensed"; color: #fff; text-align: right; align-self: center; }
+
+.note { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 12px 14px; font-size: 13px; color: var(--ink-soft); margin-top: 26px; }
+.note b { color: var(--ink); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Best shot, reworked</h1>
+  <p class="lede">Today's card shows the path into the ACC title game but leads with playoff odds, so it's unclear which goal it's for. Three ways to fix it, all on Louisville with no picks. The numbers are made up to show the layout; the real ones would come from the same simulated seasons.</p>
+
+  <div class="cols">
+    <!-- Today, for reference -->
+    <section class="opt">
+      <p class="tag">Today</p>
+      <p class="why">Steps are for the title game; the big number is the playoff.</p>
+      <p class="h2">Best shot</p>
+      <div class="card cur">
+        <div class="big"><span class="plate">1 in 8</span><span class="muted cond" style="font-size:14px;font-weight:700">to make the playoff</span></div>
+        <div class="step"><span class="dot"></span><div><b class="cond" style="font-size:16px;color:#fff">Louisville wins out</b><div class="muted" style="font-size:12px">22% likely</div></div></div>
+        <div class="step"><span class="dot"></span><div><b class="cond" style="font-size:16px;color:#fff">Wake Forest loses to SMU, beats Georgia Tech</b><div class="muted" style="font-size:12px">38% likely</div></div></div>
+        <p class="muted" style="font-size:12px;margin:10px 0 0">That puts Louisville in the ACC title game 34% of the time. Favorites win the other 5 games it needs.</p>
+        <div class="btns"><span class="btn lamp">Fill in this path</span><span class="btn line">Try it in the Lab →</span></div>
+      </div>
+    </section>
+
+    <!-- 1 + 2: named goal, step ladder -->
+    <section class="opt">
+      <p class="tag">1 + 2 · Named goal, step by step</p>
+      <p class="why">The card says its goal. Each step shows what it adds, ending at the playoff.</p>
+      <p class="h2">Way into the ACC title game</p>
+      <p class="sub">The likeliest results that put Louisville in it. Each row is what it adds to the rows above.</p>
+      <div class="card">
+        <span class="goal">Clearest path</span>
+        <p class="headline">Win out, and Wake Forest loses once</p>
+        <div class="lad">
+          <span class="hd">After</span><span class="hd">Title game</span><span class="hd">Playoff</span>
+          <div class="r now"><div class="what"><span class="n">·</span><div><b>Today</b></div></div><span class="v">9%</span><span class="v">5%</span></div>
+          <div class="r"><div class="what"><span class="n">1</span><div><b><img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/97.png" alt=""> Louisville wins out</b><i>9-3 · 22% likely</i></div></div><span class="v">23%<small>+14</small></span><span class="v">13%<small>+8</small></span></div>
+          <div class="r"><div class="what"><span class="n">2</span><div><b><img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/2567.png" alt=""> SMU beats Wake Forest</b><i>Nov 14 · 44% likely</i></div></div><span class="v">61%<small>+38</small></span><span class="v">24%<small>+11</small></span></div>
+          <div class="r"><div class="what"><span class="n">3</span><div><b>Favorites win the rest</b><i>5 games · Louisville clinches</i></div></div><span class="v">In</span><span class="v">31%<small>+7</small></span></div>
+          <div class="r end"><div class="what"><span class="n">4</span><div><b>Louisville wins the title game</b><i>vs Miami · 26% if they meet</i></div></div><span class="v">Won</span><span class="v">In</span></div>
+        </div>
+        <p class="foot">All four: about 1 in 30 seasons. The champion gets a playoff spot.</p>
+        <div class="btns"><span class="btn lamp">Fill in this path</span><span class="btn line">Try it in the Lab →</span></div>
+      </div>
+    </section>
+
+    <!-- 3: ways in, each with its path -->
+    <section class="opt">
+      <p class="tag">3 · A path under each way in</p>
+      <p class="why">Replaces the card: “Ways into the playoff” opens to show each way's likeliest path.</p>
+      <p class="h2">Ways into the playoff</p>
+      <p class="sub">Louisville's 5% playoff odds, split by how it gets in. Tap one for its likeliest path.</p>
+      <div class="card" style="padding-top:4px;padding-bottom:4px">
+        <div class="way" open>
+          <button type="button" onclick="this.parentElement.toggleAttribute('open')"><span><b>Win the ACC</b><i>The champion gets a spot.</i></span><span class="plate">3%</span>
+            <svg class="chev" viewBox="0 0 12 12" width="12" height="12"><path d="M2.5 4.5 6 8 9.5 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></svg></button>
+          <div class="body">
+            <div class="mini">
+              <b>Louisville wins out</b><span>22%</span>
+              <b>SMU beats Wake Forest</b><span>44%</span>
+              <b>Favorites win the rest</b><span class="muted" style="font-size:13px">clinches</span>
+              <b>Beats Miami in the title game</b><span>26%</span>
+            </div>
+            <p class="muted" style="font-size:12px;margin:8px 0 0">Each step's chance on its own. All of it: about 1 in 30.</p>
+            <div class="btns"><span class="btn lamp">Fill in this path</span></div>
+          </div>
+        </div>
+        <div class="way">
+          <button type="button" onclick="this.parentElement.toggleAttribute('open')"><span><b>At-large</b><i>Almost only at 9-3.</i></span><span class="plate">2%</span>
+            <svg class="chev" viewBox="0 0 12 12" width="12" height="12"><path d="M2.5 4.5 6 8 9.5 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/></svg></button>
+          <div class="body">
+            <div class="mini">
+              <b>Louisville wins out</b><span>22%</span>
+              <b>Oregon loses once more</b><span>41%</span>
+              <b>BYU loses once more</b><span>48%</span>
+            </div>
+            <p class="muted" style="font-size:12px;margin:8px 0 0">What the seasons where Louisville gets in without the title most often have in common.</p>
+            <div class="btns"><span class="btn lamp">Fill in this path</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="note">
+    <b>What each one needs.</b> 1 + 2 uses the path we already find; the new part is the running title-game and playoff odds for each row, from the same simulated seasons filtered one step at a time. 3 adds an at-large path: the results most common in the seasons where the team gets in without the title. That's new core work and fuzzier, since no single set of results guarantees an at-large spot.
+  </div>
+</main>
+</body>
+</html>
