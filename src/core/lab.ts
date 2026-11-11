@@ -7,7 +7,7 @@ import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { conferenceName, conferenceShort, formatFine, formatOdds, formatSideOdds, shownChange } from "./paths";
 import { announcedField, bracketGames, findFormat } from "./playoff";
 import { INDEPENDENTS, type Game, type Season } from "./season";
-import { gameWinProbability, mix, mulberry32 } from "./sim";
+import { gameWinProbability, mix, mulberry32, neutralOdds } from "./sim";
 import { pairKey } from "./steps";
 import { conferenceData, decidedTitleGame } from "./tiebreak";
 import { nationalView, type NationalView } from "./view";
@@ -423,11 +423,13 @@ export type LabFill = "favorites" | { seed: number };
 const FILL_SALT = 1 << 24;
 
 /**
- * The picks (less any on a game since gone final) plus a pick for every regular-season game neither final nor picked, title games aside (the standings
- * decide those). Existing picks stay. A seeded fill draws each game at its model odds; the same seed and picks give
- * the same season.
+ * The picks (less any on a game since gone final) plus a pick for every regular-season game neither final nor picked,
+ * title games aside (the standings decide who plays in those). Then, for each of `conferences` with no title pick and
+ * its title game not final, a pick of the title-game winner between the two teams those standings send (the favourite
+ * at neutral-site odds, or drawn at them). Existing picks stay. A seeded fill draws each game at its model odds; the
+ * same seed and picks give the same season.
  */
-export function fillLabLocks(season: Season, locks: Partial<LabLocks>, how: LabFill): LabLocks {
+export function fillLabLocks(season: Season, locks: Partial<LabLocks>, how: LabFill, conferences: readonly string[] = []): LabLocks {
   const out = filled(locks);
   // Picks on games since gone final are dropped, as seasonLab drops them.
   const games: Record<number, number> = {};
@@ -438,7 +440,19 @@ export function fillLabLocks(season: Season, locks: Partial<LabLocks>, how: LabF
     const homeWins = how === "favorites" ? p >= 0.5 : mulberry32(mix(how.seed, 0, FILL_SALT + g.id))() < p;
     games[g.id] = homeWins ? g.homeId : g.awayId;
   }
-  return { ...out, games };
+  const titles = { ...out.titles };
+  const names = new Map(season.teams.map((t) => [t.id, t.name]));
+  const winnerOf = (g: Game): number => games[g.id] ?? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId);
+  const odds = neutralOdds(season);
+  conferences.forEach((c, k) => {
+    if (titles[c] !== undefined || titleFinal(season, c)) return;
+    const m = standingsWithPicks(season, c, (g) => games[g.id] !== undefined, winnerOf, names).matchup;
+    if (!m) return;
+    const [a, b] = m.teams;
+    const p = odds(a, b, 0, 0);
+    titles[c] = (how === "favorites" ? p >= 0.5 : mulberry32(mix(how.seed, 1, FILL_SALT + k))() < p) ? a : b;
+  });
+  return { ...out, games, titles };
 }
 
 // --- Lock codec: picks as a short URL-safe string. ---------------------------------------------------------------

@@ -61,7 +61,7 @@ self.onmessage = async (e: MessageEvent<LabRequest>) => {
       return;
     }
     if (req.kind === "fill") {
-      self.postMessage({ kind: "filled", id: req.id, locks: fillLabLocks(season, req.locks, req.how) } satisfies LabResponse);
+      self.postMessage({ kind: "filled", id: req.id, locks: fillLabLocks(season, req.locks, req.how, SUPPORTED_CONFERENCES) } satisfies LabResponse);
       return;
     }
     const code = encodeLabLocks(season, req.locks);
