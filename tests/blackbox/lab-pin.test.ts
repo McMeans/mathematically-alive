@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { labOddsChange, labTeamOdds, seasonFromCfbd, seasonLab, type CfbdSnapshot } from "@/core";
+import { fillLabLocks, labOddsChange, labTeamOdds, seasonFromCfbd, seasonLab, type CfbdSnapshot } from "@/core";
 
 // Every FBS game of 2026 through week 9, from fixtures/cfp-2026.json.
 const season = seasonFromCfbd((JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot }).snapshot);
@@ -29,14 +29,16 @@ describe("season lab: a pinned team's odds", () => {
 });
 
 describe("season lab: how a pinned team's odds moved", () => {
-  it("counts points of the odds as shown, so 5% to 9% reads +4 pts", () => {
+  it("counts points of the odds as shown, so 5% to 9% reads +4 pts and 5% to 6% reads +1 pt", () => {
+    expect(labOddsChange(0.05, 0.06)).toBe("+1 pt");
+    expect(labOddsChange(0.06, 0.05)).toBe("−1 pt");
     expect(labOddsChange(0.05, 0.09)).toBe("+4 pts");
     expect(labOddsChange(0.094, 0.051)).toBe("−4 pts");
     expect(labOddsChange(0.004, 0.007)).toBe("+0.3 pts");
   });
 
   it("reads the edge odds as shown: \">99%\" as 99 and \"<0.1%\" as 0.1", () => {
-    expect(labOddsChange(0.98, 1)).toBe("+1 pts"); // 98% to >99%
+    expect(labOddsChange(0.98, 1)).toBe("+1 pt"); // 98% to >99%
     expect(labOddsChange(0.995, 0.999)).toBeNull(); // >99% both ways
     expect(labOddsChange(0, 0.004)).toBe("+0.3 pts"); // <0.1% to 0.4%
   });
@@ -66,5 +68,16 @@ describe("season lab: picking a title game before it's settled", () => {
     const t = lab.national.teams.find((x) => x.teamId === a)!;
     expect(t.champion).toBeCloseTo(t.titleGame!, 9);
     expect(lab.conferences.find((c) => c.conference === "ACC")!.picked).toBe(a);
+  });
+
+  it("once the picks settle a matchup, offers exactly those two, in seed order", () => {
+    const lab = seasonLab(season, { ...base, locks: fillLabLocks(season, {}, "favorites") });
+    const settled = lab.conferences.filter((c) => c.matchup?.exact);
+    expect(settled.length).toBeGreaterThan(0);
+    for (const c of settled) {
+      expect(c.final!.exact).toBe(true);
+      expect(c.final!.teams).toEqual(c.matchup!.teams);
+      expect(c.final!.chances[0] + c.final!.chances[1]).toBeCloseTo(1, 9);
+    }
   });
 });

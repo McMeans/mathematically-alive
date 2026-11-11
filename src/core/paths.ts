@@ -102,9 +102,14 @@ function sideOdds(p: number, status: PathStatus): Shown {
   return fineOdds(p);
 }
 
-/** The percent `formatSideOdds` shows, as a number (">99%" is 99), for differences between shown odds. */
-export function shownSideOdds(p: number, status: PathStatus): number {
-  return sideOdds(p, status).pct;
+/**
+ * How far odds moved in points of the percent `formatSideOdds` shows (">99%" counts as 99, "<0.1%" as 0.1), so the
+ * move matches the two numbers on screen: "+4", "−0.3", or null when they read the same. `statusOf` gives each side's
+ * status (default: alive).
+ */
+export function shownChange(before: number, after: number, statusOf: (p: number) => PathStatus = () => "alive"): string | null {
+  const d = Math.round((sideOdds(after, statusOf(after)).pct - sideOdds(before, statusOf(before)).pct) * 10) / 10;
+  return d > 0 ? `+${d}` : d < 0 ? `−${-d}` : null;
 }
 
 /** A team's record for display: "4-5 (2-4 ACC)", or just "4-5" for an independent or without a conference. */

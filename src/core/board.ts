@@ -2,7 +2,7 @@
 // to root against, the likeliest title-game matchup, and the playoff race around the cut line. Read from one season
 // simulation and the national run over the same seasons. All wording the page shows is here.
 import type { NationalResult } from "./national";
-import { conferenceName, formatOdds, formatRecord, formatSideOdds, shownSideOdds } from "./paths";
+import { conferenceName, formatOdds, formatRecord, formatSideOdds, shownChange } from "./paths";
 import { powerConferences } from "./committee";
 import { fieldPicker, playoffFormat } from "./playoff";
 import { INDEPENDENTS, teamRecord, type Game, type Season } from "./season";
@@ -408,8 +408,8 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
   // Help from elsewhere: games that clearly move the playoff odds, grouped by the side to root against.
   const games: { game: HelpGame; against: number; swing: number }[] = [];
   // In points of the odds as shown beside it, so "0.4%" against today's "<0.1%" reads "+0.3".
-  const today = shownSideOdds(inField.reduce((a, b) => a + b, 0) / n, "alive");
-  const change = (p: number) => { const d = Math.round((shownSideOdds(p, "alive") - today) * 10) / 10; return d > 0 ? `+${d}` : d < 0 ? `−${-d}` : null; };
+  const today = inField.reduce((a, b) => a + b, 0) / n;
+  const change = (p: number) => shownChange(today, p);
   others.forEach(({ g }, k) => {
     let hn = 0, hIn = 0, aIn = 0, hT = 0, aT = 0;
     for (let it = 0; it < n; it++) {
@@ -503,11 +503,9 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
   if (shotGroups.length > 0) {
     // A power conference's champion gets an automatic bid (`autoBid`, above).
     const pct = (p: number) => (p >= 1 ? "In" : show(p));
-    const add = (now: number | null, before: number | null) => {
-      if (now === null || before === null) return null;
-      const d = Math.round(now * 100) - Math.round(before * 100);
-      return d > 0 ? `+${d}` : d < 0 ? `−${-d}` : null;
-    };
+    // In points of the odds as shown ("In" counts as 100).
+    const add = (now: number | null, before: number | null) =>
+      now === null || before === null ? null : shownChange(before, now, (p) => (p >= 1 ? "clinched" : "alive"));
     const steps: ShotStep[] = [];
     let prevT: number | null = titled ? 0 : null, prevF: number | null = 0;
     const row = (kind: ShotStep["kind"], text: string, detail: string, results: ShotStep["results"], k: number, t: number, f: number) => {
