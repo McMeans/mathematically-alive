@@ -7,6 +7,10 @@ The design is **design B, the stadium scoreboard**: a green board with lit numbe
 on a light gray ground. Drafts that show the intent live in `docs/redesign/b-*.html` (`b-scoreboard.html` for the team
 page, `b-lab.html` for the Season Lab). Product context is in `PRODUCT.md`.
 
+**See it:** [`docs/style-guide.html`](style-guide.html) is the visual companion to this guide: swatches, type,
+the header, picks, races, best shot, buttons, motion, contrast, the mark and do/don't pairs, rendered with the real
+tokens. Open it in a browser. Update both in the same change when the design moves.
+
 The site is **light-only**. There is no dark mode, and none is planned.
 
 ## Contents
