@@ -33,7 +33,7 @@ jobs:
   review:
     # Same-repo PRs only: a fork's PR never runs this job, so it can't spend the subscription.
     if: github.event.pull_request.head.repo.full_name == github.repository
-    needs: test
+    # No `needs: test`: the review runs alongside the tests, so it lands in minutes instead of after them.
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -55,7 +55,7 @@ jobs:
           prompt: |
             Review PR #${{ github.event.pull_request.number }} in ${{ github.repository }} using the checks in
             .claude/skills/pr-review/SKILL.md. Skip its coverage gate step and its output and posting
-            sections: the test job already ran the gate, and the format below replaces them.
+            sections: the test job runs the gate, and the format below replaces them.
 
             Sort every finding into one tier:
             - Blocker: wrong output, crash, data loss, security hole, or new src/core behavior with no black-box test.
