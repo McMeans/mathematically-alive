@@ -628,14 +628,17 @@ function Games({ games, picked, titles, conferences, name, abbr, onPick, onTitle
   const [mine, setMine] = useState(false);
   const [find, setFind] = useState("");
   const [menu, setMenu] = useState(false);
-  const bigSet = useMemo(() => new Set(big.map((g) => g.gameId)), [big]);
-  // A picked game no longer swings the field, so it leaves the big games: keep the ones picked from there.
-  const [kept, setKept] = useState<Set<number>>(() => new Set());
-  const isBig = (id: number) => bigSet.has(id) || (kept.has(id) && picked[id] !== undefined);
-  function pick(gameId: number, winner: number) {
-    if (bigSet.has(gameId)) setKept((k) => new Set(k).add(gameId));
-    onPick(gameId, winner);
+  // A picked game no longer swings the field, so it leaves the run's big games. Once a game has been a big game it
+  // stays one here, picked, unpicked or filled, so picking a winner never takes it off the list.
+  const [kept, setKept] = useState<Set<number>>(() => new Set(big.map((g) => g.gameId)));
+  const [seenBig, setSeenBig] = useState(big);
+  if (big !== seenBig) {
+    setSeenBig(big);
+    setKept((k) => (big.every((g) => k.has(g.gameId)) ? k : new Set([...k, ...big.map((g) => g.gameId)])));
   }
+  const isBig = (id: number) => kept.has(id);
+  const bigCount = useMemo(() => games.filter((g) => kept.has(g.id)).length, [games, kept]);
+  const pick = onPick;
   const chips = useMemo(() => {
     const present = new Set(games.flatMap((g) => g.conferences));
     return [...CHIP_ORDER.filter((c) => present.has(c)), ...[...present].filter((c) => !CHIP_ORDER.includes(c)).sort()];
@@ -660,7 +663,7 @@ function Games({ games, picked, titles, conferences, name, abbr, onPick, onTitle
     <>
       <PaneHeading id="games-h" right={
         <Seg label="Which games" value={pinned ? ("none" as "big") : scope} onChange={(v) => { setScope(v); setMine(false); }} options={[
-          { id: "big", label: <>Big games <i className="ml-1 font-sans text-xs not-italic opacity-80">{big.length}</i></> },
+          { id: "big", label: <>Big games <i className="ml-1 font-sans text-xs not-italic opacity-80">{bigCount}</i></> },
           { id: "all", label: <>All <i className="ml-1 font-sans text-xs not-italic opacity-80">{games.length}</i></> },
         ]} />
       }>Games left</PaneHeading>
@@ -698,7 +701,7 @@ function Games({ games, picked, titles, conferences, name, abbr, onPick, onTitle
       </div>
       {scope === "all" && !pinned && <p className="mt-2 flex items-center gap-2 text-[13px] text-ink-muted"><span className="h-3.5 w-[18px] rounded-[3px] border-2 border-lamp" />Amber outline: a big game, one that moves the field most</p>}
       {pinned && <p className="mt-2 text-[13px] text-ink-muted">{name(focus!)}&rsquo;s games left, and its conference title game.</p>}
-      {shown.length === 0 && finals.length === 0 && <p className="mt-3 text-sm text-ink-muted">{scope === "big" && big.length === 0 ? "No open game moves the field much." : "No games left for this filter."}</p>}
+      {shown.length === 0 && finals.length === 0 && <p className="mt-3 text-sm text-ink-muted">{scope === "big" && bigCount === 0 ? "No open game moves the field much." : "No games left for this filter."}</p>}
       {[...weeks].map(([week, w]) => (
         <div key={week}>
           <p className="cond mb-2 mt-5 flex items-baseline gap-2.5"><b className="text-[19px] font-extrabold">Week {week}</b><span className="text-[15px] font-bold tracking-[0.04em] text-ink-muted">{w.date}</span></p>
