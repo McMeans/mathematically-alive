@@ -2,7 +2,7 @@
 // which results elsewhere move one team's playoff odds. All wording lives here so black-box tests can check it.
 import type { NationalResult } from "./national";
 import { PROJECTED_NOTE, formatFine, formatOdds } from "./paths";
-import { bracketGames } from "./playoff";
+import { bracketGames, playoffField } from "./playoff";
 import type { Season } from "./season";
 import type { SimResult } from "./sim";
 import { OVERALL, isClear } from "./signal";
@@ -65,7 +65,16 @@ export type NationalView = {
  * results and team names in them). Null when the
  * national run has no playoff.
  */
-export function nationalView(national: NationalResult, opts: { bubble?: number; season?: Season } = {}): NationalView | null {
+export function nationalView(national: NationalResult, opts: {
+  bubble?: number;
+  season?: Season;
+  /**
+   * Seed the projected field from this ranking instead (best first, every FBS team) with these conference champions,
+   * under the season's format (`playoffField`; needs `season`). Each spot keeps its simulated odds; the bubble is the
+   * next teams in the ranking. Ignored once the field is announced.
+   */
+  ranking?: { order: readonly number[]; champions: readonly number[] };
+} = {}): NationalView | null {
   if (!national.playoff) return null;
   const T = national.teams.find((t) => t.playoff)!.playoff!.seeds.length as 4 | 12;
   const games = bracketGames(T);
@@ -76,6 +85,8 @@ export function nationalView(national: NationalResult, opts: { bubble?: number; 
   };
   const iterations = national.iterations.toLocaleString("en-US");
   if (national.announced) return announcedView(national, opts.season, T, games, roundOf, iterations);
+
+  if (opts.ranking && opts.season) return rankedView(national, opts.season, opts.ranking, T, games, roundOf, iterations, opts.bubble ?? 6);
 
   const withOdds = national.teams.filter((t) => t.playoff !== null && t.playoff.field > 0);
   const byField = [...withOdds].sort((a, b) => b.playoff!.field - a.playoff!.field || a.teamId - b.teamId);
@@ -99,6 +110,36 @@ export function nationalView(national: NationalResult, opts: { bubble?: number; 
   return {
     teams: T, announced: false, heading: "Projected playoff field", bracketHeading: "Projected bracket", field, bracket, bubble,
     note: `Projected from ${iterations} simulated seasons. Modelled odds, not a prediction of the committee.`,
+  };
+}
+
+/** The field the format picks from a ranking, its bracket, and the next teams in the ranking as the bubble. */
+function rankedView(
+  national: NationalResult, season: Season, ranking: { order: readonly number[]; champions: readonly number[] }, T: 4 | 12,
+  games: ReturnType<typeof bracketGames>, roundOf: (g: number) => BracketGame["round"], iterations: string, bubbleSize: number,
+): NationalView {
+  const seeds = playoffField(season, ranking.order, ranking.champions);
+  const byId = new Map(national.teams.map((t) => [t.teamId, t]));
+  const field: FieldSpot[] = seeds.map((id, k) => {
+    const p = byId.get(id)?.playoff;
+    const [inOdds, atSeed] = [p?.field ?? 0, p?.seeds[k] ?? 0];
+    return {
+      seed: k + 1, teamId: id, field: inOdds, atSeed, bye: p?.bye ?? 0, champion: p?.champion ?? 0,
+      text: `In ${formatOdds(inOdds)} · seed ${k + 1} in ${formatOdds(atSeed)}`,
+    };
+  });
+  const seeded = new Set(seeds);
+  const bubble = ranking.order.filter((id) => !seeded.has(id)).slice(0, bubbleSize).map((id) => {
+    const odds = byId.get(id)?.playoff?.field ?? 0;
+    return { teamId: id, field: odds, text: `In ${formatFine(odds)}` };
+  });
+  const side = (x: number): BracketSide => (x >= 0 ? { teamId: field[x].teamId, seed: x + 1 } : { winnerOf: ~x });
+  const bracket = games.map(([a, b, home], index) => ({
+    index, round: roundOf(index), a: side(a), b: side(b), site: home ? "At the higher seed" : "Neutral site", result: null,
+  }));
+  return {
+    teams: T, announced: false, heading: "Projected playoff field", bracketHeading: "Projected bracket", field, bracket, bubble,
+    note: `Seeded from the live ranking: the committee's latest, moved only by results since and the picks. Each conference's champion is its picked one, else its highest-ranked team. Chances in from ${iterations} simulated seasons.`,
   };
 }
 

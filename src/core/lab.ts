@@ -6,7 +6,7 @@ import { simulateNational, titleRace, type NationalResult } from "./national";
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { conferenceName, conferenceShort, formatFine, formatOdds, formatSideOdds, shownChange } from "./paths";
 import { announcedField, bracketGames, findFormat } from "./playoff";
-import type { Game, Season } from "./season";
+import { INDEPENDENTS, type Game, type Season } from "./season";
 import { gameWinProbability, mix, mulberry32 } from "./sim";
 import { pairKey } from "./steps";
 import { conferenceData, decidedTitleGame } from "./tiebreak";
@@ -212,14 +212,20 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     .sort((a, b) => b.spots - a.spots || a.gameId - b.gameId)
     .slice(0, 15)
     .map((g) => ({ gameId: g.gameId, spots: g.spots, text: `Swings about ${g.spots.toFixed(1)} ${g.spots.toFixed(1) === "1.0" ? "spot" : "spots"} in the field` }));
-  const live = liveRanking(season, { locks: locks.games, champions: Object.values(locks.titles) }).teams.slice(0, opts.top ?? 25);
+  const liveAll = liveRanking(season, { locks: locks.games, champions: Object.values(locks.titles) }).teams;
+  const live = liveAll.slice(0, opts.top ?? 25);
+  // The projected field is seeded from the live ranking. Champions: each conference's picked one, else its highest-ranked team.
+  const order = liveAll.map((t) => t.teamId);
+  const conferenceOf = new Map(season.teams.map((t) => [t.id, t.conference]));
+  const champions = [...new Set(season.teams.flatMap((t) => (t.classification === "fbs" && t.conference && t.conference !== INDEPENDENTS ? [t.conference] : [])))]
+    .flatMap((c) => locks.titles[c] ?? order.find((id) => conferenceOf.get(id) === c) ?? []);
   return {
     national,
     live,
     picks,
     open,
     summary: `${picks === 0 ? "No picks yet" : picks === 1 ? "1 pick" : `${picks} picks`}${open === 0 && picks > 0 ? " · every game picked" : ""} · ${seasons}`,
-    playoff: nationalView(national, { season }),
+    playoff: nationalView(national, { season, ranking: { order, champions } }),
     conferences,
     ranking,
     bigGames,

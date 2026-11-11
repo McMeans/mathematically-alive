@@ -128,4 +128,24 @@ describe("live ranking on a real season", () => {
     expect(picked).toHaveLength(25);
     expect(picked.find((t) => t.teamId === one)?.rank ?? 26).toBeGreaterThan(1);
   });
+
+  it("the Season Lab seeds its projected field and bracket from the live ranking, and a pick reseeds them", () => {
+    const opts = { iterations: 50, seed: 3, conferences: ["ACC", "Big 12", "SEC", "Big Ten"] };
+    const base = seasonLab(season, opts);
+    const field = base.playoff!.field.map((f) => f.teamId);
+    expect(field[0]).toBe(committee[0]);
+    // Every seeded team but the automatic bids comes from the ranking's top, in its order; the bubble is who's next.
+    const order = base.live.map((t) => t.teamId);
+    const next = order.filter((id) => !field.includes(id));
+    expect(base.playoff!.bubble.map((b) => b.teamId)).toEqual(next.slice(0, base.playoff!.bubble.length));
+    const quarterfinal = base.playoff!.bracket.find((g) => g.round === "Quarterfinal")!;
+    expect(quarterfinal.a).toEqual({ teamId: committee[0], seed: 1 });
+
+    const one = committee[0];
+    const game = season.games.find((g) => !g.completed && (g.homeId === one || g.awayId === one))!;
+    const loses = game.homeId === one ? game.awayId : game.homeId;
+    const picked = seasonLab(season, { ...opts, locks: { games: { [game.id]: loses }, titles: {}, bracket: {} } });
+    expect(picked.playoff!.field[0].teamId).not.toBe(one);
+    expect(picked.playoff!.bracket.find((g) => g.round === "Quarterfinal")!.a).toEqual({ teamId: picked.playoff!.field[0].teamId, seed: 1 });
+  });
 });
