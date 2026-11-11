@@ -69,7 +69,7 @@ export function nationalView(national: NationalResult, opts: {
   bubble?: number;
   season?: Season;
   /**
-   * Seed the projected field from this ranking instead (best first, every FBS team: the projected one) with these conference champions,
+   * Seed the projected field from this ranking instead (best first, every FBS team) with these conference champions,
    * under the season's format (`playoffField`; needs `season`). Each spot keeps its simulated odds; the bubble is the
    * next teams in the ranking. Ignored once the field is announced.
    */
@@ -139,7 +139,7 @@ function rankedView(
   }));
   return {
     teams: T, announced: false, heading: "Projected playoff field", bracketHeading: "Projected bracket", field, bracket, bubble,
-    note: `Seeded from the projected final ranking: the committee's latest, with every game played out ${iterations} times and the picks kept. Each power conference's champion is its picked one, else its likeliest. A team's chance in can differ from its seed: the seed is its most likely place, the chance how often it gets in at all.`,
+    note: `Seeded from the committee's latest ranking, moved by results since and your picks. Each power conference's champion is its picked one, else its highest-ranked team. Chances in from ${iterations} simulated seasons, every game played out: a seed is where things stand, the chance how often it holds.`,
   };
 }
 

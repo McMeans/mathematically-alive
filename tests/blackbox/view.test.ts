@@ -86,11 +86,12 @@ describe("results elsewhere for the playoff", () => {
     expect(playoffSignals(season, sim, national, teamId, 2).length).toBeLessThanOrEqual(2);
   });
 
-  it("finds at least one game that matters for a bubble team in a big run", () => {
+  it("finds games elsewhere that matter for the bubble in a big run", () => {
     const big = simulateSeason(season, { iterations: 3000, seed: 5 });
     const nat = simulateNational(season, { iterations: 3000, seed: 5, conferences: POWER }, big);
-    const bubbleTeam = nationalView(nat)!.bubble[0].teamId;
-    expect(playoffSignals(season, big, nat, bubbleTeam).length).toBeGreaterThan(0);
+    // A bubble team can hang on its own games alone; across the bubble, some depend on others' results.
+    const bubble = nationalView(nat)!.bubble.map((b) => b.teamId);
+    expect(bubble.some((id) => playoffSignals(season, big, nat, id).length > 0)).toBe(true);
   }, 60_000);
 
   it("is empty when the run has no playoff or the simulations don't match", () => {

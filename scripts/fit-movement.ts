@@ -4,7 +4,8 @@
 // For every pair of committee rankings in a season (an earlier one and any later one, the final included), each FBS
 // team's score in the later ranking is modelled as
 //   anchor * A + wins * dW + losses * dL + g6Wins * dW(G6 only) + upset * dU + champion * dC
-// where A is its anchored score in the earlier ranking (the stand-in's score at the place the committee put it),
+// (plus lossyWins * dW when the team has two or more losses by then)
+// where A is its anchored score in the earlier ranking (minus the square root of the place the committee put it),
 // dW/dL its wins and losses since, dU how surprising those results were (a win adds the chance it had of losing, a
 // loss takes off the chance it had of winning) and dC whether it has since won a power conference's title game.
 // Fitted by maximum likelihood on the pairs the later ranking states (as fit-committee.ts does), each ranking pair
@@ -14,11 +15,14 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { committeeRanking, gameWinProbability, seasonFromCfbd, type CfbdSnapshot } from "../src/core";
 import { powerConferences, titleGameIndex } from "../src/core/committee";
-import { powerTeam as isPower } from "../src/core/live";
+import { anchorAt, powerTeam as isPower } from "../src/core/live";
 
 type Fixture = { snapshot: CfbdSnapshot; rankings: { week: number; ranks: { rank: number; teamId: number }[] }[] };
-const KEYS = ["anchor", "wins", "losses", "g6Wins", "upset", "champion"] as const;
+const KEYS = ["anchor", "wins", "losses", "g6Wins", "upset", "champion", "lossyWins"] as const;
 const RIDGE = 0.01;
+/** Pair weights: a pair within the later ranking counts TOP_WEIGHT / (the higher team's place); a ranked team over one just outside, UNRANKED_WEIGHT. Tuned so the top, which the site shows, drives the fit. */
+const TOP_WEIGHT = 5;
+const UNRANKED_WEIGHT = 0.1;
 
 type Case = { ids: number[]; x: Map<number, number[]>; target: number[]; horizon: "next" | "final" | "other"; anchorOrder: number[] };
 
@@ -36,24 +40,26 @@ function cases(): Case[] {
     const last = fx.rankings.length - 1;
     for (let r = 0; r < last; r++) {
       const cur = fx.rankings[r];
-      // Anchored score: the stand-in's score at the place the committee (then the stand-in, below its 25) put the team.
+      // Anchored score: by the place the committee (then the stand-in, below its 25) put the team (live.ts's anchorAt).
       const stand = committeeRanking(season, { throughWeek: cur.week - 1 });
       const ranked = cur.ranks.map((x) => x.teamId).filter((id) => power.has(id));
       const inR = new Set(ranked);
       const anchorOrder = [...ranked, ...stand.map((t) => t.teamId).filter((id) => !inR.has(id))];
-      const anchorScore = new Map(anchorOrder.map((id, p) => [id, stand[p].score]));
+      const anchorScore = new Map(anchorOrder.map((id, p) => [id, anchorAt(p)]));
       for (let q = r + 1; q <= last; q++) {
         const nxt = fx.rankings[q];
-        const x = new Map(fbs.map((id) => [id, [anchorScore.get(id) ?? 0, 0, 0, 0, 0, 0]]));
+        const x = new Map(fbs.map((id) => [id, [anchorScore.get(id) ?? 0, 0, 0, 0, 0, 0, 0, 0, 0]]));
+        const seenLosses = new Map(stand.map((t) => [t.teamId, t.losses]));
         season.games.forEach((g, i) => {
           if (!g.completed || g.week < cur.week || g.week >= nxt.week) return;
           const homeWon = g.homePoints! > g.awayPoints!;
           const [w, l] = homeWon ? [g.homeId, g.awayId] : [g.awayId, g.homeId];
           const pw = homeWon ? prob[i] : 1 - prob[i];
           const xw = x.get(w), xl = x.get(l);
-          if (xw) { xw[1]++; if (!power.get(w)) xw[3]++; xw[4] += 1 - pw; if (titleGames.has(i)) xw[5] = 1; }
-          if (xl) { xl[2]++; xl[4] -= pw; }
+          if (xw) { xw[1]++; if (!power.get(w)) xw[3]++; xw[4] += 1 - pw; if (titleGames.has(i)) xw[5] = 1; xw[6] += 1 - pw; if (!power.get(w)) xw[7] += 1 - pw; }
+          if (xl) { xl[2]++; xl[4] -= pw; xl[6] -= 1 - pw; if (!power.get(l)) xl[7] -= 1 - pw; }
         });
+        for (const [id, v] of x) v[8] = (seenLosses.get(id) ?? 0) + v[2] >= 2 ? v[1] : 0;
         out.push({ ids: fbs, x, target: nxt.ranks.map((t) => t.teamId).filter((id) => power.has(id)), horizon: q === r + 1 ? "next" : q === last ? "final" : "other", anchorOrder });
       }
     }
@@ -61,27 +67,32 @@ function cases(): Case[] {
   return out;
 }
 
-function fit(all: Case[]): number[] {
+function fit(all: Case[], cols: number[] = [0, 1, 2, 3, 4, 5, 8]): number[] {
   const groups = all.map((c) => {
     const inT = new Set(c.target);
     // Unranked teams: the ones that could plausibly be ranked (the anchor's top 40), to keep the fit about the top.
     const unranked = c.anchorOrder.slice(0, 40).filter((id) => !inT.has(id));
     const diffs: number[][] = [];
-    const d = (a: number, b: number) => c.x.get(a)!.map((v, k) => v - c.x.get(b)![k]);
+    const d = (a: number, b: number) => cols.map((k) => c.x.get(a)![k] - c.x.get(b)![k]);
+    // Pairs within the ranking, the higher pair counting more (the top is what the site shows), and each ranked team
+    // over the teams just outside it, once.
+    const weights: number[] = [];
     c.target.forEach((a, i) => {
-      for (const b of c.target.slice(i + 1)) diffs.push(d(a, b));
-      for (const b of unranked) diffs.push(d(a, b));
+      c.target.slice(i + 1).forEach((b) => { diffs.push(d(a, b)); weights.push(TOP_WEIGHT / (i + 1)); });
+      for (const b of unranked) { diffs.push(d(a, b)); weights.push(UNRANKED_WEIGHT); }
     });
-    return diffs;
+    return { diffs, weights };
   });
-  const n = KEYS.length;
+  const n = cols.length;
   let w = new Array<number>(n).fill(0);
   for (let iter = 0; iter < 60; iter++) {
     const grad = w.map((x) => -RIDGE * x);
     const hess = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? -RIDGE : 0)));
-    for (const diffs of groups) {
-      const s = 1 / diffs.length;
-      for (const dd of diffs) {
+    for (const { diffs, weights } of groups) {
+      const total = weights.reduce((a, b) => a + b, 0);
+      for (let q = 0; q < diffs.length; q++) {
+        const dd = diffs[q];
+        const s = weights[q] / total;
         const p = 1 / (1 + Math.exp(-dd.reduce((acc, v, k) => acc + v * w[k], 0)));
         for (let i = 0; i < n; i++) {
           grad[i] += s * (1 - p) * dd[i];
@@ -114,9 +125,13 @@ function agreement(all: Case[], horizon: Case["horizon"], order: (c: Case) => nu
 function main() {
   const all = cases();
   const w = fit(all);
-  const byScore = (wt: number[]) => (c: Case) => [...c.ids].sort((a, b) =>
-    c.x.get(b)!.reduce((s, v, k) => s + v * wt[k], 0) - c.x.get(a)!.reduce((s, v, k) => s + v * wt[k], 0));
-  const old = [1, 0.9529, -1.419, 0, 3 * 0.1225, 0.744]; // the earlier live ranking: stand-in weights, RESULT_POINTS 3
+  const byScore = (wt: number[], cols = [0, 1, 2, 3, 4, 5, 8]) => (c: Case) => [...c.ids].sort((a, b) =>
+    cols.reduce((s, k, j) => s + c.x.get(b)![k] * wt[j], 0) - cols.reduce((s, k, j) => s + c.x.get(a)![k] * wt[j], 0));
+  // Scored against expectation: each result's (outcome - chance), as one gap for every team and a Group of Six one.
+  const centered = fit(all, [0, 6, 7]);
+  console.log(`against expectation: ${JSON.stringify(centered.map((v) => Number(v.toPrecision(4))))}`);
+  for (const h of ["next", "final"] as const) console.log(`${h}: against expectation ${(agreement(all, h, byScore(centered, [0, 6, 7])) * 100).toFixed(1)}%`);
+  const old = [1, 0.9529, -1.419, 0, 3 * 0.1225, 0.744, 0]; // the earlier live ranking: stand-in weights, RESULT_POINTS 3
   for (const h of ["next", "final"] as const) {
     console.log(`${h}: no change ${(agreement(all, h, (c) => c.anchorOrder) * 100).toFixed(1)}%  earlier ${(agreement(all, h, byScore(old)) * 100).toFixed(1)}%  fitted ${(agreement(all, h, byScore(w)) * 100).toFixed(1)}%`);
   }

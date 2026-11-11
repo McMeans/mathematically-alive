@@ -11,7 +11,7 @@
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { powerConferences, teamRating, titleGameIndex, type CommitteeFeatures } from "./committee";
 import { announcedField, bracketGames, championsNeeded, fieldPicker, findFormat, playoffRun, type AnnouncedField, type PlayoffRun } from "./playoff";
-import { liveModel, movedScore, resultPoints } from "./live";
+import { holdCeilings, liveModel, movedScore, resultPoints } from "./live";
 import { isArmyNavy, type Game, type Season } from "./season";
 import { HOME_FIELD } from "./odds";
 import { COMMITTEE_SALT, PLAYOFF_SALT, mix, neutralOdds, simulateSeason, tiebreakDraw, titleRoll, type SimResult } from "./sim";
@@ -446,6 +446,7 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       champSum[k] += champ[k];
     }
     sortBy(order, score);
+    holdCeilings(order, (k) => l[k]);
     rankings.set(order, it * F);
     for (let p = 0; p < F; p++) {
       const k = order[p];
@@ -518,6 +519,7 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
       }
       forder.set(order);
       sortBy(forder, fscore);
+      holdCeilings(forder, (k) => l[k]);
       for (let p = 0; p < F; p++) fIds[p] = fbsIds[forder[p]];
       const makes = pick(fIds, (id) => champ[idx(id)] === 1).includes(focus!);
       // Put the season back as it was.

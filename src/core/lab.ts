@@ -144,8 +144,8 @@ export type SeasonLab = {
   /** The committee stand-in's ranking by average place, best first. Modelled, not the committee. */
   ranking: LabRanked[];
   /**
-   * The projected final ranking (projected.ts): every game played out over the simulated seasons, the picks kept.
-   * Its top 25 (or `top`), best first; `change` is the move from the current ranking (real results only, no picks).
+   * The projected ranking (projected.ts): the committee's latest, moved by results since and the picks (each scored
+   * against what was expected). Its top 25 (or `top`), best first; `change` is the move from the current ranking.
    */
   live: LiveRanked[];
   /**
@@ -213,9 +213,9 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     .sort((a, b) => b.spots - a.spots || a.gameId - b.gameId)
     .slice(0, 15)
     .map((g) => ({ gameId: g.gameId, spots: g.spots, text: `Swings about ${g.spots.toFixed(1)} ${g.spots.toFixed(1) === "1.0" ? "spot" : "spots"} in the field` }));
-  // The projected ranking and field (projected.ts): the same the team view's race card shows. The top 25's moves
-  // are against where each team stands now (the live ranking on real results only, no picks).
-  const projected = projectedField(season, national);
+  // The projected ranking and field (projected.ts): the current picture moved by the picks, the same the team
+  // view's race card shows. The top 25's moves are against where each team stands now (real results only).
+  const projected = projectedField(season, national, locks.games);
   const now = liveRanking(season).teams;
   const nowPlace = new Map(now.map((t) => [t.teamId, t]));
   const live: LiveRanked[] = projected.order.slice(0, opts.top ?? 25).map((teamId, k) => {

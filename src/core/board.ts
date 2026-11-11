@@ -483,7 +483,7 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
     };
   }
 
-  const race = playoffRace(season, national, teamId);
+  const race = playoffRace(season, national, teamId, locks);
 
   const ownChances = own.map(({ g }): OwnChance => {
     const pHome = gameWinProbability(season, g);
@@ -562,12 +562,12 @@ function when(g: Game): string {
 }
 
 /** The race card: the projected field around the page's team. Null when the team isn't ranked or no field can be picked. */
-function playoffRace(season: Season, national: NationalResult, teamId: number): PlayoffRace | null {
+function playoffRace(season: Season, national: NationalResult, teamId: number, locks: Record<number, number>): PlayoffRace | null {
   const format = playoffFormat(season.year);
   if (national.teams.length <= format.teams) return null;
   const name = (id: number) => season.teams.find((t) => t.id === id)!.name;
-  // The projected final ranking, likeliest champions and field (projected.ts), shared with the Season Lab.
-  const { order, place: projected, champions, field } = projectedField(season, national);
+  // The projected ranking, champions and field (projected.ts): the current picture moved by the picks, shared with the Season Lab.
+  const { order, place: projected, champions, field } = projectedField(season, national, locks);
   if (!projected.has(teamId)) return null;
   const champs = new Map([...champions].map(([id, c]) => [id, BID_TAGS[c] ?? c]));
   const inField = new Set(field);

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { liveRanking, seasonFromCfbd, seasonLab, teamRecord, type CfbdSnapshot, type Season } from "@/core";
+import { gameWinProbability, liveRanking, seasonFromCfbd, seasonLab, teamRecord, type CfbdSnapshot, type Season } from "@/core";
 
 // 2026 through week 9, and the committee's first ranking (week 10), from fixtures/cfp-2026.json.
 const fx = JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot; rankings: { week: number; ranks: { teamId: number }[] }[] };
@@ -26,16 +26,24 @@ describe("projected ranking", () => {
   it("a Group of Six team's wins lift it less than the same wins would lift a power team", () => {
     const id = committee.find((t) => !POWER.includes(conferenceOf(season, t) ?? "") && season.teams.find((x) => x.id === t)!.name !== "Notre Dame")!;
     const asPower: Season = { ...season, teams: season.teams.map((t) => (t.id === id ? { ...t, conference: "SEC" } : t)) };
+    // Its games left, played and won.
+    const won = (s: Season): Season => ({ ...s, games: s.games.map((g) => (winOut(s, id)[g.id] ? { ...g, completed: true, homePoints: g.homeId === id ? 30 : 10, awayPoints: g.homeId === id ? 10 : 30 } : g)) });
     expect(placeOf(season, id)).toBe(placeOf(asPower, id));
-    expect(placeOf(season, id, winOut(season, id))).toBeGreaterThan(placeOf(asPower, id, winOut(asPower, id)));
+    expect(placeOf(won(season), id)).toBeGreaterThan(placeOf(won(asPower), id));
   });
 
-  it("each power conference's likeliest champion in its title race holds a place in the projected field", () => {
+  it("with no picks the projected field is the current picture: the committee's order, its top team the 1 seed", () => {
+    const l = lab(season);
+    expect(l.live.map((t) => t.teamId)).toEqual(committee);
+    expect(l.playoff!.field[0].teamId).toBe(committee[0]);
+  });
+
+  it("each power conference's champion holds a place in the projected field: its highest-ranked team when none is picked", () => {
     const l = lab(season);
     const field = new Set(l.playoff!.field.map((f) => f.teamId));
-    for (const c of l.conferences.filter((x) => POWER.includes(x.conference))) {
-      const best = [...c.teams].sort((a, b) => b.champion - a.champion || a.teamId - b.teamId)[0];
-      expect(field.has(best.teamId)).toBe(true);
+    for (const c of POWER) {
+      const top = l.live.find((t) => conferenceOf(season, t.teamId) === c);
+      if (top) expect(field.has(top.teamId)).toBe(true);
     }
   });
 
@@ -45,5 +53,24 @@ describe("projected ranking", () => {
     const atLarge = l.playoff!.field.map((f) => f.teamId).filter((id) => order.has(id) && order.get(id)! <= 12);
     const places = atLarge.map((id) => order.get(id)!);
     expect(places).toEqual([...places].sort((a, b) => a - b));
+  });
+
+  it("with every game picked, the picks count as if they had been played: the season is ranked on its whole record", () => {
+    const open = season.games.filter((g) => !g.completed);
+    // Favourites win every open game.
+    const locks = Object.fromEntries(open.map((g) => [g.id, gameWinProbability(season, g) >= 0.5 ? g.homeId : g.awayId]));
+    const played: Season = { ...season, games: season.games.map((g) => (locks[g.id] === undefined ? g : { ...g, completed: true, homePoints: locks[g.id] === g.homeId ? 30 : 10, awayPoints: locks[g.id] === g.homeId ? 10 : 30 })) };
+    const order = (s: Season, l?: Record<number, number>) => liveRanking(s, { locks: l }).teams.map((t) => t.teamId);
+    expect(order(season, locks)).toEqual(order(played));
+  });
+
+  it("no team with three losses ranks above seventh, or with four above thirteenth", () => {
+    // The committee's top team loses every game it has left.
+    const id = committee[0];
+    const locks = Object.fromEntries(season.games.filter((g) => !g.completed && (g.homeId === id || g.awayId === id)).map((g) => [g.id, g.homeId === id ? g.awayId : g.homeId]));
+    const losses = teamRecord(season, id, locks).losses;
+    const rank = liveRanking(season, { locks }).teams.find((t) => t.teamId === id)!.rank;
+    expect(losses).toBeGreaterThanOrEqual(3);
+    expect(rank).toBeGreaterThanOrEqual(losses >= 4 ? 13 : 7);
   });
 });

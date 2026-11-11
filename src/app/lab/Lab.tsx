@@ -491,7 +491,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
       {fieldView === "bracket" && p && <Bracket games={p.bracket} picked={picked} abbr={abbr} name={name} onPick={onPick} onReset={onResetBracket} />}
       {fieldView === "top25" && (
         <>
-          <p className="mb-2 text-[13px] text-ink-muted">Projected final ranking: every game played out, your picks kept. Arrows show the move from the current ranking. Amber numbers are in the field.</p>
+          <p className="mb-2 text-[13px] text-ink-muted">The committee&rsquo;s latest ranking, moved by results since and your picks. Arrows show the move from the current ranking. Amber numbers are in the field.</p>
           <div className="rounded bg-board-deep py-1.5">
             {view.live.map((r) => (
               <FieldRow key={r.teamId} seed={r.rank} lit={inField.has(r.teamId)} id={r.teamId} name={name(r.teamId)} me={r.teamId === focus}
@@ -808,7 +808,7 @@ function Races({ conferences, name, paged, focus }: { conferences: LabConference
   return (
     <>
       <PaneHeading id="races-h">Conference races</PaneHeading>
-      <p className="-mt-1 mb-3 text-[13px] text-ink-muted">Title-game odds. Tap for standings. #: current rank. S: projected seed.</p>
+      <p className="-mt-1 mb-3 text-[13px] text-ink-muted">Title-game odds. Tap for standings.</p>
       <div className="flex flex-col gap-2">
         {conferences.map((c) => {
           const isOpen = open.has(c.conference);
@@ -829,7 +829,6 @@ function Races({ conferences, name, paged, focus }: { conferences: LabConference
                 {[...lead, ...extra].map((t, k) => (
                   <span key={t.teamId} className="contents">
                     <span className={`cond flex min-w-0 items-center gap-1.5 truncate text-[17px] font-bold ${t.teamId === focus ? "text-lamp" : k === 0 ? "text-white" : "text-board-text"}`}><TeamLogo id={t.teamId} /> <span className="truncate"><Rank id={t.teamId} />{name(t.teamId)}</span>
-                      <Seed id={t.teamId} />
                       {t.teamId === c.picked && <span className="shrink-0 text-[15px] text-lamp"><PickMark /></span>}</span>
                     <span className={`plate text-right text-[17px] ${t.teamId === focus ? "text-lamp" : k === 0 ? "text-white" : "text-board-text"}`}>{pct(t.titleGame)}</span>
                   </span>

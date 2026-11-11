@@ -1,10 +1,11 @@
 // Live ranking: the College Football Playoff committee's latest ranking, moved only by results since it came out.
 //
-// Each team starts from an anchored score: the committee stand-in's score (committee.ts) at the place the latest
-// ranking put it (its top 25 in the committee's order, every other team below in the stand-in's order), so with no
-// new results the order is the committee's. Results since then move it, by weights fitted on how the committee's
+// Each team starts from an anchored score set by the place the latest ranking put it (`anchorAt`; its top 25 in the
+// committee's order, every other team below in the stand-in's order, committee.ts), so with no new results the order
+// is the committee's. Results since then move it, by weights fitted on how the committee's
 // rankings moved from one release to any later one in 2014-2025 (scripts/fit-movement.ts):
-// - each win and loss, a win by a Group of Six team counting for less (the committee rarely lifts them far);
+// - each win and loss, a win counting for less by a Group of Six team (the committee rarely lifts them far) or by a
+//   team with two losses or more;
 // - how surprising each result was (an upset moves a team more than an expected result);
 // - winning a power conference's title game.
 // A game with no result (unplayed and not picked) moves nothing: this is where the committee stands on the results
@@ -41,13 +42,46 @@ export type LiveModel = {
   home: Float64Array;
 };
 
+/**
+ * A place's anchored score, before its fitted weight: minus the square root of the place (1 is first). Places near the
+ * top sit further apart than places lower down, as in the committee's rankings, so a result moves a team past fewer
+ * teams near the top. Of the spacings tried (the stand-in's own scores, log, square root, linear), it ordered the
+ * committee's later rankings best (scripts/fit-movement.ts).
+ */
+export const anchorAt = (place: number): number => -Math.sqrt(place + 1);
+
+/**
+ * The highest place the committee has given a team with this many losses, 2014-2025 (every weekly ranking in
+ * fixtures/cfp-<year>.json): with 3 losses #7 (2017 Auburn, 10-3), with 4 #13 (2017 Stanford, 9-4), and with 5 or
+ * more, none ranked; #20 here. A linear score can't hold that line, so the ranking enforces it.
+ */
+export const highestPlace = (losses: number): number => (losses <= 2 ? 1 : losses === 3 ? 7 : losses === 4 ? 13 : 20);
+
+/**
+ * Reorders `order` (best first) in place so no team sits above the highest place its losses allow (`highestPlace`):
+ * each place goes to the best team below that may hold it, the teams it passes each moving down one. A place no team
+ * below may hold keeps its team.
+ */
+export function holdCeilings<T extends number>(order: { length: number; [k: number]: T }, losses: (x: T) => number): void {
+  const n = Math.min(order.length, 20);
+  for (let p = 0; p < n; p++) {
+    if (highestPlace(losses(order[p])) - 1 <= p) continue;
+    let q = p + 1;
+    while (q < order.length && highestPlace(losses(order[q])) - 1 > p) q++;
+    if (q === order.length) continue;
+    const x = order[q];
+    for (let r = q; r > p; r--) order[r] = order[r - 1];
+    order[p] = x;
+  }
+}
+
 /** How surprising a result was: the chance the loser had. Added to the winner's surprise, taken off the loser's. */
 export const resultPoints = (homeChance: number, homeWon: boolean): number => (homeWon ? 1 - homeChance : homeChance);
 
 /** The moved score, past the anchor: new wins and losses, surprise, and a new power-conference title. */
 export const movedScore = (m: LiveModel, k: number, newWins: number, newLosses: number, surprise: number, champion: boolean): number =>
-  m.anchor[k] + M.wins * newWins + M.losses * newLosses + M.g6Wins * m.g6[k] * newWins + M.upset * surprise +
-  (champion && !m.seenChampion[k] ? M.champion : 0);
+  m.anchor[k] + (M.wins + M.g6Wins * m.g6[k] + (m.seenLosses[k] + newLosses >= 2 ? M.lossyWins : 0)) * newWins + M.losses * newLosses +
+  M.upset * surprise + (champion && !m.seenChampion[k] ? M.champion : 0);
 
 /** Power-conference teams, plus Notre Dame, which the committee ranks as one. */
 export function powerTeam(season: Season, id: number): boolean {
@@ -94,9 +128,8 @@ export function liveModel(season: Season): LiveModel {
   const ranked = (release?.teamIds ?? []).filter((id) => fbsIndex.has(id));
   const inRanking = new Set(ranked);
   const order = [...ranked, ...byScore.map((k) => fbsIds[k]).filter((id) => !inRanking.has(id))];
-  // Each team takes the score the stand-in gives that place, so the gaps between places stay the model's.
   const anchor = new Float64Array(F);
-  order.forEach((id, p) => { anchor[fbsIndex.get(id)!] = M.anchor * score[byScore[p]]; });
+  order.forEach((id, p) => { anchor[fbsIndex.get(id)!] = M.anchor * anchorAt(p); });
   const g6 = Uint8Array.from(fbsIds, (id) => (powerTeam(season, id) ? 0 : 1));
   return { release, fbsIds, anchor, seenWins, seenLosses, g6, seenChampion, order, counts, seen, home };
 }
@@ -114,10 +147,10 @@ export type LiveRankingOptions = {
   /** Picked results: game id -> id of the team that wins it. A completed game keeps its real result. */
   locks?: Record<number, number>;
   /**
-   * Picked conference champions. Each gets the power-conference champion's credit (if its conference is one) and,
-   * when its title game isn't in the data with a result, a win.
+   * Picked conference title games whose game isn't in the data with a result: the winner, and the team it beat
+   * (null when the matchup isn't known). The winner gets a win (and a power conference's title), the loser a loss.
    */
-  champions?: readonly number[];
+  titles?: readonly { winner: number; loser: number | null }[];
 };
 
 export type LiveRanked = {
@@ -138,53 +171,84 @@ export type LiveRanking = {
 };
 
 /**
- * The committee's latest ranking, moved by the results since it came out: the real ones and any picked ones. Games
- * with neither move nothing. Teams the committee didn't rank are placed below its ranked ones by the stand-in.
+ * The committee's latest ranking, moved by the results since it came out. A real result moves a team as the fit
+ * says (live.ts's header). A picked one moves it by how much it beat what was expected, while few games are picked,
+ * shading to its full result as the picks fill the season. So with no picks this is where the committee stands now; a
+ * pick never gains a team ground just because the teams around it haven't been picked yet; and a season picked in
+ * full is ranked on its whole record. Teams the committee didn't rank are placed below its ranked ones by the stand-in.
  */
 export function liveRanking(season: Season, opts: LiveRankingOptions = {}): LiveRanking {
   const m = liveModel(season);
   const locks = opts.locks ?? {};
   const byId = new Map(season.teams.map((t) => [t.id, t]));
   const fbsIndex = new Map(m.fbsIds.map((id, k) => [id, k]));
-  const F = m.fbsIds.length;
   const games = season.games;
-  // Each counted game's winner, when it has one: its real result, else a pick.
-  const winners = games.map((g, i) => {
-    if (!m.counts[i]) return null;
-    if (g.completed) return g.homePoints! > g.awayPoints! ? g.homeId : g.awayId;
-    const pick = locks[g.id];
-    return pick === g.homeId || pick === g.awayId ? pick : null;
-  });
-
-  const wins = new Float64Array(F);
-  const losses = new Float64Array(F);
-  const surprise = new Float64Array(F);
-  games.forEach((g, i) => {
-    const won = winners[i];
-    if (won === null || m.seen[i]) return;
-    const w = fbsIndex.get(won) ?? -1;
-    const l = fbsIndex.get(won === g.homeId ? g.awayId : g.homeId) ?? -1;
-    const pts = resultPoints(m.home[i], won === g.homeId);
-    if (w >= 0) { wins[w]++; surprise[w] += pts; }
-    if (l >= 0) { losses[l]++; surprise[l] -= pts; }
-  });
-
-  const champions = new Set(powerChampions(season, (i) => winners[i] !== null, (g) => winners[games.indexOf(g)]!));
   const power = new Set(powerConferences(season.year));
-  for (const id of opts.champions ?? []) {
-    const k = fbsIndex.get(id);
-    const conference = byId.get(id)?.conference;
-    if (k === undefined || !conference) continue;
-    if (power.has(conference)) champions.add(id);
+  const powerTitle = new Set(powerConferences(season.year).map((c) =>
+    titleGameIndex(season, new Set(season.teams.filter((t) => t.conference === c).map((t) => t.id)))).filter((i) => i >= 0));
+  const delta = new Float64Array(m.fbsIds.length);
+  // What a team gains from a result: a win (less for a Group of Six team), how surprising it was, and a new power title.
+  // `lossy`: teams with two or more losses once the decided results are in (filled in below, before any gain is used).
+  const lossy = new Uint8Array(m.fbsIds.length);
+  const winGain = (k: number, pWin: number, title: boolean) =>
+    M.wins + M.g6Wins * m.g6[k] + (lossy[k] ? M.lossyWins : 0) + M.upset * (1 - pWin) + (title && !m.seenChampion[k] ? M.champion : 0);
+  const lossGain = (pWin: number) => M.losses - M.upset * pWin;
+  // A picked result counts as it happened, less what was expected of it (`discount` times its expected gain): with few
+  // picks, nearly all of it, so a pick moves a team only by how much it beat the odds and unpicked teams aren't left
+  // behind; with every game picked, none, so the season's whole record counts as the committee counts it at the end.
+  // In between, in proportion to the share of games still open.
+  type Result = { winner: number; loser: number | null; pWin: number; real: boolean; title: boolean };
+  const results: Result[] = [];
+  let open = 0, picked = 0;
+  const decided = games.map(() => false);
+  games.forEach((g, i) => {
+    if (!m.counts[i] || m.seen[i]) return;
+    if (!g.completed) open++;
+    const pick = locks[g.id];
+    const won = g.completed ? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId) : pick === g.homeId || pick === g.awayId ? pick : null;
+    if (won === null) return;
+    if (!g.completed) picked++;
+    decided[i] = true;
+    const homeWon = won === g.homeId;
+    results.push({ winner: won, loser: homeWon ? g.awayId : g.homeId, pWin: homeWon ? m.home[i] : 1 - m.home[i], real: g.completed, title: powerTitle.has(i) });
+  });
+  for (const { winner, loser } of opts.titles ?? []) {
+    const conference = byId.get(winner)?.conference;
+    if (!conference) continue;
     const i = titleGameIndex(season, new Set(season.teams.filter((t) => t.conference === conference).map((t) => t.id)));
-    if (i < 0 || winners[i] === null) wins[k]++;
+    if (i >= 0 && (decided[i] || m.seen[i])) continue;
+    // A title game not in the data: one more game, picked.
+    open++;
+    picked++;
+    const pWin = loser === null ? 0.5 : gameWinProbability(season, { id: -1, week: 0, start: "", neutralSite: true, conferenceGame: true, homeId: winner, awayId: loser, homePoints: null, awayPoints: null, completed: false, spread: null });
+    results.push({ winner, loser, pWin, real: false, title: power.has(conference) });
+  }
+  const discount = open === 0 ? 0 : 1 - picked / open;
+  const newLosses = new Int32Array(m.fbsIds.length);
+  for (const r of results) { const l = r.loser === null ? -1 : fbsIndex.get(r.loser) ?? -1; if (l >= 0) newLosses[l]++; }
+  m.fbsIds.forEach((_, k) => { lossy[k] = m.seenLosses[k] + newLosses[k] >= 2 ? 1 : 0; });
+  for (const { winner, loser, pWin, real, title } of results) {
+    const w = fbsIndex.get(winner) ?? -1;
+    const l = loser === null ? -1 : fbsIndex.get(loser) ?? -1;
+    const cut = real ? 0 : discount;
+    if (w >= 0) {
+      const win = winGain(w, pWin, title);
+      delta[w] += win - cut * (pWin * win + (1 - pWin) * lossGain(pWin));
+    }
+    if (l >= 0) {
+      const pL = 1 - pWin;
+      const loss = lossGain(pL);
+      delta[l] += loss - cut * (pL * winGain(l, pL, title) + (1 - pL) * loss);
+    }
   }
 
   const anchorPlace = new Map(m.order.map((id, p) => [id, p]));
-  const score = Float64Array.from(m.fbsIds, (id, k) => movedScore(m, k, wins[k], losses[k], surprise[k], champions.has(id)));
+  const score = Float64Array.from(m.fbsIds, (_, k) => m.anchor[k] + delta[k]);
   const sorted = m.fbsIds.map((_, k) => k)
-    // Scores within rounding of each other are a tie (the offsets are sums of floats), which the anchor's order breaks.
+    // Scores within rounding of each other are a tie (the anchor's scores are sums of floats), which the anchor's order breaks.
     .sort((x, y) => (Math.abs(score[y] - score[x]) > 1e-9 ? score[y] - score[x] : anchorPlace.get(m.fbsIds[x])! - anchorPlace.get(m.fbsIds[y])!));
+  // Losses for the ceiling: what the ranking saw plus every decided result since.
+  holdCeilings(sorted, (k) => m.seenLosses[k] + newLosses[k]);
   const committee = new Map((m.release?.teamIds ?? []).map((id, p) => [id, p + 1]));
   return {
     release: m.release,
