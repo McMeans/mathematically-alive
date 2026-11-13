@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { explore, formatPlayoff, seasonFromCfbd, seasonLab, simulateBracket, type CfbdSnapshot, type Season } from "@/core";
+import { explore, fillLabLocks, formatPlayoff, labChanges, seasonFromCfbd, seasonLab, simulateBracket, type CfbdSnapshot, type Season } from "@/core";
 
 const fx = JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot; rankings: { week: number; ranks: { teamId: number }[] }[] };
 const first = fx.rankings[0];
@@ -33,5 +33,23 @@ describe("lab bracket and title picks", () => {
       .outlook.find((t) => t.teamId === id)!;
     expect(formatPlayoff(me.playoff, me.cfp, me.status, me.autoBid)).toBe("In");
     expect(me.autoBid).toBe(true);
+  });
+});
+
+describe("lab records and change headline", () => {
+  it("a picked title game counts in both teams' records", () => {
+    const c = lab().conferences.find((x) => x.final?.exact) ?? lab().conferences.find((x) => x.final)!;
+    const [w, l] = c.final!.teams;
+    const before = lab().records, after = lab({ [c.conference]: w }).records;
+    const parse = (r: string) => r.split("-").map(Number);
+    expect(parse(after[w])).toEqual([parse(before[w])[0] + 1, parse(before[w])[1]]);
+    expect(parse(after[l])).toEqual([parse(before[l])[0], parse(before[l])[1] + 1]);
+  });
+
+  it("a batch of field changes names two and counts the rest, so the headline stays short", () => {
+    const filled = seasonLab(season, { ...opts, locks: fillLabLocks(season, {}, { seed: 9 }, conferences) });
+    const h = labChanges(season, lab(), filled).headline;
+    expect(h.split("; ").length).toBeLessThanOrEqual(3);
+    if (h.split("; ").length === 3) expect(h).toMatch(/; \d+ more changes?\.$/);
   });
 });

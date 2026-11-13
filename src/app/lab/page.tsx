@@ -30,6 +30,8 @@ const weekDates: Record<number, string> = (() => {
   return Object.fromEntries([...days].map(([week, w]) => [week, [...w].sort((a, b) => b[1] - a[1])[0][0]]));
 })();
 const conferenceOfTeam = new Map(season.teams.map((t) => [t.id, t.conference]));
+// The conference filter lists FBS conferences only: an FCS opponent's (Southern) is no chip.
+const fbs = new Set(season.teams.filter((t) => t.classification === "fbs").map((t) => t.id));
 
 // Games still to play between two known teams, title games aside (they're decided by the standings).
 const games: LabGame[] = season.games
@@ -42,7 +44,7 @@ const games: LabGame[] = season.games
       id: g.id, week: g.week, date: weekDates[g.week], homeId: g.homeId, awayId: g.awayId, neutral: g.neutralSite,
       // A flex-week game between two members (the Pac-12's week 13) is outside the standings but still the league's.
       group: home && home !== "FBS Independents" && (g.conferenceGame || home === conferenceOfTeam.get(g.awayId)) ? conferenceShort(home) : "Nonconference",
-      conferences: [conferenceOfTeam.get(g.homeId), conferenceOfTeam.get(g.awayId)].filter((c): c is string => !!c).map(conferenceShort),
+      conferences: [g.homeId, g.awayId].filter((id) => fbs.has(id)).map((id) => conferenceOfTeam.get(id)).filter((c): c is string => !!c).map(conferenceShort),
       homeOdds: formatOdds(p), awayOdds: formatOdds(1 - p),
     };
   });

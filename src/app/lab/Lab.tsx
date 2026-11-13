@@ -297,7 +297,7 @@ export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdd
             {headline ? (
               <>
                 <small className="cond block text-xs font-bold tracking-[0.1em] text-board-muted">{note ? "Note" : "Last pick"}</small>
-                <b className="cond block text-lg font-bold leading-tight tracking-[0.03em] text-lamp md:text-2xl">{headline}</b>
+                <b title={headline} className="cond block truncate text-lg font-bold leading-tight tracking-[0.03em] text-lamp md:text-xl">{headline}</b>
               </>
             ) : <span className="text-[15px] text-board-muted">Pick a game, or fill the rest.</span>}
           </div>

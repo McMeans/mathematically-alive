@@ -131,7 +131,7 @@ export type LabBigGame = {
 
 export type SeasonLab = {
   national: NationalResult;
-  /** Each FBS team's record, picks counted as played: "10-2". */
+  /** Each FBS team's record, picks counted as played, a picked title game among them: "11-2". */
   records: Record<number, string>;
   /** How many picks are in effect. */
   picks: number;
@@ -238,7 +238,11 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     bigGames,
     records: Object.fromEntries(season.teams.filter((t) => t.classification === "fbs").map((t) => {
       const r = teamRecord(season, t.id, locks.games);
-      return [t.id, `${r.wins}-${r.losses}`];
+      // A picked title game counts: a win for the winner, a loss for the team it beat.
+      const title = conferences.find((c) => c.picked !== null && c.final?.teams.includes(t.id) && c.final.teams.includes(c.picked));
+      const won = title ? (title.picked === t.id ? 1 : 0) : 0;
+      const lost = title ? 1 - won : 0;
+      return [t.id, `${r.wins + won}-${r.losses + lost}`];
     })),
   };
 }
@@ -283,7 +287,7 @@ export type LabMover = {
 };
 
 export type LabChanges = {
-  /** "Miami into the field as the 11 seed; SMU out.", "Oregon up to the 2 seed.", or "No change to the projected field." Empty with no playoff. */
+  /** "Miami into the field as the 11 seed; SMU out.", "Oregon up to the 2 seed.", or "No change to the projected field." At most two changes named, then "; 3 more changes". Empty with no playoff. */
   headline: string;
   /** The biggest moves of at least 2 points, biggest first, up to 5. */
   movers: LabMover[];
@@ -310,7 +314,10 @@ export function labChanges(season: Season, before: SeasonLab, after: SeasonLab):
       .slice(0, 2)
       .map((s) => `${name(s.teamId)} ${s.seed < was.get(s.teamId)! ? "up" : "down"} to the ${s.seed} seed`);
     const parts = ins.length + outs.length > 0 ? [...ins, ...outs] : moved;
-    headline = parts.length === 0 ? "No change to the projected field." : `${parts.join("; ")}.`;
+    // At most two changes named, so a fill's batch stays one line: "Miami into the field as the 11 seed; SMU out; 4 more changes."
+    const more = parts.length - 2;
+    headline = parts.length === 0 ? "No change to the projected field."
+      : `${parts.slice(0, 2).join("; ")}${more > 0 ? `; ${more} more ${more === 1 ? "change" : "changes"}` : ""}.`;
   }
   const old = new Map(before.national.teams.map((t) => [t.teamId, t]));
   const movers: LabMover[] = [];
