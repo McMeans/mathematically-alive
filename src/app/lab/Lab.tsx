@@ -595,15 +595,15 @@ function Bracket({ games, picked, abbr, name, onPick, onReset, onSimulate }: {
           );
         })}
       </div>
-      <div className="mt-2.5 flex items-center gap-2 border-t border-board-line pt-2.5">
+      <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-board-line pt-2.5">
         {champion !== undefined ? (
-          <p className="cond flex min-w-0 items-center gap-1.5 text-base font-bold text-white">
+          <p className="cond flex w-full min-w-0 items-center gap-1.5 text-base font-bold text-white">
             <span className="text-xs tracking-[0.08em] text-board-muted">Your champion</span>
             <TeamLogo id={champion} size="18px" />
             <span className="truncate">{seedOf.get(champion) !== undefined && <span className="mr-1 text-board-muted">{seedOf.get(champion)}</span>}{name(champion)}</span>
           </p>
         ) : (
-          <p className="text-[13px] text-board-muted">{Object.keys(picked).length > 0 ? "Pick the final to crown a champion." : "Tap a team to move it on. Shown only: the odds don’t change."}</p>
+          <p className="w-full text-[13px] text-board-muted">{Object.keys(picked).length > 0 ? "Pick the final to crown a champion." : "Tap a team to move it on. Shown only: the odds don’t change."}</p>
         )}
         <button type="button" onClick={onSimulate} disabled={Object.keys(picked).length >= games.length}
           className="cond ml-auto h-7 shrink-0 rounded-[3px] border border-board-line px-2.5 text-[13px] font-bold tracking-[0.05em] text-board-text hover:border-board-muted disabled:opacity-40">
