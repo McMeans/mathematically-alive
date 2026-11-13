@@ -7,7 +7,7 @@ import { simulateNational, titleRace, type NationalResult } from "./national";
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { conferenceName, conferenceShort, formatFine, formatOdds, formatSideOdds, shownChange } from "./paths";
 import { announcedField, bracketGames, findFormat } from "./playoff";
-import { type Game, type Season } from "./season";
+import { teamRecord, type Game, type Season } from "./season";
 import { gameWinProbability, mix, mulberry32, neutralOdds } from "./sim";
 import { pairKey } from "./steps";
 import { conferenceData, decidedTitleGame } from "./tiebreak";
@@ -131,6 +131,8 @@ export type LabBigGame = {
 
 export type SeasonLab = {
   national: NationalResult;
+  /** Each FBS team's record, picks counted as played: "10-2". */
+  records: Record<number, string>;
   /** How many picks are in effect. */
   picks: number;
   /** Regular-season games neither final nor picked. 0: every game is set ("Every game picked" in the summary). */
@@ -234,6 +236,10 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     conferences,
     ranking,
     bigGames,
+    records: Object.fromEntries(season.teams.filter((t) => t.classification === "fbs").map((t) => {
+      const r = teamRecord(season, t.id, locks.games);
+      return [t.id, `${r.wins}-${r.losses}`];
+    })),
   };
 }
 

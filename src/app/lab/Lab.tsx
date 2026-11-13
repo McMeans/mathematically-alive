@@ -474,7 +474,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
             {p.field.map((s, k) => (
               <div key={s.teamId}>
                 {k === 4 && <><div className="mx-3.5 my-1.5 h-px bg-board-line" /><p className="cond px-3.5 pb-1 text-xs font-bold tracking-[0.08em] text-board-muted">First round</p></>}
-                <FieldRow seed={s.seed} lit={k < 4} id={s.teamId} rank={ranks[s.teamId]} name={name(s.teamId)} odds={pct(s.field)} me={s.teamId === focus} />
+                <FieldRow seed={s.seed} lit={k < 4} id={s.teamId} rank={ranks[s.teamId]} name={name(s.teamId)} record={view.records[s.teamId]} odds={pct(s.field)} me={s.teamId === focus} />
               </div>
             ))}
           </div>
@@ -482,10 +482,10 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
             <>
               <h3 className="cond mb-2 mt-4 text-[17px] font-extrabold">On the bubble</h3>
               <div className="rounded bg-board-deep py-1.5">
-                {p.bubble.map((b) => <FieldRow key={b.teamId} id={b.teamId} rank={ranks[b.teamId]} name={name(b.teamId)} odds={pct(b.field)} me={b.teamId === focus} />)}
+                {p.bubble.map((b) => <FieldRow key={b.teamId} id={b.teamId} rank={ranks[b.teamId]} name={name(b.teamId)} record={view.records[b.teamId]} odds={pct(b.field)} me={b.teamId === focus} />)}
                 {focus !== null && focusOdds && !inField.has(focus) && !onBubble.has(focus) && (
                   <div className="mt-1 border-t border-dashed border-board-line pt-1">
-                    <FieldRow id={focus} rank={ranks[focus]} name={name(focus)} odds={focusOdds.playoffText} me tag="Pinned" />
+                    <FieldRow id={focus} rank={ranks[focus]} name={name(focus)} record={view.records[focus]} odds={focusOdds.playoffText} me tag="Pinned" />
                   </div>
                 )}
               </div>
@@ -499,7 +499,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
           <p className="mb-2 text-[13px] text-ink-muted">The committee&rsquo;s latest ranking, moved by results since and your picks. Arrows show the move from the current ranking. Amber numbers are in the field.</p>
           <div className="rounded bg-board-deep py-1.5">
             {view.live.map((r) => (
-              <FieldRow key={r.teamId} seed={r.rank} lit={inField.has(r.teamId)} id={r.teamId} name={name(r.teamId)} me={r.teamId === focus}
+              <FieldRow key={r.teamId} seed={r.rank} lit={inField.has(r.teamId)} id={r.teamId} name={name(r.teamId)} record={view.records[r.teamId]} me={r.teamId === focus}
                 odds={r.change > 0 ? `▲${r.change}` : r.change < 0 ? `▼${-r.change}` : ""} tone={r.change > 0 ? "text-root" : "text-drop"}
                 tag={r.committeeRank === null ? "Unranked" : undefined} />
             ))}
@@ -511,12 +511,12 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
   );
 }
 
-function FieldRow({ seed, lit, id, rank, name, odds, me, tag, tone }: { seed?: number; lit?: boolean; id: number; rank?: string; name: string; odds: string; me?: boolean; tag?: string; tone?: string }) {
+function FieldRow({ seed, lit, id, rank, name, record, odds, me, tag, tone }: { seed?: number; lit?: boolean; id: number; rank?: string; name: string; record?: string; odds: string; me?: boolean; tag?: string; tone?: string }) {
   return (
     <div className={`grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2.5 px-3.5 py-1.5 ${me ? "bg-lamp/10" : ""}`}>
       <span className={`plate text-center text-[22px] ${lit ? "text-lamp" : "text-board-muted"}`}>{seed ?? ""}</span>
       <span className="cond flex min-w-0 items-center gap-1.5 truncate text-[19px] font-bold text-white">
-        <TeamLogo id={id} /> <span className="truncate">{rank && <span className="mr-1 text-[0.74em] font-bold text-board-muted">{rank}</span>}{name}</span>
+        <TeamLogo id={id} /> <span className="truncate">{rank && <span className="mr-1 text-[0.74em] font-bold text-board-muted">{rank}</span>}{name}{record && <span className="ml-1.5 font-sans text-[12px] font-semibold text-board-muted">{record}</span>}</span>
         {tag && <i className="ml-1 font-sans text-[11px] font-semibold not-italic tracking-[0.06em] text-lamp">{tag}</i>}
       </span>
       <span className={`plate text-[22px] ${tone ?? (me ? "text-lamp" : "text-white")}`}>{odds}</span>

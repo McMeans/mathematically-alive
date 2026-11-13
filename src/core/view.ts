@@ -140,7 +140,7 @@ function rankedView(
   }));
   return {
     teams: T, announced: false, heading: "Projected playoff field", bracketHeading: "Projected bracket", field, bracket, bubble,
-    note: `Seeded from the committee's latest ranking, moved by results since and your picks. Each power conference's champion is its picked one, else its highest-ranked team. Chances in from ${iterations} simulated seasons, every game played out: a seed is where things stand, the chance how often it holds.`,
+    note: `Seeded from the committee's latest ranking, moved by results since and your picks. Each power conference's champion is its picked one, else whichever of its two likeliest title-game teams wins that game more often. Chances in from ${iterations} simulated seasons, every game played out: a seed is where things stand, the chance how often it holds.`,
   };
 }
 

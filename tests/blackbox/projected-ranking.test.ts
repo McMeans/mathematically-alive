@@ -38,13 +38,19 @@ describe("projected ranking", () => {
     expect(l.playoff!.field[0].teamId).toBe(committee[0]);
   });
 
-  it("each power conference's champion holds a place in the projected field: its highest-ranked team when none is picked", () => {
+  it("with no title pick, a power conference's spot goes to the likelier winner of its two likeliest title-game teams", () => {
     const l = lab(season);
     const field = new Set(l.playoff!.field.map((f) => f.teamId));
     for (const c of POWER) {
-      const top = l.live.find((t) => conferenceOf(season, t.teamId) === c);
-      if (top) expect(field.has(top.teamId)).toBe(true);
+      const pair = l.national.teams.filter((t) => t.conference === c && (t.titleGame ?? 0) > 0)
+        .sort((a, b) => b.titleGame! - a.titleGame!).slice(0, 2).sort((a, b) => b.champion! - a.champion!);
+      if (pair.length) expect(field.has(pair[0].teamId)).toBe(true);
     }
+  });
+
+  it("the lab gives each team's record with its picks counted", () => {
+    const id = committee[0];
+    expect(lab(season, winOut(season, id)).records[id]).toBe(`${teamRecord(season, id, winOut(season, id)).wins}-${teamRecord(season, id).losses}`);
   });
 
   it("a seed comes from the projected ranking, not the chance in: the field is in projected order, champions aside", () => {
