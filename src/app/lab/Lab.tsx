@@ -115,6 +115,10 @@ function useLab(initial: LabView) {
         run(next);
         return;
       }
+      if (r.kind === "bracketed") {
+        setBracketState({ key: r.key, picks: r.picks });
+        return;
+      }
       if (r.kind === "filled") {
         // Only the latest request's fill: a pick made while it was on its way wins.
         if (r.id !== latest.current) return;
@@ -256,6 +260,8 @@ function useLab(initial: LabView) {
   const status = failed ? "Couldn’t update. Showing the last result." : refining ? "Refining…" : "";
   return { locks, view, status, refining, note, focus, canUndo: history.length > 0, pickGame, pickTitle, pickBracket, bracketPicks, fill, undo, pin,
     resetBracket: () => setBracketState({ key: "", picks: {} }),
+    /** Play out the bracket's open games once, its picks kept. */
+    simulateBracket: () => view.playoff && worker.current?.postMessage({ kind: "bracket", id: 0, games: view.playoff.bracket, picked: bracketPicks, seed: Math.floor(Math.random() * 2 ** 31) } satisfies LabRequest),
     reset: () => { setBracketState({ key: "", picks: {} }); update(none()); } };
 }
 
@@ -265,10 +271,9 @@ type FieldView = "seeds" | "bracket" | "top25";
 const PIN_ICON = <svg viewBox="0 0 16 16" aria-hidden className="h-3.5 w-3.5"><path d="M6 1.5h4l-.6 4.2 2.6 2.6v1.2H8.6V15H7.4V9.5H4V8.3l2.6-2.6z" fill="currentColor" /></svg>;
 
 export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdds, through, asOf }: Props) {
-  const { locks, view, status, refining, note, focus, canUndo, pickGame, pickTitle, pickBracket, bracketPicks, fill, undo, pin, reset, resetBracket } = useLab(initial);
+  const { locks, view, status, refining, note, focus, canUndo, pickGame, pickTitle, pickBracket, bracketPicks, fill, undo, pin, reset, resetBracket, simulateBracket } = useLab(initial);
   const [tab, setTab] = useState<Tab>("field");
   const [fieldView, setFieldView] = useState<FieldView>("seeds");
-  const [lastPinned, setLastPinned] = useState<number | null>(null);
   const pagedSet = useMemo(() => new Set(paged), [paged]);
   const name = (id: number) => names[id] ?? `Team ${id}`;
   const picks = count(locks);
@@ -276,7 +281,7 @@ export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdd
   const now = focus === null ? null : picks === 0 ? before : view.focus?.teamId === focus ? view.focus : before;
   const headline = note || view.changes?.headline || "";
   const teamPage = focus === null ? "/" : `/team/${focus}${Object.keys(locks.games).length ? `?picks=${encodeLocks(locks.games)}` : ""}`;
-  const unpin = () => { setLastPinned(focus); pin(null); };
+  const unpin = () => pin(null);
   const focusConference = focus === null ? null : view.conferences.find((c) => c.standings.some((s) => s.teamId === focus))?.conference ?? null;
 
   return (
@@ -334,13 +339,12 @@ export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdd
       <div className={`grid flex-1 grid-cols-[minmax(0,1fr)] lg:min-h-0 lg:grid-cols-[minmax(320px,380px)_minmax(0,1fr)_300px] ${focus !== null ? "pb-24 md:pb-0" : ""}`}>
         <section aria-labelledby="field-h" className={`scroll-thin bg-paper p-3.5 pb-10 md:p-5 lg:block lg:overflow-y-auto lg:border-r lg:border-rule ${tab === "field" ? "" : "hidden"}`}>
           <Field view={view} ranks={ranks} fieldView={fieldView} setFieldView={setFieldView} name={name} abbr={(id) => abbrs[id] ?? name(id)} focus={focus} focusOdds={now}
-            picked={bracketPicks} onPick={(g, w) => view.playoff && pickBracket(view.playoff.bracket, g, w)} onResetBracket={resetBracket} />
+            picked={bracketPicks} onPick={(g, w) => view.playoff && pickBracket(view.playoff.bracket, g, w)} onResetBracket={resetBracket} onSimulateBracket={simulateBracket} />
         </section>
         <section aria-labelledby="games-h" className={`scroll-thin p-3.5 pb-10 md:p-5 lg:block lg:overflow-y-auto ${tab === "games" ? "" : "hidden"}`}>
           <MarksContext.Provider value={ranks}>
           <Games games={games} picked={locks.games} titles={locks.titles} conferences={view.conferences} name={name} abbr={(id) => abbrs[id] ?? name(id)}
-            onPick={pickGame} onTitle={pickTitle} open={view.open} onFill={fill} big={view.bigGames} focus={focus} focusConference={focusConference}
-            onPin={lastPinned !== null && focus === null ? () => pin(lastPinned) : null} pinName={lastPinned !== null ? name(lastPinned) : ""} teams={teams} />
+            onPick={pickGame} onTitle={pickTitle} open={view.open} onFill={fill} big={view.bigGames} focus={focus} focusConference={focusConference} teams={teams} />
           </MarksContext.Provider>
         </section>
         <section aria-labelledby="races-h" className={`scroll-thin bg-paper p-3.5 pb-10 md:p-5 lg:block lg:overflow-y-auto lg:border-l lg:border-rule ${tab === "races" ? "" : "hidden"}`}>
@@ -447,9 +451,9 @@ function Seg<T extends string>({ options, value, onChange, label }: { options: {
 }
 
 /** The projected field (seeds), its bracket, or the projected top 25. */
-function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusOdds, picked, onPick, onResetBracket }: {
+function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusOdds, picked, onPick, onResetBracket, onSimulateBracket }: {
   view: LabView; ranks: Record<number, string>; fieldView: FieldView; setFieldView: (v: FieldView) => void; name: (id: number) => string; abbr: (id: number) => string;
-  focus: number | null; focusOdds: LabTeamOdds | null; picked: Record<number, number>; onPick: (gameIndex: number, winner: number) => void; onResetBracket: () => void;
+  focus: number | null; focusOdds: LabTeamOdds | null; picked: Record<number, number>; onPick: (gameIndex: number, winner: number) => void; onResetBracket: () => void; onSimulateBracket: () => void;
 }) {
   const p = view.playoff;
   const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -489,7 +493,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
           )}
         </>
       )}
-      {fieldView === "bracket" && p && <Bracket games={p.bracket} picked={picked} abbr={abbr} name={name} onPick={onPick} onReset={onResetBracket} />}
+      {fieldView === "bracket" && p && <Bracket games={p.bracket} picked={picked} abbr={abbr} name={name} onPick={onPick} onReset={onResetBracket} onSimulate={onSimulateBracket} />}
       {fieldView === "top25" && (
         <>
           <p className="mb-2 text-[13px] text-ink-muted">The committee&rsquo;s latest ranking, moved by results since and your picks. Arrows show the move from the current ranking. Amber numbers are in the field.</p>
@@ -525,9 +529,9 @@ function FieldRow({ seed, lit, id, rank, name, odds, me, tag, tone }: { seed?: n
  * quarterfinal its winner plays in, a semifinal centred on its two quarterfinals. Any known team can be picked to win,
  * even before its opponent is.
  */
-function Bracket({ games, picked, abbr, name, onPick, onReset }: {
+function Bracket({ games, picked, abbr, name, onPick, onReset, onSimulate }: {
   games: BracketGame[]; picked: Record<number, number>; abbr: (id: number) => string; name: (id: number) => string;
-  onPick: (gameIndex: number, winner: number) => void; onReset: () => void;
+  onPick: (gameIndex: number, winner: number) => void; onReset: () => void; onSimulate: () => void;
 }) {
   // A picked winner carries its seed into the next round.
   const seedOf = new Map(games.flatMap((g) => [g.a, g.b]).flatMap((s) => ("teamId" in s ? [[s.teamId, s.seed] as const] : [])));
@@ -601,8 +605,12 @@ function Bracket({ games, picked, abbr, name, onPick, onReset }: {
         ) : (
           <p className="text-[13px] text-board-muted">{Object.keys(picked).length > 0 ? "Pick the final to crown a champion." : "Tap a team to move it on. Shown only: the odds don’t change."}</p>
         )}
-        <button type="button" onClick={onReset} disabled={Object.keys(picked).length === 0}
+        <button type="button" onClick={onSimulate} disabled={Object.keys(picked).length >= games.length}
           className="cond ml-auto h-7 shrink-0 rounded-[3px] border border-board-line px-2.5 text-[13px] font-bold tracking-[0.05em] text-board-text hover:border-board-muted disabled:opacity-40">
+          Simulate
+        </button>
+        <button type="button" onClick={onReset} disabled={Object.keys(picked).length === 0}
+          className="cond h-7 shrink-0 rounded-[3px] border border-board-line px-2.5 text-[13px] font-bold tracking-[0.05em] text-board-text hover:border-board-muted disabled:opacity-40">
           Reset bracket
         </button>
       </div>
@@ -622,12 +630,12 @@ function PickMark({ className = "" }: { className?: string }) {
 const CHIP_ORDER = ["ACC", "Big Ten", "SEC", "Big 12", "American", "Pac 12", "MW", "SBC", "MAC", "CUSA", "Independents"];
 
 /** The games left, by week, filtered; then each conference's title game between its likeliest two teams. */
-function Games({ games, picked, titles, conferences, name, abbr, onPick, onTitle, open, onFill, big, focus, focusConference, onPin, pinName, teams }: {
+function Games({ games, picked, titles, conferences, name, abbr, onPick, onTitle, open, onFill, big, focus, focusConference, teams }: {
   games: LabGame[]; picked: Record<number, number>; titles: Record<string, number>; conferences: LabConference[];
   name: (id: number) => string; abbr: (id: number) => string;
   onPick: (gameId: number, winner: number) => void; onTitle: (conference: string, winner: number) => void;
   open: number; onFill: (how: LabFill) => void; big: LabView["bigGames"];
-  focus: number | null; focusConference: string | null; onPin: (() => void) | null; pinName: string;
+  focus: number | null; focusConference: string | null;
   teams: { id: number; name: string }[];
 }) {
   const [scope, setScope] = useState<"big" | "all">(big.length > 0 ? "big" : "all");
@@ -703,7 +711,6 @@ function Games({ games, picked, titles, conferences, name, abbr, onPick, onTitle
         {focus !== null && (
           <Chip on={pinned} lamp onClick={() => setMine(!mine)}><TeamLogo id={focus} dark={false} size="16px" /> {name(focus)}&rsquo;s games</Chip>
         )}
-        {focus === null && onPin && <Chip lamp on={false} onClick={onPin}>{PIN_ICON} Pin {pinName}</Chip>}
         {chips.map((c) => <Chip key={c} on={!pinned && conf === c} onClick={() => { setConf(c); setMine(false); }}>{c}</Chip>)}
       </div>
       {scope === "all" && !pinned && <p className="mt-2 flex items-center gap-2 text-[13px] text-ink-muted"><span className="h-3.5 w-[18px] rounded-[3px] border-2 border-lamp" />Amber outline: a big game, one that moves the field most</p>}

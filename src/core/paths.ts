@@ -242,11 +242,12 @@ export function playoffDetail(o: { cfp: NationalPlayoff | null }): { label: stri
 }
 
 /**
- * Playoff odds as shown: "In" or "Out" once the committee has announced the field; before, the odds, given the
- * team's title-game status (`formatSideOdds`).
+ * Playoff odds as shown: "In" or "Out" once the committee has announced the field; "In" for a team with a sure
+ * automatic bid (`TeamOutlook.autoBid`); before, the odds, given the team's title-game status (`formatSideOdds`).
  */
-export function formatPlayoff(p: number, cfp: NationalPlayoff | null, status: PathStatus): string {
+export function formatPlayoff(p: number, cfp: NationalPlayoff | null, status: PathStatus, autoBid = false): string {
   if (cfp?.run) return cfp.run.seed === null ? "Out" : "In";
+  if (autoBid) return "In";
   return formatSideOdds(p, status);
 }
 

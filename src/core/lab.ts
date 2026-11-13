@@ -201,7 +201,7 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
       })),
     ...tables.get(conference)!,
     final: null,
-  })).map((c) => ({ ...c, final: labFinal(c, national) }));
+  })).map((c) => ({ ...c, final: labFinal(c, season) }));
   const listed = national.teams.slice(0, opts.top ?? 25);
   const ranking = listed.map((t, k) => ({
     rank: k + 1, teamId: t.teamId, meanRank: t.meanRank,
@@ -237,17 +237,12 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
   };
 }
 
-/** The matchup to pick a title-game winner in: the exact one, or the two likeliest teams. */
-function labFinal(c: LabConference, national: NationalResult): LabFinal | null {
+/** The matchup to pick a title-game winner in: the exact one, or the two likeliest teams. Its odds are the game's, at a
+ * neutral site, so picking a winner doesn't move them. */
+function labFinal(c: LabConference, season: Season): LabFinal | null {
   const pair: [number, number] | null = c.matchup?.exact ? c.matchup.teams : c.teams.length >= 2 ? [c.teams[0].teamId, c.teams[1].teamId] : null;
   if (!pair) return null;
-  const odds = (id: number) => national.teams.find((t) => t.teamId === id);
-  const cond = pair.map((id) => {
-    const t = odds(id);
-    return t && t.titleGame ? (t.champion ?? 0) / t.titleGame : 0.5;
-  });
-  const total = cond[0] + cond[1];
-  const a = total > 0 ? cond[0] / total : 0.5;
+  const a = neutralOdds(season)(pair[0], pair[1], 0, 0);
   const chances: [number, number] = [a, 1 - a];
   return { teams: pair, key: [...pair].sort((x, y) => x - y).join("|"), chances, texts: [formatOdds(chances[0]), formatOdds(chances[1])], exact: c.matchup?.exact ?? false };
 }

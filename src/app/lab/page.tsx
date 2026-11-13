@@ -40,7 +40,8 @@ const games: LabGame[] = season.games
     const home = conferenceOfTeam.get(g.homeId) ?? null;
     return {
       id: g.id, week: g.week, date: weekDates[g.week], homeId: g.homeId, awayId: g.awayId, neutral: g.neutralSite,
-      group: g.conferenceGame && home ? conferenceShort(home) : "Nonconference",
+      // A flex-week game between two members (the Pac-12's week 13) is outside the standings but still the league's.
+      group: home && home !== "FBS Independents" && (g.conferenceGame || home === conferenceOfTeam.get(g.awayId)) ? conferenceShort(home) : "Nonconference",
       conferences: [conferenceOfTeam.get(g.homeId), conferenceOfTeam.get(g.awayId)].filter((c): c is string => !!c).map(conferenceShort),
       homeOdds: formatOdds(p), awayOdds: formatOdds(1 - p),
     };

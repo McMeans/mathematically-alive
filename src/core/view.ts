@@ -4,7 +4,8 @@ import type { NationalResult } from "./national";
 import { PROJECTED_NOTE, formatFine, formatOdds } from "./paths";
 import { bracketGames, playoffField } from "./playoff";
 import type { Season } from "./season";
-import type { SimResult } from "./sim";
+import { HOME_FIELD } from "./odds";
+import { mix, mulberry32, neutralOdds, type SimResult } from "./sim";
 import { OVERALL, isClear } from "./signal";
 import { pairKey } from "./steps";
 
@@ -242,4 +243,26 @@ export function playoffSignals(season: Season, sim: SimResult, national: Nationa
   });
   out.sort((x, y) => y.swing - x.swing || x.gameId - y.gameId);
   return out.slice(0, max);
+}
+
+/**
+ * Plays out a bracket's open games: one draw from each game's odds, `picked` winners kept, a first-round game at the
+ * higher seed's home and every later one at a neutral site. Returns every game's winner by index. Games already
+ * played (`result`) keep their winner when `picked` has it; a game with an unknown side is skipped.
+ */
+export function simulateBracket(season: Season, games: BracketGame[], picked: Record<number, number>, seed: number): Record<number, number> {
+  const odds = neutralOdds(season);
+  const out: Record<number, number> = { ...picked };
+  const rand = mulberry32(mix(seed, 2, 0x8b4c));
+  const team = (s: BracketSide) => ("teamId" in s ? s : out[s.winnerOf] !== undefined ? { teamId: out[s.winnerOf], seed: seedOf.get(out[s.winnerOf]) ?? 99 } : null);
+  const seedOf = new Map(games.flatMap((g) => [g.a, g.b]).flatMap((s) => ("teamId" in s ? [[s.teamId, s.seed] as const] : [])));
+  for (const g of [...games].sort((x, y) => x.index - y.index)) {
+    const a = team(g.a), b = team(g.b);
+    if (!a || !b) continue;
+    if (out[g.index] === a.teamId || out[g.index] === b.teamId) continue;
+    const [hi, lo] = a.seed <= b.seed ? [a, b] : [b, a];
+    const p = odds(hi.teamId, lo.teamId, 0, 0, g.site === "Neutral site" ? 0 : HOME_FIELD);
+    out[g.index] = rand() < p ? hi.teamId : lo.teamId;
+  }
+  return out;
 }

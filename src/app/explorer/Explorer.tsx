@@ -286,7 +286,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
       status={status}
       failed={failed}
       scores={[
-        { value: formatPlayoff(me.playoff, me.cfp, me.status), label: `${labels.playoff}*`, lead: true, detail: playoffDetail(me) },
+        { value: formatPlayoff(me.playoff, me.cfp, me.status, me.autoBid), label: `${labels.playoff}*`, lead: true, detail: playoffDetail(me) },
         { value: formatTitleOdds(me.titleGame, me.status), label: `${short} title game` },
         { value: formatChampion(me), label: labels.champion },
       ]}

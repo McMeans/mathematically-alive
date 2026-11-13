@@ -45,7 +45,7 @@ export { simulateNational } from "./national";
 export type { NationalOptions, NationalPlayoff, NationalResult, NationalSeason, NationalTeam } from "./national";
 export { announcedField, playoffField, playoffFormat } from "./playoff";
 export type { AnnouncedField, PlayoffFormat, PlayoffRun } from "./playoff";
-export { nationalView, playoffSignals } from "./view";
+export { nationalView, playoffSignals, simulateBracket } from "./view";
 export { INDEPENDENTS, exploreIndependent, independentOutlook } from "./independent";
 export type { IndependentExploration, IndependentGame, IndependentOptions, IndependentOutlook } from "./independent";
 export type { BracketGame, BracketSide, BubbleTeam, FieldSpot, NationalView, PlayoffSignal } from "./view";
