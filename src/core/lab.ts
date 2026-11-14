@@ -287,7 +287,7 @@ export type LabMover = {
 };
 
 export type LabChanges = {
-  /** "Miami into the field as the 11 seed; SMU out.", "Oregon up to the 2 seed.", or "No change to the projected field." At most two changes named, then "; 3 more changes". Empty with no playoff. */
+  /** "Miami in at 11, SMU out", "Oregon up to 2", or "No change to the projected field." At most three changes named, then "+2 more". Empty with no playoff. */
   headline: string;
   /** The biggest moves of at least 2 points, biggest first, up to 5. */
   movers: LabMover[];
@@ -306,18 +306,18 @@ export function labChanges(season: Season, before: SeasonLab, after: SeasonLab):
   if (before.playoff && after.playoff) {
     const was = new Map(before.playoff.field.map((s) => [s.teamId, s.seed]));
     const now = new Map(after.playoff.field.map((s) => [s.teamId, s.seed]));
-    const ins = after.playoff.field.filter((s) => !was.has(s.teamId)).map((s) => `${name(s.teamId)} into the field as the ${s.seed} seed`);
+    const ins = after.playoff.field.filter((s) => !was.has(s.teamId)).map((s) => `${name(s.teamId)} in at ${s.seed}`);
     const outs = before.playoff.field.filter((s) => !now.has(s.teamId)).map((s) => `${name(s.teamId)} out`);
     const moved = after.playoff.field
       .filter((s) => was.has(s.teamId) && was.get(s.teamId) !== s.seed)
       .sort((a, b) => Math.abs(was.get(b.teamId)! - b.seed) - Math.abs(was.get(a.teamId)! - a.seed) || a.seed - b.seed)
       .slice(0, 2)
-      .map((s) => `${name(s.teamId)} ${s.seed < was.get(s.teamId)! ? "up" : "down"} to the ${s.seed} seed`);
+      .map((s) => `${name(s.teamId)} ${s.seed < was.get(s.teamId)! ? "up" : "down"} to ${s.seed}`);
     const parts = ins.length + outs.length > 0 ? [...ins, ...outs] : moved;
-    // At most two changes named, so a fill's batch stays one line: "Miami into the field as the 11 seed; SMU out; 4 more changes."
-    const more = parts.length - 2;
+    // Short, and at most three changes named, so a fill's batch fits the header: "Miami in at 11, SMU out, Duke out +2 more".
+    const more = parts.length - 3;
     headline = parts.length === 0 ? "No change to the projected field."
-      : `${parts.slice(0, 2).join("; ")}${more > 0 ? `; ${more} more ${more === 1 ? "change" : "changes"}` : ""}.`;
+      : `${parts.slice(0, 3).join(", ")}${more > 0 ? ` +${more} more` : ""}`;
   }
   const old = new Map(before.national.teams.map((t) => [t.teamId, t]));
   const movers: LabMover[] = [];

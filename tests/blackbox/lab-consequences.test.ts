@@ -22,7 +22,7 @@ describe("season lab: what a pick changed", () => {
     const entered = upset.playoff!.field.filter((s) => !before.has(s.teamId));
     const left = base.playoff!.field.filter((s) => !after.has(s.teamId));
     expect(entered.length).toBeGreaterThan(0);
-    for (const s of entered) expect(headline).toContain(`${name(s.teamId)} into the field as the ${s.seed} seed`);
+    for (const s of entered) expect(headline).toContain(`${name(s.teamId)} in at ${s.seed}`);
     for (const s of left) expect(headline).toContain(`${name(s.teamId)} out`);
     // The beaten favourite's playoff odds fall, and it is among the movers.
     const fav = movers.find((m) => m.teamId === favourite)!;
@@ -47,12 +47,12 @@ describe("season lab: what a pick changed", () => {
     }
     if (!found) throw new Error("no pick only reshuffles seeds");
     const was = new Map(base.playoff!.field.map((x) => [x.teamId, x.seed]));
-    const moves = labChanges(season, base, found).headline.replace(/\.$/, "").split("; ");
+    const moves = labChanges(season, base, found).headline.replace(/\.$/, "").split(", ");
     expect(moves.length).toBeGreaterThan(0);
     expect(moves.length).toBeLessThanOrEqual(2);
     for (const m of moves) {
       const s = found.playoff!.field.find((x) => m.startsWith(`${name(x.teamId)} `))!;
-      expect(m).toBe(`${name(s.teamId)} ${s.seed < was.get(s.teamId)! ? "up" : "down"} to the ${s.seed} seed`);
+      expect(m).toBe(`${name(s.teamId)} ${s.seed < was.get(s.teamId)! ? "up" : "down"} to ${s.seed}`);
     }
   }, 30_000);
 

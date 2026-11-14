@@ -46,10 +46,10 @@ describe("lab records and change headline", () => {
     expect(parse(after[l])).toEqual([parse(before[l])[0], parse(before[l])[1] + 1]);
   });
 
-  it("a batch of field changes names two and counts the rest, so the headline stays short", () => {
+  it("a batch of field changes names three and counts the rest, so the headline stays short", () => {
     const filled = seasonLab(season, { ...opts, locks: fillLabLocks(season, {}, { seed: 9 }, conferences) });
     const h = labChanges(season, lab(), filled).headline;
-    expect(h.split("; ").length).toBeLessThanOrEqual(3);
-    if (h.split("; ").length === 3) expect(h).toMatch(/; \d+ more changes?\.$/);
+    expect(h.split(", ").length).toBeLessThanOrEqual(3);
+    expect(h.length).toBeLessThan(90);
   });
 });
