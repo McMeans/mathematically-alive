@@ -171,11 +171,10 @@ export type LiveRanking = {
 };
 
 /**
- * The committee's latest ranking, moved by the results since it came out. A real result moves a team as the fit
- * says (live.ts's header). A picked one moves it by how much it beat what was expected, while few games are picked,
- * shading to its full result as the picks fill the season. So with no picks this is where the committee stands now; a
- * pick never gains a team ground just because the teams around it haven't been picked yet; and a season picked in
- * full is ranked on its whole record. Teams the committee didn't rank are placed below its ranked ones by the stand-in.
+ * The committee's latest ranking, moved by the results since it came out. A result moves a team as the fit says
+ * (live.ts's header), and a picked result counts exactly as if it had been played. A game with no result and no pick
+ * moves nothing. So with no picks this is where the committee stands now, and the ranking always matches the records
+ * the picks give. Teams the committee didn't rank are placed below its ranked ones by the stand-in.
  */
 export function liveRanking(season: Season, opts: LiveRankingOptions = {}): LiveRanking {
   const m = liveModel(season);
@@ -193,52 +192,39 @@ export function liveRanking(season: Season, opts: LiveRankingOptions = {}): Live
   const winGain = (k: number, pWin: number, title: boolean) =>
     M.wins + M.g6Wins * m.g6[k] + (lossy[k] ? M.lossyWins : 0) + M.upset * (1 - pWin) + (title && !m.seenChampion[k] ? M.champion : 0);
   const lossGain = (pWin: number) => M.losses - M.upset * pWin;
-  // A picked result counts as it happened, less what was expected of it (`discount` times its expected gain): with few
-  // picks, nearly all of it, so a pick moves a team only by how much it beat the odds and unpicked teams aren't left
-  // behind; with every game picked, none, so the season's whole record counts as the committee counts it at the end.
-  // In between, in proportion to the share of games still open.
-  type Result = { winner: number; loser: number | null; pWin: number; real: boolean; title: boolean };
+  // Every decided result counts in full: a played game, or a pick (a pick is a result that has not happened yet).
+  type Result = { winner: number; loser: number | null; pWin: number; title: boolean };
   const results: Result[] = [];
-  let open = 0, picked = 0;
   const decided = games.map(() => false);
   games.forEach((g, i) => {
     if (!m.counts[i] || m.seen[i]) return;
-    if (!g.completed) open++;
     const pick = locks[g.id];
     const won = g.completed ? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId) : pick === g.homeId || pick === g.awayId ? pick : null;
     if (won === null) return;
-    if (!g.completed) picked++;
     decided[i] = true;
     const homeWon = won === g.homeId;
-    results.push({ winner: won, loser: homeWon ? g.awayId : g.homeId, pWin: homeWon ? m.home[i] : 1 - m.home[i], real: g.completed, title: powerTitle.has(i) });
+    results.push({ winner: won, loser: homeWon ? g.awayId : g.homeId, pWin: homeWon ? m.home[i] : 1 - m.home[i], title: powerTitle.has(i) });
   });
   for (const { winner, loser } of opts.titles ?? []) {
     const conference = byId.get(winner)?.conference;
     if (!conference) continue;
     const i = titleGameIndex(season, new Set(season.teams.filter((t) => t.conference === conference).map((t) => t.id)));
     if (i >= 0 && (decided[i] || m.seen[i])) continue;
-    // A title game in the data is already counted open above; one not in the data is one more game. Picked either way.
-    if (i < 0 || !m.counts[i]) open++;
-    picked++;
+    // A title game not in the data is one more game, counted as played.
     const pWin = loser === null ? 0.5 : gameWinProbability(season, { id: -1, week: 0, start: "", neutralSite: true, conferenceGame: true, homeId: winner, awayId: loser, homePoints: null, awayPoints: null, completed: false, spread: null });
-    results.push({ winner, loser, pWin, real: false, title: power.has(conference) });
+    results.push({ winner, loser, pWin, title: power.has(conference) });
   }
-  const discount = open === 0 ? 0 : 1 - picked / open;
   const newLosses = new Int32Array(m.fbsIds.length);
   for (const r of results) { const l = r.loser === null ? -1 : fbsIndex.get(r.loser) ?? -1; if (l >= 0) newLosses[l]++; }
   m.fbsIds.forEach((_, k) => { lossy[k] = m.seenLosses[k] + newLosses[k] >= 2 ? 1 : 0; });
-  for (const { winner, loser, pWin, real, title } of results) {
+  for (const { winner, loser, pWin, title } of results) {
     const w = fbsIndex.get(winner) ?? -1;
     const l = loser === null ? -1 : fbsIndex.get(loser) ?? -1;
-    const cut = real ? 0 : discount;
     if (w >= 0) {
-      const win = winGain(w, pWin, title);
-      delta[w] += win - cut * (pWin * win + (1 - pWin) * lossGain(pWin));
+      delta[w] += winGain(w, pWin, title);
     }
     if (l >= 0) {
-      const pL = 1 - pWin;
-      const loss = lossGain(pL);
-      delta[l] += loss - cut * (pL * winGain(l, pL, title) + (1 - pL) * loss);
+      delta[l] += lossGain(1 - pWin);
     }
   }
 

@@ -16,7 +16,7 @@ const lab = (s: Season, games: Record<number, number> = {}) => seasonLab(s, { ..
 const placeOf = (s: Season, id: number, locks?: Record<number, number>) => liveRanking(s, { locks }).teams.find((t) => t.teamId === id)!.rank;
 
 describe("projected ranking", () => {
-  it("winning out lifts a two-loss power team ranked in the teens a few places, not into the top four: every other team plays its games too", () => {
+  it("winning out lifts a two-loss power team ranked in the teens a few places, not into the top four", () => {
     const id = committee.slice(14, 20).find((t) => POWER.includes(conferenceOf(season, t) ?? "") && teamRecord(season, t).losses >= 2)!;
     const projected = lab(season, winOut(season, id)).live.find((t) => t.teamId === id)!;
     expect(projected.rank).toBeGreaterThan(4);

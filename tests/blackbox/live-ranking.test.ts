@@ -43,15 +43,6 @@ describe("live ranking", () => {
     expect(of(E).change).toBeGreaterThan(0);
   });
 
-  it("a real result moves a team as it happened; the same result picked moves it only by how much it beat the odds", () => {
-    // Dogwood (#4) beats Ash (#1), an even game: real, it passes Ash; picked, it moves by half the gap.
-    const played = { ...league, games: league.games.map((g) => (g.id === 32 ? { ...g, homePoints: 7, awayPoints: 20, completed: true } : g)) };
-    const real = ids(played), picked = ids(league, { locks: { 32: D } });
-    expect(real.indexOf(D)).toBeLessThan(real.indexOf(A));
-    expect(picked.indexOf(D)).toBeLessThan(3);
-    expect(picked.indexOf(D)).toBeGreaterThanOrEqual(real.indexOf(D));
-  });
-
   it("a picked title-game loss counts as a loss", () => {
     // Ash and Birch are level at the top; Ash losing a title game to Elm drops it below Birch.
     expect(ids(league, { titles: [{ winner: E, loser: A }] }).indexOf(A)).toBeGreaterThan(ids(league, { titles: [{ winner: E, loser: A }] }).indexOf(B));
