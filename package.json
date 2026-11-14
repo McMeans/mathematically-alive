@@ -15,6 +15,7 @@
     "cfp": "tsx --env-file-if-exists=.env.local scripts/fetch-cfp.ts",
     "fit-committee": "tsx scripts/fit-committee.ts",
     "fit-movement": "tsx scripts/fit-movement.ts",
+    "predev": "tsx scripts/build-data.ts",
     "pretypecheck": "tsx scripts/build-data.ts",
     "prelint": "tsx scripts/build-data.ts",
     "prebuild": "tsx scripts/build-data.ts"
