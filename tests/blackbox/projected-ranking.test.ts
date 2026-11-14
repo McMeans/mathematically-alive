@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { fillLabLocks, gameWinProbability, liveRanking, seasonFromCfbd, seasonLab, teamRecord, type CfbdSnapshot, type Game, type Season, type Team } from "@/core";
+import { fillLabLocks, gameWinProbability, liveRanking, seasonFromCfbd, seasonLab, simulateNational, teamRecord, type CfbdSnapshot, type Game, type Season, type Team } from "@/core";
 
 // 2026 through week 9, and the committee's first ranking (week 10), from fixtures/cfp-2026.json.
 const fx = JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot; rankings: { week: number; ranks: { teamId: number }[] }[] };
@@ -111,6 +111,40 @@ describe("projected ranking", () => {
     expect(place(T(10))).toBeGreaterThanOrEqual(26);
     // Without the pick, the committee's 10th (five losses) still can't sit above 22nd.
     expect(liveRanking(league).teams.find((t) => t.teamId === T(10))!.rank).toBeGreaterThanOrEqual(22);
+  });
+
+  it("in every simulated season, a team with six losses stays out of the top 25", () => {
+    // A made-up league of 30 teams, T1-T25 ranked by the committee in week 8. T9 is far the strongest team by rating.
+    // It lost to the five unranked teams T26-T30 and, in a second league, only to two of them; it then has one game
+    // left, against T28.
+    const build = (lost: number): Season => {
+      const teams: Team[] = Array.from({ length: 30 }, (_, k) => ({
+        id: k + 1, name: `T${k + 1}`, abbreviation: null, conference: "Test", classification: "fbs", color: null, altColor: null, rating: k + 1 === 9 ? 40 : 0,
+      }));
+      const game = (id: number, week: number, homeId: number, awayId: number, awayWon?: boolean): Game => ({
+        id, week, start: `2026-09-${String(week).padStart(2, "0")}T18:00:00Z`, neutralSite: false, conferenceGame: false, homeId, awayId,
+        homePoints: awayWon === undefined ? null : awayWon ? 10 : 30, awayPoints: awayWon === undefined ? null : awayWon ? 30 : 10, completed: awayWon !== undefined, spread: null,
+      });
+      const games: Game[] = [];
+      // T9 plays the five unranked teams and T11: it loses the first `lost`, wins the rest. One more game remains.
+      for (let i = 0; i < 6; i++) games.push(game(100 + i, i + 1, 9, i < 5 ? 26 + i : 11, i < lost));
+      games.push(game(300, 9, 9, 28));
+      return {
+        year: 2026, fetchedAt: "2026-10-20T00:00:00Z", teams, games,
+        committeeRankings: [{ week: 8, postseason: false, teamIds: Array.from({ length: 25 }, (_, k) => k + 1) }],
+      };
+    };
+    const six = build(6);
+    const two = build(2);
+    expect(teamRecord(six, 9).losses).toBe(6);
+    expect(teamRecord(two, 9).losses).toBe(2);
+
+    const run = (s: Season) => simulateNational(s, { iterations: 400, seed: 11, conferences: [] }).teams.find((t) => t.teamId === 9)!;
+    const capped = run(six);
+    expect(capped.top25).toBe(0);
+    expect(capped.meanRank).toBeGreaterThanOrEqual(26);
+    // The same team with two losses does reach the top 25, so the ceiling is what keeps the six-loss team out.
+    expect(run(two).top25).toBeGreaterThan(0);
   });
 
   it("filling the season re-picks a title game whose earlier pick the filled games put out of it", () => {
