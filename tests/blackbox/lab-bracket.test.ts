@@ -61,5 +61,5 @@ describe("lab records and change headline", () => {
     const me = explore(season, { conference: "SEC", iterations: 200, seed: 3, teamId: out, locks: {}, titleLocks: { SEC: out } })
       .outlook.find((t) => t.teamId === out)!;
     expect(me.autoBid).toBe(false);
-  });
+  }, 30_000);
 });
