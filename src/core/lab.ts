@@ -150,6 +150,10 @@ export type SeasonLab = {
    * against what was expected). Its top 25 (or `top`), best first; `change` is the move from the current ranking.
    */
   live: LiveRanked[];
+  /** The whole projected ranking, every FBS team, best first. Places past the committee's 25 are our estimate. */
+  liveAll: LiveRanked[];
+  /** The divider shown below #25 in the whole ranking. */
+  estimateNote: string;
   /**
    * The open games that move the field most, biggest first: up to 15, each swinging at least 0.1 spots, among games
    * neither side wins more than 90% of the time (a long shot's swing is mostly noise). Empty with no playoff.
@@ -220,15 +224,18 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
   const projected = projectedField(season, national, locks.games);
   const now = liveRanking(season).teams;
   const nowPlace = new Map(now.map((t) => [t.teamId, t]));
-  const live: LiveRanked[] = projected.order.slice(0, opts.top ?? 25).map((teamId, k) => {
+  const liveAll: LiveRanked[] = projected.order.map((teamId, k) => {
     const cur = nowPlace.get(teamId)!;
     return { teamId, rank: k + 1, committeeRank: cur.committeeRank, change: cur.rank - (k + 1) };
   });
+  const live = liveAll.slice(0, opts.top ?? 25);
   const order = projected.order;
   const champions = [...projected.champions.keys()];
   return {
     national,
     live,
+    liveAll,
+    estimateNote: "Beyond the committee's 25: our estimate",
     picks,
     open,
     summary: `${picks === 0 ? "No picks yet" : picks === 1 ? "1 pick" : `${picks} picks`}${open === 0 && picks > 0 ? " · every game picked" : ""} · ${seasons}`,

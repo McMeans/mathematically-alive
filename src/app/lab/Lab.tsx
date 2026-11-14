@@ -2,7 +2,7 @@
 // The Season Lab, design B: the stadium board. Header with what the last pick changed; the playoff field, the games
 // left and the conference races side by side (tabs on phones); a pinned team followed as you pick.
 import Link from "next/link";
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { conferenceShort, encodeLocks, labOddsChange, type BracketGame, type BracketSide, type LabConference, type LabFill, type LabLocks, type LabTeamOdds } from "@/core";
 import type { LabRequest, LabResponse, LabView } from "@/app/lab.worker";
 import { ShareButton } from "@/app/explorer/Share";
@@ -467,6 +467,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
   const pct = (x: number) => `${Math.round(x * 100)}%`;
   const inField = new Set(p?.field.map((s) => s.teamId) ?? []);
   const onBubble = new Set(p?.bubble.map((b) => b.teamId) ?? []);
+  const [all, setAll] = useState(false);
   return (
     <>
       <PaneHeading id="field-h" right={
@@ -506,12 +507,21 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
         <>
           <p className="mb-2 text-[13px] text-ink-muted">The committee&rsquo;s latest ranking, moved by results since and your picks. Arrows show the move from the current ranking. Amber numbers are in the field.</p>
           <div className="rounded bg-board-deep py-1.5">
-            {view.live.map((r) => (
+            {(all ? view.liveAll : view.live).map((r) => (
+              <Fragment key={r.teamId}>
+              {r.rank === 26 && <p className="cond mx-3.5 mt-1.5 border-t border-dashed border-board-line px-0 pb-1 pt-2 text-xs font-bold tracking-[0.08em] text-board-muted">{view.estimateNote}</p>}
               <FieldRow key={r.teamId} seed={r.rank} lit={inField.has(r.teamId)} id={r.teamId} name={name(r.teamId)} record={view.records[r.teamId]} me={r.teamId === focus}
                 odds={r.change > 0 ? `▲${r.change}` : r.change < 0 ? `▼${-r.change}` : ""} tone={r.change > 0 ? "text-root" : "text-drop"}
-                tag={r.committeeRank === null ? "Unranked" : undefined} />
+                tag={r.committeeRank === null && r.rank <= 25 ? "Unranked" : undefined} />
+              </Fragment>
             ))}
           </div>
+          {view.liveAll.length > view.live.length && (
+            <button type="button" onClick={() => setAll(!all)} aria-expanded={all}
+              className="cond mt-2 rounded border border-ink-soft px-3 py-1 text-sm font-bold tracking-[0.04em] text-ink hover:bg-paper">
+              {all ? "Show top 25" : `Show all ${view.liveAll.length}`}
+            </button>
+          )}
         </>
       )}
       {!p && <p className="text-sm text-ink-muted">This season&rsquo;s playoff isn&rsquo;t simulated.</p>}

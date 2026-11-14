@@ -1,0 +1,27 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { seasonFromCfbd, seasonLab, type CfbdSnapshot } from "@/core";
+
+const season = seasonFromCfbd((JSON.parse(readFileSync("fixtures/cfp-2026.json", "utf8")) as { snapshot: CfbdSnapshot }).snapshot);
+const lab = seasonLab(season, { iterations: 200, seed: 7, conferences: ["SEC", "Big Ten"] });
+const fbs = season.teams.filter((t) => t.classification === "fbs");
+
+describe("season lab: the whole projected ranking", () => {
+  it("ranks every FBS team once, 1 to N, in order", () => {
+    expect(lab.liveAll).toHaveLength(fbs.length);
+    expect(new Set(lab.liveAll.map((r) => r.teamId))).toEqual(new Set(fbs.map((t) => t.id)));
+    expect(lab.liveAll.map((r) => r.rank)).toEqual(fbs.map((_, k) => k + 1));
+  });
+
+  it("starts with the same top 25 the Lab shows", () => {
+    expect(lab.liveAll.slice(0, 25)).toEqual(lab.live);
+  });
+
+  it("flags places past the committee's 25 as our estimate", () => {
+    expect(lab.estimateNote).toBe("Beyond the committee's 25: our estimate");
+  });
+
+  it("every team past 25 has a record to show", () => {
+    for (const r of lab.liveAll) expect(lab.records[r.teamId]).toMatch(/^\d+-\d+/);
+  });
+});
