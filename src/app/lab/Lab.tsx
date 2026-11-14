@@ -517,7 +517,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
               <RankToggle id="rank-toggle" open={all} label={all ? `${view.topLabel} ▴` : `${view.allLabel} ▾`} onClick={() => setAll(!all)} />
             )}
             {all && view.liveAll.slice(view.live.length).map(row)}
-            {all && <RankToggle open label={`${view.topLabel} ▴`} name={view.backLabel} onClick={() => { setAll(false); requestAnimationFrame(() => document.getElementById("rank-toggle")?.scrollIntoView({ block: "center" })); }} />}
+            {all && <RankToggle open label={`${view.topLabel} ▴`} name={view.backLabel} onClick={() => { setAll(false); requestAnimationFrame(() => { const t = document.getElementById("rank-toggle"); t?.focus({ preventScroll: true }); t?.scrollIntoView({ block: "center" }); }); }} />}
           </div>
         </>
       )}
