@@ -180,7 +180,7 @@ Shared building blocks live in `src/app/explorer/Board.tsx` and are reused by th
 - `TeamLogo({ id, dark, size })` loads CollegeFootballData's 64px logo: `logos-dark` (the default, `dark`) on the board,
   `logos` (`dark={false}`) on the ground, on white, or on an amber pick. When a button fills amber, flip it:
   `<TeamLogo id={id} dark={!on} />`. Logos are decorative (`alt=""`); the name is always next to them.
-- `TeamName({ id, name, dark })` is logo, then this week's committee rank (`#16`, from `RanksContext`, smaller and
+- `TeamName({ id, name, dark })` is logo (`gap-1`), then this week's committee rank (`#16`, from `RanksContext`, smaller and
   dimmer), then the name, truncating. Use it wherever the page names a team.
 
 ### Result buttons (the pick)
@@ -197,7 +197,7 @@ Shared building blocks live in `src/app/explorer/Board.tsx` and are reused by th
 `Outcome` shows the result's label (`cond`), its chance (Public Sans, `text-xs`), then one or two lit numbers, each with
 a `cond` label under it. A number may carry an odds change, `plate text-[13px]`: `text-root` when it starts with `+`,
 `text-drop` otherwise. In the Lab, a picked `TeamButton` swaps its odds for `PickMark` (a heavy square-ended check,
-`role="img" aria-label="Picked"`), and the beaten side fades to `opacity-40` with a line through the name.
+`role="img" aria-label="Picked"`), and the beaten side fades to `opacity-40` (no strike-through: the fade and the amber winner say it).
 
 ### Week-by-week and help cards
 
@@ -279,7 +279,11 @@ of logo, name, record and odds. The current team's row is `bg-lamp/10` with the 
 - A what-if in flight dims the main column (`opacity-80`) and sets `aria-busy`; a `role="status"` line says
   "Updating…", or "Couldn't update. Showing the last result." in `hurt`.
 - Opening another team covers the column with a white veil and a "Loading [team]…" pill (`role="status"`).
-- The Lab header's "Last pick" line is `aria-live="polite"` and shows the core's headline in `lamp`.
+- The Lab header's "Field change" block is `aria-live="polite"`: the core's `LabChanges.lines` as up to two short
+  lines, a small label (`In`/`Up` in `root`, `Out`/`Down` in `drop`) then the teams in white, each new seed small in
+  `board-muted` before the name, up to four a line then "+N". It never grows the header. A note shows in `lamp` instead.
+- The Lab's seeds and top 25 show each team's record (picks counted, a picked title game too) small in `board-muted`
+  after the name. Rank tags are the current ranking only; the Lab shows no projected-seed tags beside names.
 
 ## Layout
 

@@ -28,7 +28,7 @@ export const RanksContext = createContext<Record<number, string>>({});
 export function TeamName({ id, name, dark = true }: { id: number; name: string; dark?: boolean }) {
   const rank = useContext(RanksContext)[id];
   return (
-    <span className="inline-flex min-w-0 items-center gap-1.5 align-bottom">
+    <span className="inline-flex min-w-0 items-center gap-1 align-bottom">
       <TeamLogo id={id} dark={dark} />
       <span className="min-w-0 truncate">{rank && <span className="mr-1 text-[0.74em] font-bold opacity-80">{rank}</span>}{name}</span>
     </span>

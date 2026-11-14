@@ -3,10 +3,10 @@ import { INDEPENDENTS, formatChance, formatPlayoff, formatRecord, type Independe
 import type { ListRow } from "./Explorer";
 
 /** The playoff side of a list row: In or Out once the field is announced, barred teams out. */
-const playoffSide = (o: Pick<TeamOutlook, "playoff" | "cfp" | "postseasonBan">, status: TeamOutlook["status"]) => {
+const playoffSide = (o: Pick<TeamOutlook, "playoff" | "cfp" | "postseasonBan"> & { autoBid?: boolean }, status: TeamOutlook["status"]) => {
   const out = o.postseasonBan || o.cfp?.run?.seed === null;
   const inField = o.cfp?.run != null && o.cfp.run.seed !== null;
-  return { playoff: formatPlayoff(o.playoff, o.cfp, o.postseasonBan ? "eliminated" : status), playoffKey: out ? -1 : inField ? 2 : o.playoff, playoffOut: out };
+  return { playoff: formatPlayoff(o.playoff, o.cfp, o.postseasonBan ? "eliminated" : status, o.autoBid), playoffKey: out ? -1 : inField ? 2 : o.playoff, playoffOut: out };
 };
 
 /**

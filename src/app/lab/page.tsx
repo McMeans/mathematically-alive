@@ -1,7 +1,7 @@
 // Season Lab: pick any game left, or a playoff game, and see the field, bracket and ranking follow. The no-picks
 // view is built at build time; picks run in the Lab worker.
 import type { Metadata } from "next";
-import { committeeRanks, conferenceShort, formatOdds, gameWinProbability, labTeamOdds } from "@/core";
+import { conferenceShort, formatOdds, gameWinProbability, labTeamOdds, liveRanks } from "@/core";
 import { asOf, baseLab, season, supportedTeams, through } from "@/app/season";
 import { Lab, type LabGame } from "./Lab";
 
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 // The national run stays on the server: it is large and the page only shows what the Lab words.
-const initial = { summary: baseLab.summary, picks: baseLab.picks, open: baseLab.open, bigGames: baseLab.bigGames, playoff: baseLab.playoff, conferences: baseLab.conferences, ranking: baseLab.ranking, changes: null, focus: null };
+const initial = { summary: baseLab.summary, picks: baseLab.picks, open: baseLab.open, bigGames: baseLab.bigGames, playoff: baseLab.playoff, conferences: baseLab.conferences, ranking: baseLab.ranking, live: baseLab.live, records: baseLab.records, changes: null, focus: null };
 const names = Object.fromEntries(season.teams.map((t) => [t.id, t.name]));
 /** Short names where space is tight (phones): the abbreviation, else the first four letters. */
 const abbrs = Object.fromEntries(season.teams.map((t) => [t.id, t.abbreviation ?? t.name.slice(0, 4).toUpperCase()]));
@@ -30,6 +30,8 @@ const weekDates: Record<number, string> = (() => {
   return Object.fromEntries([...days].map(([week, w]) => [week, [...w].sort((a, b) => b[1] - a[1])[0][0]]));
 })();
 const conferenceOfTeam = new Map(season.teams.map((t) => [t.id, t.conference]));
+// The conference filter lists FBS conferences only: an FCS opponent's (Southern) is no chip.
+const fbs = new Set(season.teams.filter((t) => t.classification === "fbs").map((t) => t.id));
 
 // Games still to play between two known teams, title games aside (they're decided by the standings).
 const games: LabGame[] = season.games
@@ -40,13 +42,14 @@ const games: LabGame[] = season.games
     const home = conferenceOfTeam.get(g.homeId) ?? null;
     return {
       id: g.id, week: g.week, date: weekDates[g.week], homeId: g.homeId, awayId: g.awayId, neutral: g.neutralSite,
-      group: g.conferenceGame && home ? conferenceShort(home) : "Nonconference",
-      conferences: [conferenceOfTeam.get(g.homeId), conferenceOfTeam.get(g.awayId)].filter((c): c is string => !!c).map(conferenceShort),
+      // A flex-week game between two members (the Pac-12's week 13) is outside the standings but still the league's.
+      group: home && home !== "FBS Independents" && (g.conferenceGame || home === conferenceOfTeam.get(g.awayId)) ? conferenceShort(home) : "Nonconference",
+      conferences: [g.homeId, g.awayId].filter((id) => fbs.has(id)).map((id) => conferenceOfTeam.get(id)).filter((c): c is string => !!c).map(conferenceShort),
       homeOdds: formatOdds(p), awayOdds: formatOdds(1 - p),
     };
   });
 
 export default function LabPage() {
   const teams = supportedTeams.map((t) => ({ id: t.id, name: t.name })).sort((a, b) => a.name.localeCompare(b.name));
-  return <Lab initial={initial} games={games} names={names} abbrs={abbrs} teams={teams} paged={supportedTeams.map((t) => t.id)} baseOdds={baseOdds} ranks={committeeRanks(season)} through={through} asOf={asOf} />;
+  return <Lab initial={initial} games={games} names={names} abbrs={abbrs} teams={teams} paged={supportedTeams.map((t) => t.id)} ranks={liveRanks(season)} baseOdds={baseOdds} through={through} asOf={asOf} />;
 }

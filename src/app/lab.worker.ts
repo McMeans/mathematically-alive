@@ -1,7 +1,7 @@
 // The Season Lab's simulations and link codec, off the main thread (the codec needs the whole season, which only
 // this worker loads). Each pick runs twice: a quick pass for numbers right away, then the full run. A newer pick
 // skips the full run of an older one.
-import { decodeLabLocks, decodeLocks, decodeTitlePick, encodeLabLocks, fillLabLocks, labChanges, labTeamOdds, seasonLab, type LabChanges, type LabFill, type LabLocks, type LabTeamOdds, type NationalResult, type Season, type SeasonLab } from "@/core";
+import { decodeLabLocks, decodeLocks, decodeTitlePick, encodeLabLocks, fillLabLocks, labChanges, labTeamOdds, seasonLab, simulateBracket, type BracketGame, type LabChanges, type LabFill, type LabLocks, type LabTeamOdds, type NationalResult, type Season, type SeasonLab } from "@/core";
 import { ITERATIONS, QUICK_ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
 import data from "./data/season.json";
 
@@ -16,12 +16,15 @@ export type LabRequest =
   | { kind: "open"; id: number; picks: string | null; games: string | null; title: string | null }
   /** Pick every open game: favourites, or one season drawn from a seed. */
   | { kind: "fill"; id: number; locks: LabLocks; how: LabFill }
+  /** Play out the bracket's open games once; `picked` winners kept. Answered with `bracketed`. */
+  | { kind: "bracket"; id: number; games: BracketGame[]; picked: Record<number, number>; seed: number }
   /** Back to no picks (the page shows its own no-picks view): the next pick's changes are against no picks. */
   | { kind: "reset"; id: number };
 export type LabResponse =
   | { kind: "result"; id: number; final: boolean; view: LabView; code: string }
   | { kind: "opened"; id: number; locks: LabLocks; note: string }
   | { kind: "filled"; id: number; locks: LabLocks }
+  | { kind: "bracketed"; id: number; key: string; picks: Record<number, number> }
   | { kind: "error"; id: number };
 
 const season = data as Season;
@@ -40,12 +43,12 @@ function run(locks: LabLocks, iterations: number, reuse: NationalResult | undefi
 }
 const strip = (lab: SeasonLab, changes: LabChanges | null, focus: number | null): LabView => ({
   summary: lab.summary, picks: lab.picks, open: lab.open, playoff: lab.playoff, conferences: lab.conferences,
-  ranking: lab.ranking, bigGames: lab.bigGames, changes, focus: focus === null ? null : labTeamOdds(lab.national, focus),
+  ranking: lab.ranking, live: lab.live, bigGames: lab.bigGames, records: lab.records, changes, focus: focus === null ? null : labTeamOdds(lab.national, focus),
 });
 
 self.onmessage = async (e: MessageEvent<LabRequest>) => {
   const req = e.data;
-  newest = Math.max(newest, req.id);
+  if (req.kind !== "bracket") newest = Math.max(newest, req.id);
   try {
     if (req.kind === "open") {
       const lab = decodeLabLocks(season, req.picks ?? "");
@@ -60,8 +63,13 @@ self.onmessage = async (e: MessageEvent<LabRequest>) => {
       opened = false; // a link with no usable picks never runs: the next pick is the visitor's own
       return;
     }
+    if (req.kind === "bracket") {
+      const key = JSON.stringify(req.games.map((g) => [g.a, g.b]));
+      self.postMessage({ kind: "bracketed", id: req.id, key, picks: simulateBracket(season, req.games, req.picked, req.seed) } satisfies LabResponse);
+      return;
+    }
     if (req.kind === "fill") {
-      self.postMessage({ kind: "filled", id: req.id, locks: fillLabLocks(season, req.locks, req.how) } satisfies LabResponse);
+      self.postMessage({ kind: "filled", id: req.id, locks: fillLabLocks(season, req.locks, req.how, SUPPORTED_CONFERENCES) } satisfies LabResponse);
       return;
     }
     const code = encodeLabLocks(season, req.locks);

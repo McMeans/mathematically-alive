@@ -1,12 +1,14 @@
 // Season Lab (docs/plan-season-lab.md): play out the rest of the season with picks for any regular-season game,
 // conference title game or playoff game, and see every conference's title race, the stand-in ranking, the field and
 // the bracket. Picks travel in a URL, so the codec lives here too. All wording comes from here.
+import { liveRanking, type LiveRanked } from "./live";
+import { projectedField } from "./projected";
 import { simulateNational, titleRace, type NationalResult } from "./national";
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
 import { conferenceName, conferenceShort, formatFine, formatOdds, formatSideOdds, shownChange } from "./paths";
 import { announcedField, bracketGames, findFormat } from "./playoff";
-import type { Game, Season } from "./season";
-import { gameWinProbability, mix, mulberry32 } from "./sim";
+import { teamRecord, type Game, type Season } from "./season";
+import { gameWinProbability, mix, mulberry32, neutralOdds } from "./sim";
 import { pairKey } from "./steps";
 import { conferenceData, decidedTitleGame } from "./tiebreak";
 import { nationalView, type NationalView } from "./view";
@@ -129,6 +131,8 @@ export type LabBigGame = {
 
 export type SeasonLab = {
   national: NationalResult;
+  /** Each FBS team's record, picks counted as played, a picked title game among them: "11-2". */
+  records: Record<number, string>;
   /** How many picks are in effect. */
   picks: number;
   /** Regular-season games neither final nor picked. 0: every game is set ("Every game picked" in the summary). */
@@ -141,6 +145,11 @@ export type SeasonLab = {
   conferences: LabConference[];
   /** The committee stand-in's ranking by average place, best first. Modelled, not the committee. */
   ranking: LabRanked[];
+  /**
+   * The projected ranking (projected.ts): the committee's latest, moved by results since and the picks (each scored
+   * against what was expected). Its top 25 (or `top`), best first; `change` is the move from the current ranking.
+   */
+  live: LiveRanked[];
   /**
    * The open games that move the field most, biggest first: up to 15, each swinging at least 0.1 spots, among games
    * neither side wins more than 90% of the time (a long shot's swing is mostly noise). Empty with no playoff.
@@ -194,7 +203,7 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
       })),
     ...tables.get(conference)!,
     final: null,
-  })).map((c) => ({ ...c, final: labFinal(c, national) }));
+  })).map((c) => ({ ...c, final: labFinal(c, season) }));
   const listed = national.teams.slice(0, opts.top ?? 25);
   const ranking = listed.map((t, k) => ({
     rank: k + 1, teamId: t.teamId, meanRank: t.meanRank,
@@ -206,29 +215,44 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     .sort((a, b) => b.spots - a.spots || a.gameId - b.gameId)
     .slice(0, 15)
     .map((g) => ({ gameId: g.gameId, spots: g.spots, text: `Swings about ${g.spots.toFixed(1)} ${g.spots.toFixed(1) === "1.0" ? "spot" : "spots"} in the field` }));
+  // The projected ranking and field (projected.ts): the current picture moved by the picks, the same the team
+  // view's race card shows. The top 25's moves are against where each team stands now (real results only).
+  const projected = projectedField(season, national, locks.games);
+  const now = liveRanking(season).teams;
+  const nowPlace = new Map(now.map((t) => [t.teamId, t]));
+  const live: LiveRanked[] = projected.order.slice(0, opts.top ?? 25).map((teamId, k) => {
+    const cur = nowPlace.get(teamId)!;
+    return { teamId, rank: k + 1, committeeRank: cur.committeeRank, change: cur.rank - (k + 1) };
+  });
+  const order = projected.order;
+  const champions = [...projected.champions.keys()];
   return {
     national,
+    live,
     picks,
     open,
     summary: `${picks === 0 ? "No picks yet" : picks === 1 ? "1 pick" : `${picks} picks`}${open === 0 && picks > 0 ? " · every game picked" : ""} · ${seasons}`,
-    playoff: nationalView(national, { season }),
+    playoff: nationalView(national, { season, ranking: { order, champions } }),
     conferences,
     ranking,
     bigGames,
+    records: Object.fromEntries(season.teams.filter((t) => t.classification === "fbs").map((t) => {
+      const r = teamRecord(season, t.id, locks.games);
+      // A picked title game counts: a win for the winner, a loss for the team it beat.
+      const title = conferences.find((c) => c.picked !== null && c.final?.teams.includes(t.id) && c.final.teams.includes(c.picked));
+      const won = title ? (title.picked === t.id ? 1 : 0) : 0;
+      const lost = title ? 1 - won : 0;
+      return [t.id, `${r.wins + won}-${r.losses + lost}`];
+    })),
   };
 }
 
-/** The matchup to pick a title-game winner in: the exact one, or the two likeliest teams. */
-function labFinal(c: LabConference, national: NationalResult): LabFinal | null {
+/** The matchup to pick a title-game winner in: the exact one, or the two likeliest teams. Its odds are the game's, at a
+ * neutral site, so picking a winner doesn't move them. */
+function labFinal(c: LabConference, season: Season): LabFinal | null {
   const pair: [number, number] | null = c.matchup?.exact ? c.matchup.teams : c.teams.length >= 2 ? [c.teams[0].teamId, c.teams[1].teamId] : null;
   if (!pair) return null;
-  const odds = (id: number) => national.teams.find((t) => t.teamId === id);
-  const cond = pair.map((id) => {
-    const t = odds(id);
-    return t && t.titleGame ? (t.champion ?? 0) / t.titleGame : 0.5;
-  });
-  const total = cond[0] + cond[1];
-  const a = total > 0 ? cond[0] / total : 0.5;
+  const a = neutralOdds(season)(pair[0], pair[1], 0, 0);
   const chances: [number, number] = [a, 1 - a];
   return { teams: pair, key: [...pair].sort((x, y) => x - y).join("|"), chances, texts: [formatOdds(chances[0]), formatOdds(chances[1])], exact: c.matchup?.exact ?? false };
 }
@@ -262,9 +286,21 @@ export type LabMover = {
   text: string;
 };
 
+/** One line of a field change: "In" with "9 Texas Tech · 10 Wake Forest", "Out" with "Oregon · UCLA". */
+export type LabChangeLine = {
+  label: "In" | "Out" | "Up" | "Down";
+  text: string;
+  /** The teams named, up to four: the new seed (null on the Out line) and the name. */
+  teams: { seed: number | null; name: string }[];
+  /** Teams past the four named ("+2"). */
+  more: number;
+};
+
 export type LabChanges = {
-  /** "Miami into the field as the 11 seed; SMU out.", "Oregon up to the 2 seed.", or "No change to the projected field." Empty with no playoff. */
+  /** The lines as one sentence: "In: 9 Texas Tech · 10 Wake Forest. Out: Oregon", or "No change to the field." Empty with no playoff. */
   headline: string;
+  /** Teams into and out of the field, new seeds first, best seed first; or, with the same twelve, the seed moves up and down. Up to four teams a line, then "+2". Empty when nothing changed. */
+  lines: LabChangeLine[];
   /** The biggest moves of at least 2 points, biggest first, up to 5. */
   movers: LabMover[];
 };
@@ -279,18 +315,29 @@ const MOVE = 0.02;
 export function labChanges(season: Season, before: SeasonLab, after: SeasonLab): LabChanges {
   const name = (id: number) => season.teams.find((t) => t.id === id)?.name ?? `Team ${id}`;
   let headline = "";
+  const lines: LabChangeLine[] = [];
   if (before.playoff && after.playoff) {
     const was = new Map(before.playoff.field.map((s) => [s.teamId, s.seed]));
     const now = new Map(after.playoff.field.map((s) => [s.teamId, s.seed]));
-    const ins = after.playoff.field.filter((s) => !was.has(s.teamId)).map((s) => `${name(s.teamId)} into the field as the ${s.seed} seed`);
-    const outs = before.playoff.field.filter((s) => !now.has(s.teamId)).map((s) => `${name(s.teamId)} out`);
-    const moved = after.playoff.field
-      .filter((s) => was.has(s.teamId) && was.get(s.teamId) !== s.seed)
-      .sort((a, b) => Math.abs(was.get(b.teamId)! - b.seed) - Math.abs(was.get(a.teamId)! - a.seed) || a.seed - b.seed)
-      .slice(0, 2)
-      .map((s) => `${name(s.teamId)} ${s.seed < was.get(s.teamId)! ? "up" : "down"} to the ${s.seed} seed`);
-    const parts = ins.length + outs.length > 0 ? [...ins, ...outs] : moved;
-    headline = parts.length === 0 ? "No change to the projected field." : `${parts.join("; ")}.`;
+    // Up to four teams a line, then "+2", so a fill's batch fits the header.
+    const line = (label: LabChangeLine["label"], all: { seed: number | null; name: string }[]): LabChangeLine => {
+      const teams = all.slice(0, 4);
+      const more = all.length - teams.length;
+      return { label, teams, more, text: `${teams.map((t) => (t.seed === null ? t.name : `${t.seed} ${t.name}`)).join(" · ")}${more > 0 ? ` +${more}` : ""}` };
+    };
+    const ins = after.playoff.field.filter((s) => !was.has(s.teamId)).sort((x, y) => x.seed - y.seed).map((s) => ({ seed: s.seed, name: name(s.teamId) }));
+    const outs = before.playoff.field.filter((s) => !now.has(s.teamId)).sort((x, y) => x.seed - y.seed).map((s) => ({ seed: null, name: name(s.teamId) }));
+    const moved = after.playoff.field.filter((s) => was.has(s.teamId) && was.get(s.teamId) !== s.seed);
+    const up = moved.filter((s) => s.seed < was.get(s.teamId)!).map((s) => ({ seed: s.seed, name: name(s.teamId) }));
+    const down = moved.filter((s) => s.seed > was.get(s.teamId)!).map((s) => ({ seed: s.seed, name: name(s.teamId) }));
+    if (ins.length + outs.length > 0) {
+      if (ins.length) lines.push(line("In", ins));
+      if (outs.length) lines.push(line("Out", outs));
+    } else {
+      if (up.length) lines.push(line("Up", up));
+      if (down.length) lines.push(line("Down", down));
+    }
+    headline = lines.length === 0 ? "No change to the field." : lines.map((l) => `${l.label}: ${l.text}`).join(". ");
   }
   const old = new Map(before.national.teams.map((t) => [t.teamId, t]));
   const movers: LabMover[] = [];
@@ -305,7 +352,7 @@ export function labChanges(season: Season, before: SeasonLab, after: SeasonLab):
     movers.push({ teamId: t.teamId, ...best, text: `${name(t.teamId)}: ${label} ${formatOdds(best.before)} → ${formatOdds(best.after)}` });
   }
   movers.sort((a, b) => Math.abs(b.after - b.before) - Math.abs(a.after - a.before) || a.teamId - b.teamId);
-  return { headline, movers: movers.slice(0, 5) };
+  return { headline, lines, movers: movers.slice(0, 5) };
 }
 
 /** One seed on the share card. `color`: the team's colour from the data ("#ba0c2f"), or null. */
@@ -409,11 +456,13 @@ export type LabFill = "favorites" | { seed: number };
 const FILL_SALT = 1 << 24;
 
 /**
- * The picks (less any on a game since gone final) plus a pick for every regular-season game neither final nor picked, title games aside (the standings
- * decide those). Existing picks stay. A seeded fill draws each game at its model odds; the same seed and picks give
- * the same season.
+ * The picks (less any on a game since gone final) plus a pick for every regular-season game neither final nor picked,
+ * title games aside (the standings decide who plays in those). Then, for each of `conferences` with no title pick and
+ * its title game not final, a pick of the title-game winner between the two teams those standings send (the favourite
+ * at neutral-site odds, or drawn at them). Existing picks stay. A seeded fill draws each game at its model odds; the
+ * same seed and picks give the same season.
  */
-export function fillLabLocks(season: Season, locks: Partial<LabLocks>, how: LabFill): LabLocks {
+export function fillLabLocks(season: Season, locks: Partial<LabLocks>, how: LabFill, conferences: readonly string[] = []): LabLocks {
   const out = filled(locks);
   // Picks on games since gone final are dropped, as seasonLab drops them.
   const games: Record<number, number> = {};
@@ -424,7 +473,21 @@ export function fillLabLocks(season: Season, locks: Partial<LabLocks>, how: LabF
     const homeWins = how === "favorites" ? p >= 0.5 : mulberry32(mix(how.seed, 0, FILL_SALT + g.id))() < p;
     games[g.id] = homeWins ? g.homeId : g.awayId;
   }
-  return { ...out, games };
+  const titles = { ...out.titles };
+  const names = new Map(season.teams.map((t) => [t.id, t.name]));
+  const winnerOf = (g: Game): number => games[g.id] ?? (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId);
+  const odds = neutralOdds(season);
+  conferences.forEach((c, k) => {
+    if (titleFinal(season, c)) return;
+    const m = standingsWithPicks(season, c, (g) => games[g.id] !== undefined, winnerOf, names).matchup;
+    if (!m) return;
+    // A title pick stands while its team still plays in the title game; one the filled games put out is picked again.
+    if (titles[c] !== undefined && (!m.exact || m.teams.includes(titles[c]))) return;
+    const [a, b] = m.teams;
+    const p = odds(a, b, 0, 0);
+    titles[c] = (how === "favorites" ? p >= 0.5 : mulberry32(mix(how.seed, 1, FILL_SALT + k))() < p) ? a : b;
+  });
+  return { ...out, games, titles };
 }
 
 // --- Lock codec: picks as a short URL-safe string. ---------------------------------------------------------------

@@ -59,6 +59,11 @@ export type TeamOutlook = {
   /** Barred from the postseason this season (`Team.postseasonBan`): no title game, no playoff. */
   postseasonBan: boolean;
   /**
+   * In the playoff for sure: its power conference's title is picked for it (or won) in a format that gives every power
+   * champion a bid (2026 on). `formatPlayoff` shows it as "In".
+   */
+  autoBid: boolean;
+  /**
    * Its conference title game once final, if it played in it: whether it won, and "Beat Virginia 27-20 in the ACC
    * title game". Null otherwise.
    */
@@ -294,6 +299,8 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
       status: statusOf(titleGame.get(id)! / n, id),
       groupOfSix,
       postseasonBan: barred.has(id),
+      autoBid: format?.autoBids === "power4G6" && !groupOfSix && !barred.has(id)
+        && ((opts.titleLocks?.[conference] === id && titleGame.get(id)! > 0) || (data.decided?.completed === true && titleResult(season, conference, data.decided, id)?.won === true)),
       titleResult: titleResult(season, conference, data.decided, id),
     })),
   };

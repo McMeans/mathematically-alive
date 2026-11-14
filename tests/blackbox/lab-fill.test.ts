@@ -68,6 +68,30 @@ describe("season lab: filling the rest", () => {
   });
 });
 
+describe("season lab: filling the title games", () => {
+  it("a fill also picks each conference's title-game winner, one of the two teams its filled standings send", () => {
+    const filled = fillLabLocks(season, {}, "favorites", POWER);
+    expect(Object.keys(filled.titles).sort()).toEqual([...POWER].sort());
+    const lab = seasonLab(season, { ...base, locks: filled });
+    for (const c of lab.conferences) {
+      expect(c.picked).toBe(filled.titles[c.conference]);
+      expect(c.matchup!.teams).toContain(filled.titles[c.conference]);
+    }
+  });
+
+  it("a title pick already made stays, and only the asked conferences get one", () => {
+    const sec = season.teams.find((t) => t.conference === "SEC" && t.name === "Georgia")!.id;
+    const filled = fillLabLocks(season, { titles: { SEC: sec } }, { seed: 5 }, ["SEC", "ACC"]);
+    expect(filled.titles.SEC).toBe(sec);
+    expect(Object.keys(filled.titles).sort()).toEqual(["ACC", "SEC"]);
+    expect(fillLabLocks(season, {}, { seed: 5 }, ["SEC", "ACC"])).toEqual(fillLabLocks(season, {}, { seed: 5 }, ["SEC", "ACC"]));
+  });
+
+  it("without conferences asked for, a fill picks no title game", () => {
+    expect(fillLabLocks(season, {}, "favorites").titles).toEqual({});
+  });
+});
+
 describe("season lab: conference standings with picks", () => {
   it("with games left, standings count final and picked games, and there's no title game yet", () => {
     const free = seasonLab(season, base);
