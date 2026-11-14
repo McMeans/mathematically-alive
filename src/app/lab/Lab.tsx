@@ -517,10 +517,9 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
               <div className="mx-3.5 mb-1 mt-1.5">
                 <button id="rank-toggle" type="button" onClick={() => setAll(!all)} aria-expanded={all} className="cond group flex w-full items-center gap-2 text-xs font-bold tracking-[0.08em] text-lamp">
                   <span className="flex-1 border-t border-dashed border-board-line" />
-                  <span className="group-hover:underline">{all ? "Top 25 ▴" : `All ${view.liveAll.length} ▾`}</span>
+                  <span className="group-hover:underline">{all ? "Top 25 ▴" : `${view.allLabel} ▾`}</span>
                   <span className="flex-1 border-t border-dashed border-board-line" />
                 </button>
-                <p className="mt-0.5 text-center text-[11px] font-semibold text-board-muted">{view.estimateNote}</p>
               </div>
             )}
             {all && view.liveAll.slice(view.live.length).map(row)}

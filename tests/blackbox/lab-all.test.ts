@@ -17,8 +17,8 @@ describe("season lab: the whole projected ranking", () => {
     expect(lab.liveAll.slice(0, 25)).toEqual(lab.live);
   });
 
-  it("flags places past the committee's 25 as our estimate", () => {
-    expect(lab.estimateNote).toBe("Beyond the committee's 25: our estimate");
+  it("labels the whole ranking as our projection, with its size", () => {
+    expect(lab.allLabel).toBe(`All ${fbs.length} (projection)`);
   });
 
   it("every team past 25 has a record to show", () => {

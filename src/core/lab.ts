@@ -152,8 +152,8 @@ export type SeasonLab = {
   live: LiveRanked[];
   /** The whole projected ranking, every FBS team, best first. Places past the committee's 25 are our estimate. */
   liveAll: LiveRanked[];
-  /** The divider shown below #25 in the whole ranking. */
-  estimateNote: string;
+  /** The control that opens the whole ranking: "All 138 (projection)". Places past the committee's 25 are ours. */
+  allLabel: string;
   /**
    * The open games that move the field most, biggest first: up to 15, each swinging at least 0.1 spots, among games
    * neither side wins more than 90% of the time (a long shot's swing is mostly noise). Empty with no playoff.
@@ -235,7 +235,7 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     national,
     live,
     liveAll,
-    estimateNote: "Beyond the committee's 25: our estimate",
+    allLabel: `All ${liveAll.length} (projection)`,
     picks,
     open,
     summary: `${picks === 0 ? "No picks yet" : picks === 1 ? "1 pick" : `${picks} picks`}${open === 0 && picks > 0 ? " · every game picked" : ""} · ${seasons}`,

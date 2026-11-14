@@ -43,7 +43,7 @@ function run(locks: LabLocks, iterations: number, reuse: NationalResult | undefi
 }
 const strip = (lab: SeasonLab, changes: LabChanges | null, focus: number | null): LabView => ({
   summary: lab.summary, picks: lab.picks, open: lab.open, playoff: lab.playoff, conferences: lab.conferences,
-  ranking: lab.ranking, live: lab.live, liveAll: lab.liveAll, estimateNote: lab.estimateNote, bigGames: lab.bigGames, records: lab.records, changes, focus: focus === null ? null : labTeamOdds(lab.national, focus),
+  ranking: lab.ranking, live: lab.live, liveAll: lab.liveAll, allLabel: lab.allLabel, bigGames: lab.bigGames, records: lab.records, changes, focus: focus === null ? null : labTeamOdds(lab.national, focus),
 });
 
 self.onmessage = async (e: MessageEvent<LabRequest>) => {
