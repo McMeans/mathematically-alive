@@ -35,6 +35,8 @@ export function projectedField(season: Season, national: NationalResult, locks: 
     }
   });
   const titles = [...counts.values()].flatMap((byWinner) => {
+    // A champion constant across every simulated season counts as picked. A title game settled some other way (a
+    // final one, say) reads the same; harmless, since liveRanking skips games already decided.
     if (byWinner.size !== 1) return [];
     const [winner, opp] = [...byWinner][0];
     const loser = [...opp].sort((x, y) => y[1] - x[1] || x[0] - y[0])[0]?.[0] ?? null;
