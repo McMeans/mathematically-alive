@@ -150,6 +150,14 @@ export type SeasonLab = {
    * against what was expected). Its top 25 (or `top`), best first; `change` is the move from the current ranking.
    */
   live: LiveRanked[];
+  /** The whole projected ranking, every FBS team, best first. Places past the committee's 25 are our estimate. */
+  liveAll: LiveRanked[];
+  /** The control that opens the whole ranking: "All 138 (projection)". Places past the committee's 25 are ours. */
+  allLabel: string;
+  /** The control that folds it back to the top list: "Top 25" (or `top`). */
+  topLabel: string;
+  /** What the fold-back control at the foot of the whole ranking is called for screen readers: "Back to top 25". */
+  backLabel: string;
   /**
    * The open games that move the field most, biggest first: up to 15, each swinging at least 0.1 spots, among games
    * neither side wins more than 90% of the time (a long shot's swing is mostly noise). Empty with no playoff.
@@ -220,15 +228,20 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
   const projected = projectedField(season, national, locks.games);
   const now = liveRanking(season).teams;
   const nowPlace = new Map(now.map((t) => [t.teamId, t]));
-  const live: LiveRanked[] = projected.order.slice(0, opts.top ?? 25).map((teamId, k) => {
+  const liveAll: LiveRanked[] = projected.order.map((teamId, k) => {
     const cur = nowPlace.get(teamId)!;
     return { teamId, rank: k + 1, committeeRank: cur.committeeRank, change: cur.rank - (k + 1) };
   });
+  const live = liveAll.slice(0, opts.top ?? 25);
   const order = projected.order;
   const champions = [...projected.champions.keys()];
   return {
     national,
     live,
+    liveAll,
+    allLabel: `All ${liveAll.length} (projection)`,
+    topLabel: `Top ${live.length}`,
+    backLabel: `Back to top ${live.length}`,
     picks,
     open,
     summary: `${picks === 0 ? "No picks yet" : picks === 1 ? "1 pick" : `${picks} picks`}${open === 0 && picks > 0 ? " · every game picked" : ""} · ${seasons}`,

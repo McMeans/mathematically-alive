@@ -467,6 +467,21 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
   const pct = (x: number) => `${Math.round(x * 100)}%`;
   const inField = new Set(p?.field.map((s) => s.teamId) ?? []);
   const onBubble = new Set(p?.bubble.map((b) => b.teamId) ?? []);
+  const [all, setAll] = useState(false);
+  /** Fold the whole ranking from its foot, then return focus and view to the toggle under #25. */
+  const foldBack = () => {
+    setAll(false);
+    requestAnimationFrame(() => {
+      const t = document.getElementById("rank-toggle");
+      t?.focus({ preventScroll: true });
+      t?.scrollIntoView({ block: "center" });
+    });
+  };
+  const row = (r: LabView["live"][number]) => (
+    <FieldRow key={r.teamId} seed={r.rank} lit={inField.has(r.teamId)} id={r.teamId} name={name(r.teamId)} record={view.records[r.teamId]} me={r.teamId === focus}
+      odds={r.change > 0 ? `▲${r.change}` : r.change < 0 ? `▼${-r.change}` : ""} tone={r.change > 0 ? "text-root" : "text-drop"}
+      tag={r.committeeRank === null && r.rank <= view.live.length ? "Unranked" : undefined} />
+  );
   return (
     <>
       <PaneHeading id="field-h" right={
@@ -506,16 +521,29 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
         <>
           <p className="mb-2 text-[13px] text-ink-muted">The committee&rsquo;s latest ranking, moved by results since and your picks. Arrows show the move from the current ranking. Amber numbers are in the field.</p>
           <div className="rounded bg-board-deep py-1.5">
-            {view.live.map((r) => (
-              <FieldRow key={r.teamId} seed={r.rank} lit={inField.has(r.teamId)} id={r.teamId} name={name(r.teamId)} record={view.records[r.teamId]} me={r.teamId === focus}
-                odds={r.change > 0 ? `▲${r.change}` : r.change < 0 ? `▼${-r.change}` : ""} tone={r.change > 0 ? "text-root" : "text-drop"}
-                tag={r.committeeRank === null ? "Unranked" : undefined} />
-            ))}
+            {view.live.map(row)}
+            {view.liveAll.length > view.live.length && (
+              <RankToggle id="rank-toggle" open={all} label={all ? `${view.topLabel} ▴` : `${view.allLabel} ▾`} onClick={() => setAll(!all)} />
+            )}
+            {all && view.liveAll.slice(view.live.length).map(row)}
+            {all && <RankToggle open label={`${view.topLabel} ▴`} name={view.backLabel} onClick={foldBack} />}
           </div>
         </>
       )}
       {!p && <p className="text-sm text-ink-muted">This season&rsquo;s playoff isn&rsquo;t simulated.</p>}
     </>
+  );
+}
+
+/** A dashed line with a centred amber control that opens or folds the whole ranking. */
+function RankToggle({ id, open, label, name, onClick }: { id?: string; open: boolean; label: string; name?: string; onClick: () => void }) {
+  return (
+    <button id={id} type="button" aria-expanded={open} aria-label={name} onClick={onClick}
+      className="cond group mx-3.5 mb-1 mt-1.5 flex w-[calc(100%-1.75rem)] items-center gap-2 text-xs font-bold tracking-[0.08em] text-lamp">
+      <span className="flex-1 border-t border-dashed border-board-line" />
+      <span className="group-hover:underline">{label}</span>
+      <span className="flex-1 border-t border-dashed border-board-line" />
+    </button>
   );
 }
 
