@@ -471,7 +471,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
   const row = (r: LabView["live"][number]) => (
     <FieldRow key={r.teamId} seed={r.rank} lit={inField.has(r.teamId)} id={r.teamId} name={name(r.teamId)} record={view.records[r.teamId]} me={r.teamId === focus}
       odds={r.change > 0 ? `▲${r.change}` : r.change < 0 ? `▼${-r.change}` : ""} tone={r.change > 0 ? "text-root" : "text-drop"}
-      tag={r.committeeRank === null && r.rank <= 25 ? "Unranked" : undefined} />
+      tag={r.committeeRank === null && r.rank <= view.live.length ? "Unranked" : undefined} />
   );
   return (
     <>
@@ -514,28 +514,27 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
           <div className="rounded bg-board-deep py-1.5">
             {view.live.map(row)}
             {view.liveAll.length > view.live.length && (
-              <div className="mx-3.5 mb-1 mt-1.5">
-                <button id="rank-toggle" type="button" onClick={() => setAll(!all)} aria-expanded={all} className="cond group flex w-full items-center gap-2 text-xs font-bold tracking-[0.08em] text-lamp">
-                  <span className="flex-1 border-t border-dashed border-board-line" />
-                  <span className="group-hover:underline">{all ? "Top 25 ▴" : `${view.allLabel} ▾`}</span>
-                  <span className="flex-1 border-t border-dashed border-board-line" />
-                </button>
-              </div>
+              <RankToggle id="rank-toggle" open={all} label={all ? `${view.topLabel} ▴` : `${view.allLabel} ▾`} onClick={() => setAll(!all)} />
             )}
             {all && view.liveAll.slice(view.live.length).map(row)}
-            {all && (
-              <button type="button" aria-expanded onClick={() => { setAll(false); requestAnimationFrame(() => document.getElementById("rank-toggle")?.scrollIntoView({ block: "center" })); }}
-                className="cond group mx-3.5 mb-1 mt-1.5 flex w-[calc(100%-1.75rem)] items-center gap-2 text-xs font-bold tracking-[0.08em] text-lamp">
-                <span className="flex-1 border-t border-dashed border-board-line" />
-                <span className="group-hover:underline">Top 25 ▴</span>
-                <span className="flex-1 border-t border-dashed border-board-line" />
-              </button>
-            )}
+            {all && <RankToggle open label={`${view.topLabel} ▴`} onClick={() => { setAll(false); requestAnimationFrame(() => document.getElementById("rank-toggle")?.scrollIntoView({ block: "center" })); }} />}
           </div>
         </>
       )}
       {!p && <p className="text-sm text-ink-muted">This season&rsquo;s playoff isn&rsquo;t simulated.</p>}
     </>
+  );
+}
+
+/** A dashed line with a centred amber control that opens or folds the whole ranking. */
+function RankToggle({ id, open, label, onClick }: { id?: string; open: boolean; label: string; onClick: () => void }) {
+  return (
+    <button id={id} type="button" aria-expanded={open} onClick={onClick}
+      className="cond group mx-3.5 mb-1 mt-1.5 flex w-[calc(100%-1.75rem)] items-center gap-2 text-xs font-bold tracking-[0.08em] text-lamp">
+      <span className="flex-1 border-t border-dashed border-board-line" />
+      <span className="group-hover:underline">{label}</span>
+      <span className="flex-1 border-t border-dashed border-board-line" />
+    </button>
   );
 }
 

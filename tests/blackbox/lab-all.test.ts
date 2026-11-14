@@ -21,6 +21,18 @@ describe("season lab: the whole projected ranking", () => {
     expect(lab.allLabel).toBe(`All ${fbs.length} (projection)`);
   });
 
+  it("labels the fold-back control with the top size", () => {
+    expect(lab.topLabel).toBe("Top 25");
+  });
+
+  it("a shorter top list is still the head of the whole ranking", () => {
+    const ten = seasonLab(season, { iterations: 200, seed: 7, conferences: ["SEC", "Big Ten"], top: 10, reuse: lab.national });
+    expect(ten.live).toHaveLength(10);
+    expect(ten.liveAll).toHaveLength(fbs.length);
+    expect(ten.liveAll.slice(0, 10)).toEqual(ten.live);
+    expect(ten.topLabel).toBe("Top 10");
+  });
+
   it("every team past 25 has a record to show", () => {
     for (const r of lab.liveAll) expect(lab.records[r.teamId]).toMatch(/^\d+-\d+/);
   });

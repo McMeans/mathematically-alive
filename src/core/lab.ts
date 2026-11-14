@@ -154,6 +154,8 @@ export type SeasonLab = {
   liveAll: LiveRanked[];
   /** The control that opens the whole ranking: "All 138 (projection)". Places past the committee's 25 are ours. */
   allLabel: string;
+  /** The control that folds it back to the top list: "Top 25" (or `top`). */
+  topLabel: string;
   /**
    * The open games that move the field most, biggest first: up to 15, each swinging at least 0.1 spots, among games
    * neither side wins more than 90% of the time (a long shot's swing is mostly noise). Empty with no playoff.
@@ -236,6 +238,7 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     live,
     liveAll,
     allLabel: `All ${liveAll.length} (projection)`,
+    topLabel: `Top ${live.length}`,
     picks,
     open,
     summary: `${picks === 0 ? "No picks yet" : picks === 1 ? "1 pick" : `${picks} picks`}${open === 0 && picks > 0 ? " · every game picked" : ""} · ${seasons}`,
