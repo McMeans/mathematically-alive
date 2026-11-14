@@ -33,8 +33,10 @@ Every change to `src/core` behavior ships with black-box tests in the same chang
 
 Design B, the stadium scoreboard (drafts: `docs/redesign/b-scoreboard.html`, `docs/redesign/b-lab.html`). A green board with lit numbers on a light gray ground; light-only.
 
+**The full design guide is [`docs/DESIGN.md`](docs/DESIGN.md)**: tokens, type scale, components, layout (phone, desktop, short desktop), motion, accessibility, do/don't, and known drift. Read it before building UI, and update it in the same change when the design moves. The summary:
+
 - Type: Saira Condensed 600–800 for board lettering and every number (`font-display`, the `cond` and `plate` classes), Public Sans for reading (`font-sans`).
-- Colors (Tailwind tokens in `src/app/globals.css`): `board` #133F2E (header, game boards) with `board-deep`/`board-deeper` and `board-line`; `board-text`/`board-muted` for text on it; `plate` #F3F0E6 (the cream plate: current nav item, Share); `lamp` #F2B134 (amber: a pick, the page's team in a race, the cut line, a big game's outline; `lamp-ink` #8A5D00 for amber text on the ground); `root` #5FD08F (a gain in odds on the board: "+5" on the side to root for); `drop` #F0806E (a loss in odds on the board, "−2"); `ground` #E4E7E5 page, `paper` #F6F8F7 rails; `ink` #15201B text, `ink-soft`, `ink-muted`.
+- Colors (Tailwind tokens in `src/app/globals.css`): `board` greens for the header and game boards; `plate` cream for the current nav item and Share; `lamp` amber for a pick or the lit thing (`lamp-ink` as text on the ground); `root` green and `drop` red for gains and losses in odds on the board; `ground`/`paper` light grays with `ink` text.
 - One meaning per color: amber is what's picked or lit; green is a gain in odds, red a loss; numbers are lit digits on the board, never boxes. Only buttons get an outline; a pick fills amber.
 - Team logos from CollegeFootballData (`logos-dark` on the board, `logos` on light or amber). `TeamLogo` in `src/app/explorer/Board.tsx`.
 - Mark: a football whose laces form a pulse line. `src/app/Logo.tsx` (cream ball, board-green pulse on the board; pass `color`/`pulse` on light grounds); below 48px it drops the lace ticks. Favicon `src/app/icon.svg` and `public/logo.svg` are the board-green ball with a cream pulse.

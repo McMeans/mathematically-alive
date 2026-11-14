@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scoreboard Style Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* The style guide for design B, the stadium scoreboard: every specimen below mirrors a component in src/app.
+   Tokens are copied from src/app/globals.css; docs/DESIGN.md is the written guide. Light-only, like the site. */
+:root {
+  --board: #133f2e; --board-deep: #0c2c20; --board-deeper: #0a241a; --board-line: #2a5a46;
+  --board-text: #d7e4dc; --board-muted: #9fbcae;
+  --plate: #f3f0e6; --plate-ink: #121a16; --lamp: #f2b134; --lamp-ink: #8a5d00;
+  --root: #5fd08f; --drop: #f0806e;
+  --ground: #e4e7e5; --paper: #f6f8f7; --ink: #15201b; --ink-soft: #3d4a43; --ink-muted: #5d6a63;
+  --rule: #d6d4cc; --hurt: #a3281c;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.5 "Public Sans", system-ui, sans-serif; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--lamp); color: var(--plate-ink); }
+:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+a { color: inherit; }
+code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: rgba(21,32,27,.06); padding: 1px 4px; border-radius: 2px; }
+.cond { font-family: "Saira Condensed", sans-serif; text-transform: uppercase; }
+.plate { font-family: "Saira Condensed", sans-serif; font-weight: 800; line-height: 1; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.logo { display: inline-block; flex-shrink: 0; object-fit: contain; vertical-align: -0.24em; width: 1.2em; height: 1.2em; }
+
+/* Page frame */
+.top { background-color: var(--board); background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1.2px); background-size: 6px 6px; color: var(--board-text); }
+.top-in { max-width: 1120px; margin: 0 auto; padding: 28px 16px 26px; display: flex; gap: 20px; align-items: center; }
+.top h1 { margin: 0; font-size: clamp(34px, 7vw, 56px); font-weight: 800; line-height: .95; color: #fff; letter-spacing: .01em; }
+.top p { margin: 6px 0 0; color: var(--board-muted); max-width: 52ch; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px 80px; display: grid; gap: 0; }
+nav.toc { position: sticky; top: 0; z-index: 5; background: var(--ground); border-bottom: 1px solid var(--rule); }
+nav.toc ul { max-width: 1120px; margin: 0 auto; padding: 8px 16px; list-style: none; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+nav.toc a { display: flex; align-items: center; height: 32px; padding: 0 10px; border-radius: 2px; text-decoration: none; font: 700 15px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); white-space: nowrap; }
+nav.toc a:hover { background: #fff; color: var(--ink); }
+section.s { padding-top: 44px; scroll-margin-top: 48px; }
+h2.h { margin: 0; font: 800 28px/1.1 "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .02em; }
+.sub { margin: 4px 0 18px; color: var(--ink-soft); max-width: 72ch; }
+h3.k { margin: 22px 0 8px; font: 800 18px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .03em; }
+.note { font-size: 13px; color: var(--ink-muted); margin: 8px 0 0; }
+.grid { display: grid; gap: 12px; }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.card { background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; padding: 14px; }
+.spec { font-size: 12px; color: var(--ink-muted); margin-top: 6px; }
+
+/* Swatches */
+.sw { border-radius: 4px; overflow: hidden; border: 1px solid var(--rule); background: #fff; }
+.sw .chip { height: 72px; display: flex; align-items: flex-end; justify-content: space-between; padding: 8px 10px; font: 800 20px "Saira Condensed", sans-serif; }
+.sw .meta { padding: 8px 10px; font-size: 13px; }
+.sw .meta b { font: 700 15px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .04em; display: block; }
+.sw .meta span { color: var(--ink-muted); }
+
+/* Type */
+.type-row { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 12px; align-items: baseline; padding: 10px 0; border-top: 1px solid var(--rule); }
+.type-row:first-child { border-top: 0; }
+.type-row small { font-size: 12px; color: var(--ink-muted); }
+@media (max-width: 560px) { .type-row { grid-template-columns: 1fr; gap: 2px; } }
+
+/* Board */
+.board { background: var(--board-deep); color: var(--board-text); border-radius: 4px; }
+.pad { padding: 14px; }
+
+/* Site bar */
+.bar { display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 14px; border-bottom: 1px solid var(--board-line); }
+.navi { display: flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 2px; font: 700 15px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .04em; color: var(--board-muted); text-decoration: none; }
+.navi.on { background: var(--plate); color: var(--plate-ink); }
+.navi:not(.on):hover { color: #fff; }
+.search { display: flex; align-items: center; gap: 8px; height: 32px; width: 200px; padding: 0 10px; border: 1px solid var(--board-line); border-radius: 3px; background: rgba(255,255,255,.06); margin-left: auto; }
+.search:focus-within { outline: 2px solid var(--lamp); outline-offset: 2px; border-color: var(--board-muted); }
+.search input { min-width: 0; flex: 1; border: 0; background: transparent; color: #fff; font: 14px "Public Sans", sans-serif; outline: none; }
+.search input::placeholder { color: var(--board-muted); }
+.search.light { background: #fff; border-color: var(--rule); margin: 0; width: auto; height: 42px; }
+.search.light:focus-within { border-color: var(--ink-muted); }
+.search.light input { color: var(--ink); font-size: 16px; }
+.search.light input::placeholder { color: var(--ink-muted); }
+@media (max-width: 560px) { .bar .name, .bar .search { display: none; } }
+
+/* Header numbers */
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; padding: 14px 16px 18px; }
+.picker { display: flex; align-items: stretch; border: 1px solid var(--board-line); border-radius: 3px; background: rgba(255,255,255,.04); max-width: 100%; }
+.picker > span:first-child { display: flex; align-items: center; gap: 8px; padding: 6px 12px; font: 800 clamp(24px, 5vw, 40px)/1 "Saira Condensed", sans-serif; text-transform: uppercase; color: #fff; }
+.picker > span:last-child { display: flex; align-items: center; border-left: 1px solid var(--board-line); padding: 0 10px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--board-muted); margin-top: 8px; }
+.stag { font: 800 12px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .1em; border: 1px solid var(--board-line); border-radius: 2px; padding: 0 6px; color: var(--board-muted); }
+.stag.live { border-color: var(--lamp); color: var(--lamp); }
+.scores { display: flex; gap: 22px; margin-left: auto; text-align: center; }
+.scores .n { color: #fff; }
+.scores .lab { display: block; margin-top: 4px; font: 600 14px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .08em; color: var(--board-muted); }
+@media (max-width: 560px) { .scores { margin-left: 0; width: 100%; justify-content: space-between; } }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 3px; font: 700 16px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .05em; text-decoration: none; transition: background-color 180ms ease-out, color 180ms ease-out, border-color 180ms ease-out, transform 120ms ease-out; }
+.btn:active { transform: scale(.97); }
+.btn.board-out { border: 1px solid var(--board-line); color: #fff; }
+.btn.board-out:hover { border-color: var(--board-muted); }
+.btn.plate-b { background: var(--plate); color: var(--plate-ink); padding: 0 16px; }
+.btn.plate-b:hover { background: #fff; }
+.btn.lit { background: var(--lamp); border: 1px solid var(--lamp); color: var(--plate-ink); }
+.btn.lamp-out { border: 1px solid var(--lamp); color: var(--lamp); }
+.btn.lamp-out:hover { background: var(--lamp); color: var(--plate-ink); }
+.btn.dim { border: 1px solid var(--board-line); color: var(--board-muted); opacity: .5; cursor: default; }
+.btn.primary { background: var(--board); color: #fff; height: 42px; padding: 0 14px; font-size: 17px; }
+.btn.primary:hover { background: var(--board-deep); }
+.btn.second { border: 1px solid var(--rule); background: #fff; color: var(--ink); font-size: 15px; }
+.btn.second:hover { border-color: var(--ink-muted); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.arrow { color: var(--lamp); }
+
+/* Chips and segments */
+.chip-b { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border-radius: 2px; border: 1px solid var(--rule); background: #fff; color: var(--ink-soft); font: 700 15px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .03em; }
+.chip-b[aria-pressed="true"] { border-color: var(--board); background: var(--board); color: #fff; }
+.chip-b.lampc { border-color: var(--lamp); color: var(--ink); }
+.chip-b.lampc[aria-pressed="true"] { background: var(--lamp); color: var(--plate-ink); }
+.conf { height: 28px; padding: 0 10px; border-radius: 2px; border: 1px solid var(--board-line); color: var(--board-muted); font: 700 15px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .03em; }
+.conf[aria-pressed="true"] { border-color: var(--plate); background: var(--plate); color: var(--plate-ink); }
+
+/* Outcome: the pick */
+.week { display: grid; gap: 8px 16px; padding: 12px 14px; }
+.week + .week { border-top: 1px solid var(--board-line); }
+@media (min-width: 900px) { .week { grid-template-columns: 13rem minmax(0,1fr); align-items: center; } }
+.wdate { font: 700 12px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .06em; color: var(--board-muted); display: block; }
+.wgame { font: 700 18px/1.2 "Saira Condensed", sans-serif; text-transform: uppercase; color: #fff; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tag { font: 700 11px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .06em; border: 1px solid var(--board-muted); color: var(--board-muted); padding: 0 6px; width: fit-content; display: inline-block; margin-top: 2px; }
+.tag.dash { border-style: dashed; }
+.pair { display: grid; gap: 6px; }
+@media (min-width: 640px) { .pair { grid-template-columns: 1fr 1fr; gap: 8px; } }
+.out { display: flex; min-height: 44px; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid var(--board-line); border-radius: 3px; background: rgba(255,255,255,.04); color: #fff; text-align: left; transition: background-color 180ms ease-out, color 180ms ease-out, transform 120ms ease-out; }
+.out:hover { border-color: var(--board-muted); background: rgba(255,255,255,.07); }
+.out:active { transform: scale(.97); }
+.out .l { font: 700 16px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .03em; color: var(--board-text); display: block; }
+.out .c { font-size: 12px; color: var(--board-muted); display: block; }
+.out .nums { display: flex; gap: 14px; align-items: baseline; flex-shrink: 0; }
+.out .num { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.out .num .v { font-size: 26px; color: #fff; }
+.out .num:nth-child(2) .v { font-size: 18px; color: var(--board-text); }
+.out .num small { font: 700 11px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .06em; color: var(--board-muted); white-space: nowrap; }
+.chg { font-size: 13px; margin-left: 4px; }
+.chg.up { color: var(--root); }
+.chg.down { color: var(--drop); }
+.out[aria-pressed="true"] { border-color: var(--lamp); background: var(--lamp); }
+.out[aria-pressed="true"], .out[aria-pressed="true"] * { color: var(--plate-ink) !important; }
+
+/* Lab team button */
+.game { display: grid; grid-template-columns: minmax(0,1fr) 26px minmax(0,1fr); align-items: center; padding: 4px 6px; }
+.tb { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border: 1px solid var(--board-line); border-radius: 3px; background: rgba(255,255,255,.04); color: #fff; width: 100%; min-width: 0; }
+.tb.home { flex-direction: row-reverse; text-align: right; }
+.tb b { font: 700 18px "Saira Condensed", sans-serif; text-transform: uppercase; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tb.home b { flex-direction: row-reverse; }
+.tb .o { font-size: 17px; color: var(--board-muted); }
+.tb.on { background: var(--lamp); border-color: var(--lamp); color: var(--plate-ink); }
+.tb.lost { opacity: .4; }
+.tb.lost b { text-decoration: line-through; }
+.tb.big { border: 2px solid var(--lamp); }
+.vs { text-align: center; font-size: 12px; color: var(--board-muted); }
+
+/* Races */
+.race { padding: 6px 0; }
+.rcols { display: grid; grid-template-columns: 1.6rem minmax(0,1fr) 1.7rem 2.5rem; gap: 6px; align-items: center; padding: 0 12px; }
+.rhead { font: 700 11px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .08em; color: var(--board-muted); border-bottom: 1px solid var(--board-line); padding-top: 4px; padding-bottom: 6px; margin-bottom: 2px; }
+.rrow { min-height: 36px; padding-top: 4px; padding-bottom: 4px; font: 700 16px "Saira Condensed", sans-serif; text-transform: uppercase; color: #fff; }
+.rrow .seed { font-size: 14px; color: var(--board-muted); display: flex; flex-direction: column; gap: 2px; line-height: 1; }
+.rrow .seed i { font-style: normal; font-size: 9.5px; letter-spacing: .06em; color: var(--board-text); }
+.rrow .nm { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rrow .pr { text-align: center; font-size: 15px; color: var(--board-muted); }
+.rrow .od { text-align: right; font-size: 18px; }
+.rrow.me { box-shadow: inset 3px 0 0 var(--lamp); }
+.rrow.me .nm, .rrow.me .od { color: var(--lamp); }
+.rrow.under { background: rgba(255,255,255,.035); box-shadow: inset 3px 0 0 var(--board-line); }
+.rrow.out .nm, .rrow.out .od { color: var(--board-muted); }
+.line { position: relative; margin: 6px 12px; border-top: 1px dashed var(--board-line); }
+.line span { position: absolute; top: -9px; right: 0; background: var(--board-deep); padding-left: 6px; font: 700 11px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .08em; color: var(--board-muted); }
+.line.cut { border-color: var(--lamp); }
+.line.cut span { color: var(--lamp); }
+.next { padding: 4px 12px 0; font: 700 11px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .09em; color: var(--board-muted); }
+.btitle { padding: 4px 12px 2px; font: 800 13px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .07em; color: #fff; margin: 0; }
+
+/* Best shot */
+.shot { display: grid; grid-template-columns: minmax(0,1fr) 4.25rem 4.25rem; column-gap: 10px; margin-top: 10px; }
+.shot .ch { font: 700 11px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .08em; color: var(--board-muted); padding-bottom: 6px; }
+.shot .ch + .ch { text-align: right; }
+.shot .cell { border-top: 1px solid var(--board-line); padding: 10px 0; }
+.shot .step { display: flex; gap: 10px; align-items: flex-start; }
+.shot .box { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex-shrink: 0; border-radius: 2px; font-size: 15px; margin-top: 1px; color: var(--plate-ink); background: var(--board-muted); }
+.shot .box.done { background: var(--lamp); }
+.shot .box.off { background: none; border: 2px solid var(--hurt); color: #fff; }
+.shot .box.today { background: none; border: 1px solid var(--board-line); color: var(--board-muted); }
+.shot .t { font: 700 17px/1.2 "Saira Condensed", sans-serif; text-transform: uppercase; color: #fff; display: block; }
+.shot .d { font-size: 12px; color: var(--board-muted); display: block; margin-top: 2px; }
+.shot .val { text-align: right; font-size: 20px; color: #fff; }
+.shot .val small { display: block; margin-top: 2px; font: 600 11px "Public Sans", sans-serif; color: var(--root); }
+.shot .val.lit { color: var(--lamp); }
+
+/* Do / don't */
+.dd { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; margin-top: 14px; }
+.dd figure { margin: 0; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; }
+.dd .stage { padding: 16px; min-height: 110px; display: flex; align-items: center; justify-content: center; }
+.dd .stage.on-board { background: var(--board-deep); }
+.dd figcaption { padding: 10px 14px; font-size: 14px; border-top: 1px solid var(--rule); }
+.dd figcaption b { display: inline-flex; align-items: center; gap: 6px; font: 800 14px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .08em; margin-right: 6px; }
+.yes b { color: #17603c; }
+.no b { color: var(--hurt); }
+.yes { box-shadow: inset 0 3px 0 #17603c; }
+.no { box-shadow: inset 0 3px 0 var(--hurt); }
+
+/* Contrast table */
+table.ct { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.ct th, table.ct td { text-align: left; padding: 8px 10px; border-top: 1px solid var(--rule); }
+table.ct th { font: 700 12px "Saira Condensed", sans-serif; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-muted); border-top: 0; }
+table.ct .demo { display: inline-block; padding: 2px 10px; border-radius: 2px; font: 800 18px "Saira Condensed", sans-serif; }
+table.ct td.r { font: 800 18px "Saira Condensed", sans-serif; text-align: right; }
+.fail { color: var(--hurt); }
+.table-wrap { overflow-x: auto; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; }
+
+/* Motion demo */
+@keyframes hang { 50% { transform: rotateX(90deg); } }
+.hang { animation: hang 180ms steps(2) both; display: inline-block; }
+@keyframes bump { from { background: color-mix(in srgb, var(--lamp) 45%, var(--board)); } }
+.bump { animation: bump 900ms cubic-bezier(0.16, 1, 0.3, 1); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; } }
+
+footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <svg width="72" height="72" viewBox="0 0 140 140" aria-hidden="true" style="flex-shrink:0"><g transform="rotate(-30 70 70)"><path d="M8 70 Q70 2 132 70 Q70 138 8 70 Z" fill="#F3F0E6"/><path d="M22 54 Q24 70 22 86 M118 54 Q116 70 118 86" fill="none" stroke="#133F2E" stroke-width="4" stroke-linecap="round" opacity="0.9"/><path d="M34 70 H54 L60 57 L68 86 L76 48 L83 70 H106" fill="none" stroke="#133F2E" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 63 V77 M47 63 V77 M90 63 V77 M98 63 V77" stroke="#133F2E" stroke-width="4" stroke-linecap="round"/></g></svg>
+    <div>
+      <h1 class="cond">Style guide</h1>
+      <p>Mathematically Alive, design B: the stadium scoreboard. A green board with lit numbers and an amber lamp for what's picked, on a light gray ground. Every specimen here mirrors a component in <code style="background:rgba(255,255,255,.08);color:var(--board-text)">src/app</code>; the written rules are in <code style="background:rgba(255,255,255,.08);color:var(--board-text)">docs/DESIGN.md</code>.</p>
+    </div>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Sections">
+  <ul>
+    <li><a href="#color">Color</a></li>
+    <li><a href="#type">Type</a></li>
+    <li><a href="#header">Header</a></li>
+    <li><a href="#picks">Picks</a></li>
+    <li><a href="#races">Races</a></li>
+    <li><a href="#shot">Best shot</a></li>
+    <li><a href="#buttons">Buttons</a></li>
+    <li><a href="#motion">Motion</a></li>
+    <li><a href="#a11y">Contrast</a></li>
+    <li><a href="#mark">Mark</a></li>
+    <li><a href="#dodont">Do / don't</a></li>
+  </ul>
+</nav>
+
+<main class="wrap">
+
+<!-- COLOR -->
+<section class="s" id="color" aria-labelledby="color-h">
+  <h2 class="h" id="color-h">Color</h2>
+  <p class="sub">One meaning per color. Amber is what's picked or lit. Green is a gain in odds, red a loss. Use the Tailwind token, never the hex, in a component.</p>
+
+  <h3 class="k">The board</h3>
+  <div class="grid g3">
+    <div class="sw"><div class="chip" style="background:#133f2e;color:#fff">board<span>#133F2E</span></div><div class="meta"><b>board</b><span>Header, selected segment, dark buttons on the ground, phone dock.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0c2c20;color:#fff">board-deep<span>#0C2C20</span></div><div class="meta"><b>board-deep</b><span>Game boards, race cards, the field, menus, the team sheet.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#2a5a46;color:#fff">board-line<span>#2A5A46</span></div><div class="meta"><b>board-line</b><span>Hairlines and unpressed outlines on the board.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0c2c20;color:#d7e4dc">board-text<span>#D7E4DC</span></div><div class="meta"><b>board-text</b><span>Body text on the board.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0c2c20;color:#9fbcae">board-muted<span>#9FBCAE</span></div><div class="meta"><b>board-muted</b><span>Labels, dates, column heads, teams that are out.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0a241a;color:#fff">board-deeper<span>#0A241A</span></div><div class="meta"><b>board-deeper</b><span>Defined; its RGB tints the shadows.</span></div></div>
+  </div>
+
+  <h3 class="k">Lamp, plate and the odds colors</h3>
+  <div class="grid g3">
+    <div class="sw"><div class="chip" style="background:#f2b134;color:#121a16">lamp<span>#F2B134</span></div><div class="meta"><b>lamp</b><span>A pick, the page's team, the cut line, a big game, the focus ring.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#e4e7e5;color:#8a5d00">lamp-ink<span>#8A5D00</span></div><div class="meta"><b>lamp-ink</b><span>Amber as text on the light ground.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f3f0e6;color:#121a16">plate<span>#F3F0E6</span></div><div class="meta"><b>plate / plate-ink</b><span>The cream plate: current nav item, Share. Ink #121A16 on plate and lamp.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0c2c20;color:#5fd08f">+5 root<span>#5FD08F</span></div><div class="meta"><b>root</b><span>A gain in odds, lit on the board.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0c2c20;color:#f0806e">−2 drop<span>#F0806E</span></div><div class="meta"><b>drop</b><span>A loss in odds, lit on the board.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#e4e7e5;color:#a3281c">hurt<span>#A3281C</span></div><div class="meta"><b>hurt</b><span>Errors on the ground; a broken best-shot step.</span></div></div>
+  </div>
+
+  <h3 class="k">The ground</h3>
+  <div class="grid g3">
+    <div class="sw"><div class="chip" style="background:#e4e7e5;color:#15201b">ground<span>#E4E7E5</span></div><div class="meta"><b>ground</b><span>Page background.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#f6f8f7;color:#15201b">paper<span>#F6F8F7</span></div><div class="meta"><b>paper</b><span>Rails and side panes.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#d6d4cc;color:#15201b">rule<span>#D6D4CC</span></div><div class="meta"><b>rule</b><span>Borders and dividers on the ground.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fff;color:#15201b">ink<span>#15201B</span></div><div class="meta"><b>ink</b><span>Text on the ground.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fff;color:#3d4a43">ink-soft<span>#3D4A43</span></div><div class="meta"><b>ink-soft</b><span>Sub-heading lines, unselected segments.</span></div></div>
+    <div class="sw"><div class="chip" style="background:#fff;color:#5d6a63">ink-muted<span>#5D6A63</span></div><div class="meta"><b>ink-muted</b><span>Footnotes, notes, placeholders.</span></div></div>
+  </div>
+  <p class="note">Legacy aliases (<code>navy</code>, <code>turf</code>, <code>marker</code>, <code>mist</code>, <code>teal</code>) still exist in <code>globals.css</code> so old class names render on-brand. Don't use them in new code.</p>
+</section>
+
+<!-- TYPE -->
+<section class="s" id="type" aria-labelledby="type-h">
+  <h2 class="h" id="type-h">Type</h2>
+  <p class="sub">Saira Condensed 600–800 for board lettering and every number. Public Sans for reading. Digits are tabular everywhere.</p>
+  <div class="grid g2">
+    <div class="board pad">
+      <div class="type-row"><small style="color:var(--board-muted)">.plate 56 · lead number</small><span class="plate" style="font-size:56px;color:#fff">38%</span></div>
+      <div class="type-row" style="border-color:var(--board-line)"><small style="color:var(--board-muted)">.cond 40 · team name</small><span class="cond" style="font:800 40px/1 'Saira Condensed';color:#fff">Indiana</span></div>
+      <div class="type-row" style="border-color:var(--board-line)"><small style="color:var(--board-muted)">.plate 26 · odds on a pick</small><span class="plate" style="font-size:26px;color:#fff">71% <span class="chg up">+5</span></span></div>
+      <div class="type-row" style="border-color:var(--board-line)"><small style="color:var(--board-muted)">.cond 18 · game</small><span class="cond" style="font:700 18px 'Saira Condensed';color:#fff">at Ohio State</span></div>
+      <div class="type-row" style="border-color:var(--board-line)"><small style="color:var(--board-muted)">.cond 11 · label</small><span class="cond" style="font:700 11px 'Saira Condensed';letter-spacing:.08em;color:var(--board-muted)">Title game</span></div>
+    </div>
+    <div class="card">
+      <div class="type-row"><small>.cond 24 · section heading</small><span class="cond" style="font:800 24px 'Saira Condensed';letter-spacing:.02em">Week by week</span></div>
+      <div class="type-row"><small>.cond 18 · rail heading</small><span class="cond" style="font:800 18px 'Saira Condensed';letter-spacing:.03em">Playoff race</span></div>
+      <div class="type-row"><small>Public Sans 15 · reading</small><span style="color:var(--ink-soft)">Indiana's playoff and Big Ten title-game odds after each of its own results.</span></div>
+      <div class="type-row"><small>Public Sans 13 · note</small><span style="font-size:13px;color:var(--ink-muted)">Title-game odds. Tap for standings.</span></div>
+      <div class="type-row"><small>Public Sans 12 · footnote</small><span style="font-size:12px;color:var(--ink-muted)">* Playoff odds are our own estimate, not the committee.</span></div>
+    </div>
+  </div>
+  <h3 class="k">Odds as the core writes them</h3>
+  <div class="board pad row" style="gap:22px">
+    <span class="plate" style="font-size:30px;color:#fff">In</span>
+    <span class="plate" style="font-size:30px;color:#fff">&gt;99%</span>
+    <span class="plate" style="font-size:30px;color:#fff">62%</span>
+    <span class="plate" style="font-size:30px;color:#fff">0.4%</span>
+    <span class="plate" style="font-size:30px;color:#fff">&lt;0.1%</span>
+    <span class="plate" style="font-size:30px;color:var(--board-muted)">Out</span>
+    <span class="plate" style="font-size:22px;color:var(--root)">+1 pt</span>
+    <span class="plate" style="font-size:22px;color:var(--drop)">−0.3</span>
+  </div>
+  <p class="note">From <code>formatSideOdds</code>, <code>formatTitleOdds</code>, <code>shownChange</code> and <code>labOddsChange</code> in <code>@/core</code>. "In" and "Out" appear only when proven. A move is counted in points of the odds as shown.</p>
+</section>
+
+<!-- HEADER -->
+<section class="s" id="header" aria-labelledby="header-h">
+  <h2 class="h" id="header-h">Header and site bar</h2>
+  <p class="sub">The board-dots header. The current nav item is the cream plate. The search's rounded box carries the focus ring; tab into it to see.</p>
+  <div class="top" style="border-radius:4px;overflow:hidden">
+    <div class="bar">
+      <svg width="24" height="24" viewBox="0 0 140 140" aria-hidden="true"><g transform="rotate(-30 70 70)"><path d="M8 70 Q70 2 132 70 Q70 138 8 70 Z" fill="#F3F0E6"/><path d="M30 70 H54 L62 50 L76 90 L84 70 H110" fill="none" stroke="#133F2E" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/></g></svg>
+      <span class="cond name" style="font:700 19px 'Saira Condensed';letter-spacing:.04em;color:#fff">Mathematically Alive</span>
+      <span class="navi on" aria-current="page">Teams</span>
+      <a class="navi" href="#header">Season Lab</a>
+      <label class="search"><svg viewBox="0 0 20 20" aria-hidden="true" width="16" height="16" style="color:var(--board-muted)"><path d="M8.5 3a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM13 13l4.5 4.5" fill="none" stroke="currentColor" stroke-width="2"/></svg><span class="sr-only">Find a team</span><input type="search" placeholder="Find a team"></label>
+    </div>
+    <div class="head">
+      <div>
+        <span class="picker"><span><img class="logo" style="width:1.1em;height:1.1em" src="https://cdn.collegefootballdata.com/logos-dark/64/84.png" alt="">Indiana</span><span><svg viewBox="0 0 12 12" width="18" height="18" aria-hidden="true"><path d="M2.5 4.5 6 8 9.5 4.5" stroke="currentColor" stroke-width="2.2" fill="none"/></svg></span></span>
+        <div class="tags">9-1 (6-1 Big Ten) <span class="stag live">Playoff · Alive</span><span class="stag">B1G title game · Out</span></div>
+      </div>
+      <div class="scores">
+        <div><span class="plate n" style="font-size:clamp(32px,6vw,56px)">38%</span><span class="lab" style="color:#fff">Playoff*</span></div>
+        <div><span class="plate n" style="font-size:clamp(22px,4vw,36px)">Out</span><span class="lab">B1G title game</span></div>
+        <div><span class="plate n" style="font-size:clamp(22px,4vw,36px)">2%</span><span class="lab">Champion</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PICKS -->
+<section class="s" id="picks" aria-labelledby="picks-h">
+  <h2 class="h" id="picks-h">Picks</h2>
+  <p class="sub">A result you can lock is a real button with <code>aria-pressed</code>. It rests on a faint white wash, outlines in <code>board-line</code>, and fills amber when picked. Tap one.</p>
+
+  <h3 class="k">Week by week (Outcome)</h3>
+  <div class="board">
+    <div class="week">
+      <div><span class="wdate">Sat, Nov 21</span><span class="wgame">at <img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/194.png" alt="">Ohio State</span></div>
+      <div class="pair">
+        <button class="out js-pick" type="button" aria-pressed="false"><span><span class="l">Indiana wins</span><span class="c">31% to win</span></span><span class="nums"><span class="num"><span class="plate v">71%</span><small>Playoff</small></span><span class="num"><span class="plate v">58%</span><small>Title game</small></span></span></button>
+        <button class="out js-pick" type="button" aria-pressed="true"><span><span class="l">Ohio State wins</span><span class="c">69% to win</span></span><span class="nums"><span class="num"><span class="plate v">24%</span><small>Playoff</small></span><span class="num"><span class="plate v">Out</span><small>Title game</small></span></span></button>
+      </div>
+    </div>
+    <div class="week">
+      <div><span class="wdate">Sat, Nov 28</span><span class="wgame">vs <img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/2649.png" alt="">Toledo</span><span class="tag dash" title="Not yet confirmed">Projected<span class="sr-only">: not yet confirmed</span></span></div>
+      <div class="pair">
+        <button class="out js-pick" type="button" aria-pressed="false"><span><span class="l">Indiana wins</span><span class="c">88% to win</span></span><span class="nums"><span class="num"><span class="plate v">41%</span><small>Playoff</small></span></span></button>
+        <button class="out js-pick" type="button" aria-pressed="false"><span><span class="l">Toledo wins</span><span class="c">12% to win</span></span><span class="nums"><span class="num"><span class="plate v">17%</span><small>Playoff</small></span></span></button>
+      </div>
+    </div>
+    <div class="week">
+      <div><span class="wdate">Sat, Oct 3</span><span class="wgame">vs Illinois</span><span class="tag">Non-con</span></div>
+      <p class="cond" style="margin:0;font:700 18px 'Saira Condensed';color:#fff">Won 31-17</p>
+    </div>
+  </div>
+
+  <h3 class="k">Help from elsewhere: odds changes</h3>
+  <div class="board pad">
+    <div class="pair">
+      <button class="out js-pick" type="button" aria-pressed="false"><span><span class="l" style="font-size:14px;color:var(--board-muted)">Michigan wins</span><span class="c">25% to win</span></span><span class="nums"><span class="num"><span><span class="plate v" style="font-size:20px">43%</span><span class="plate chg up">+5</span></span><small>Playoff</small></span></span></button>
+      <button class="out js-pick" type="button" aria-pressed="false"><span><span class="l" style="font-size:14px;color:var(--board-muted)">Oregon wins</span><span class="c">75% to win</span></span><span class="nums"><span class="num"><span><span class="plate v" style="font-size:20px">36%</span><span class="plate chg down">−2</span></span><small>Playoff</small></span></span></button>
+    </div>
+  </div>
+
+  <h3 class="k">Season Lab (TeamButton)</h3>
+  <div class="board" style="padding:2px 0">
+    <div class="game">
+      <button class="tb on" type="button" aria-pressed="true"><b><img class="logo" src="https://cdn.collegefootballdata.com/logos/64/2390.png" alt="">Miami</b><svg viewBox="0 0 16 16" width="20" height="20" role="img" aria-label="Picked"><path d="M3 8.6 6.4 12 13 4.6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"/></svg></button>
+      <span class="vs">at</span>
+      <button class="tb home lost" type="button" aria-pressed="false"><b><img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/150.png" alt="">Duke</b><span class="plate o">17%</span></button>
+    </div>
+    <div class="game">
+      <button class="tb big" type="button" aria-pressed="false"><b><img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/333.png" alt="">Alabama</b><span class="plate o">74%</span></button>
+      <span class="vs">at</span>
+      <button class="tb home big" type="button" aria-pressed="false"><b><img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/2.png" alt="">Auburn</b><span class="plate o">26%</span></button>
+    </div>
+  </div>
+  <p class="note">Picked: amber fill, the check mark, the light <code>logos</code> version. Beaten side: 40% opacity, struck through. Amber 2px outline: a big game, one that moves the field most.</p>
+</section>
+
+<!-- RACES -->
+<section class="s" id="races" aria-labelledby="races-h">
+  <h2 class="h" id="races-h">Races</h2>
+  <p class="sub">Lines between rows are dashed. The cut is the one amber line. The page's team is the only lit row: an amber bar on the left, amber name and odds.</p>
+  <div class="grid g2">
+    <div>
+      <h3 class="k" style="margin-top:0">Playoff race</h3>
+      <div class="board race">
+        <div class="rcols rhead" aria-hidden="true"><span>Sd</span><span>Team</span><span style="text-align:center">Rk</span><span style="text-align:right">Odds</span></div>
+        <div class="rcols rrow"><span class="seed">1</span><span class="nm"><img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/61.png" alt="">Georgia</span><span class="pr">1</span><span class="plate od">&gt;99%</span></div>
+        <div class="line"><span>Byes</span></div>
+        <div class="rcols rrow"><span class="seed">9<i>AQ</i></span><span class="nm"><img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/252.png" alt="">BYU</span><span class="pr">11</span><span class="plate od">81%</span></div>
+        <div class="rcols rrow me"><span class="seed">12</span><span class="nm"><img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/84.png" alt="">Indiana</span><span class="pr">13</span><span class="plate od">38%</span></div>
+        <div class="line cut"><span>Cut</span></div>
+        <div class="next">Next in line</div>
+        <div class="rcols rrow under out"><span class="seed"></span><span class="nm"><img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/251.png" alt="">Texas</span><span class="pr">14</span><span class="plate od">29%</span></div>
+      </div>
+    </div>
+    <div>
+      <h3 class="k" style="margin-top:0">Group of Six block, then the at-large line</h3>
+      <div class="board race">
+        <p class="btitle">Group of Six bid</p>
+        <div class="rcols rhead" aria-hidden="true"><span>Sd</span><span>Team</span><span style="text-align:center">Rk</span><span style="text-align:right">Odds</span></div>
+        <div class="rcols rrow"><span class="seed"></span><span class="nm"><img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/68.png" alt="">Boise State</span><span class="pr">20</span><span class="plate od">44%</span></div>
+        <div class="line"><span>Bid</span></div>
+        <div class="rcols rrow me"><span class="seed"></span><span class="nm"><img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/2649.png" alt="">Toledo</span><span class="pr">24</span><span class="plate od">21%</span></div>
+      </div>
+      <p class="note">Rail board rows: <code>cond</code> 16–17px; the odds are <code>plate</code>. Column headings come from the core.</p>
+    </div>
+  </div>
+</section>
+
+<!-- BEST SHOT -->
+<section class="s" id="shot" aria-labelledby="shot-h">
+  <h2 class="h" id="shot-h">Best shot</h2>
+  <p class="sub">The likeliest way in, step by step. A step's square fills amber as your picks complete it and rings red when one goes against it. Gains under each number are <code>root</code>.</p>
+  <div class="board pad">
+    <p class="cond" style="margin:0;font:800 24px/1.15 'Saira Condensed';color:#fff">Win out and Oregon loses once</p>
+    <div class="shot" role="table">
+      <div role="row" style="display:contents"><span class="ch" role="columnheader">Step</span><span class="ch" role="columnheader">Title game</span><span class="ch" role="columnheader">Playoff</span></div>
+      <div role="row" style="display:contents">
+        <div class="cell" role="cell"><span class="step"><span class="plate box today"></span><span><b class="t" style="color:var(--board-muted)">Today</b></span></span></div>
+        <div class="cell" role="cell"><span class="plate val" style="color:var(--board-muted)">Out</span></div>
+        <div class="cell" role="cell"><span class="plate val" style="color:var(--board-muted)">38%</span></div>
+      </div>
+      <div role="row" style="display:contents">
+        <div class="cell" role="cell"><span class="step"><span class="plate box done" aria-label="Picked">1</span><span><b class="t">Beat Ohio State</b><i class="d" style="font-style:normal">Nov 21 · 31% to win</i></span></span></div>
+        <div class="cell" role="cell"><span class="plate val">58%<small>+58</small></span></div>
+        <div class="cell" role="cell"><span class="plate val">71%<small>+33</small></span></div>
+      </div>
+      <div role="row" style="display:contents">
+        <div class="cell" role="cell"><span class="step"><span class="plate box off" aria-label="Off this path">2</span><span><b class="t">Michigan beats Oregon</b><i class="d" style="font-style:normal">Nov 28 · 25% to win</i></span></span></div>
+        <div class="cell" role="cell"><span class="plate val">80%<small>+22</small></span></div>
+        <div class="cell" role="cell"><span class="plate val">86%<small>+15</small></span></div>
+      </div>
+      <div role="row" style="display:contents">
+        <div class="cell" role="cell"><span class="step"><span class="plate box done">3</span><span><b class="t">Win the Big Ten title game</b></span></span></div>
+        <div class="cell" role="cell"><span class="plate val lit">In</span></div>
+        <div class="cell" role="cell"><span class="plate val lit">In</span></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn lit" type="button" style="height:40px;font-size:17px">Lock this path</button>
+      <a class="btn board-out" href="#shot" style="height:40px;font-size:17px;color:var(--board-text)">Try it in the Lab <span class="arrow" aria-hidden="true">→</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- BUTTONS -->
+<section class="s" id="buttons" aria-labelledby="buttons-h">
+  <h2 class="h" id="buttons-h">Buttons, chips and tags</h2>
+  <p class="sub">Only buttons get an outline. Small radii: 3px for buttons, 2px for chips, segments and tags.</p>
+  <div class="grid g2">
+    <div class="board pad" style="background:var(--board)">
+      <h3 class="k" style="margin-top:0;color:#fff">On the board</h3>
+      <div class="row">
+        <a class="btn board-out" href="#buttons">Open picks in Lab <span style="font:600 12px 'Public Sans';text-transform:none;letter-spacing:0;color:var(--board-muted)">· 2 picks</span> <span class="arrow" aria-hidden="true">→</span></a>
+        <button class="btn plate-b" type="button">Share</button>
+        <button class="btn lit" type="button">Reset</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn board-out" type="button">Undo</button>
+        <button class="btn dim" type="button" disabled>Reset</button>
+        <button class="btn lamp-out" type="button">Undo this path</button>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="conf" type="button" aria-pressed="true">B1G</button>
+        <button class="conf" type="button" aria-pressed="false">SEC</button>
+        <button class="conf" type="button" aria-pressed="false">ACC</button>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <span class="stag live">Playoff · Alive</span><span class="stag">Title game · In</span>
+        <span class="tag" style="margin:0">Non-con</span><span class="tag dash" style="margin:0">Projected</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="k" style="margin-top:0">On the ground</h3>
+      <div class="row">
+        <button class="btn primary" type="button">Fill the rest <span aria-hidden="true" style="font-size:12px">▾</span></button>
+        <button class="btn second" type="button">Share picks</button>
+        <button class="btn second" type="button">Reset</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="chip-b js-chip" type="button" aria-pressed="true">All</button>
+        <button class="chip-b lampc js-chip" type="button" aria-pressed="false"><img class="logo" src="https://cdn.collegefootballdata.com/logos/64/84.png" alt="" style="width:16px;height:16px">Indiana's games</button>
+        <button class="chip-b js-chip" type="button" aria-pressed="false">SEC</button>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <label class="search light" style="flex:1"><svg viewBox="0 0 20 20" aria-hidden="true" width="16" height="16" style="color:var(--ink-muted)"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 13l4 4" stroke="currentColor" stroke-width="2"/></svg><span class="sr-only">Find a team</span><input placeholder="Find a team"></label>
+      </div>
+      <p class="note">Status and notes on the ground: <span style="color:var(--lamp-ink);font-weight:600">Big Ten title pick cleared: the matchup changed.</span> <span style="color:var(--hurt)">Couldn’t update. Showing the last result.</span></p>
+    </div>
+  </div>
+</section>
+
+<!-- MOTION -->
+<section class="s" id="motion" aria-labelledby="motion-h">
+  <h2 class="h" id="motion-h">Motion</h2>
+  <p class="sub">Short and eased, never bouncy. A lit number flips once when it changes (<code>.plate-hang</code>, 180ms). The phone dock glows amber when odds move (<code>.bump</code>, 900ms). Reduced motion cuts both to 1ms.</p>
+  <div class="row" style="gap:16px">
+    <div class="board pad" style="display:flex;align-items:center;gap:16px;background:var(--board)" id="bumpbox">
+      <span class="plate" style="font-size:44px;color:#fff;perspective:200px"><span id="flip" class="hang">38%</span></span>
+      <span class="cond" style="font:700 12px 'Saira Condensed';letter-spacing:.08em;color:var(--board-muted)">Playoff</span>
+    </div>
+    <button class="btn second" type="button" id="replay">Change the odds</button>
+  </div>
+</section>
+
+<!-- A11Y -->
+<section class="s" id="a11y" aria-labelledby="a11y-h">
+  <h2 class="h" id="a11y-h">Contrast</h2>
+  <p class="sub">WCAG ratios computed from the tokens. Small text needs 4.5. The focus ring is a 2px amber outline, offset 2px.</p>
+  <div class="table-wrap">
+    <table class="ct">
+      <thead><tr><th>Sample</th><th>Pair</th><th style="text-align:right">Ratio</th></tr></thead>
+      <tbody>
+        <tr><td><span class="demo" style="background:#0c2c20;color:#fff">38%</span></td><td>white on board-deep</td><td class="r">15.0</td></tr>
+        <tr><td><span class="demo" style="background:#0c2c20;color:#d7e4dc">Body</span></td><td>board-text on board-deep</td><td class="r">11.5</td></tr>
+        <tr><td><span class="demo" style="background:#0c2c20;color:#9fbcae">Label</span></td><td>board-muted on board-deep</td><td class="r">7.4</td></tr>
+        <tr><td><span class="demo" style="background:#133f2e;color:#9fbcae">Label</span></td><td>board-muted on board</td><td class="r">5.8</td></tr>
+        <tr><td><span class="demo" style="background:#0c2c20;color:#f2b134">Lit</span></td><td>lamp on board-deep</td><td class="r">8.0</td></tr>
+        <tr><td><span class="demo" style="background:#0c2c20;color:#5fd08f">+5</span></td><td>root on board-deep</td><td class="r">7.8</td></tr>
+        <tr><td><span class="demo" style="background:#0c2c20;color:#f0806e">−2</span></td><td>drop on board-deep</td><td class="r">5.7</td></tr>
+        <tr><td><span class="demo" style="background:#f2b134;color:#121a16">Pick</span></td><td>plate-ink on lamp</td><td class="r">9.4</td></tr>
+        <tr><td><span class="demo" style="background:#e4e7e5;color:#5d6a63">Note</span></td><td>ink-muted on ground (don't go lighter)</td><td class="r">4.5</td></tr>
+        <tr><td><span class="demo" style="background:#e4e7e5;color:#8a5d00">Note</span></td><td>lamp-ink on ground</td><td class="r">4.6</td></tr>
+        <tr><td><span class="demo" style="background:#e4e7e5;color:#f2b134">Never</span></td><td>lamp on ground: never as text</td><td class="r fail">1.5</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Known gap: the amber focus ring is 1.5:1 on <code>ground</code> and 1.8:1 on <code>paper</code>, under the 3:1 WCAG asks of focus indicators. It reads well on the board.</p>
+</section>
+
+<!-- MARK -->
+<section class="s" id="mark" aria-labelledby="mark-h">
+  <h2 class="h" id="mark-h">The mark</h2>
+  <p class="sub">A football whose laces form a pulse line. Cream ball on the board, board-green ball on light grounds. Below 48px it drops the lace ticks and thickens the pulse.</p>
+  <div class="grid g3">
+    <div class="board pad" style="display:flex;align-items:center;justify-content:center;gap:24px;background:var(--board);min-height:150px">
+      <svg width="96" height="96" viewBox="0 0 140 140" role="img" aria-label="Mark on the board"><g transform="rotate(-30 70 70)"><path d="M8 70 Q70 2 132 70 Q70 138 8 70 Z" fill="#F3F0E6"/><path d="M22 54 Q24 70 22 86 M118 54 Q116 70 118 86" fill="none" stroke="#133F2E" stroke-width="4" stroke-linecap="round" opacity="0.9"/><path d="M34 70 H54 L60 57 L68 86 L76 48 L83 70 H106" fill="none" stroke="#133F2E" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 63 V77 M47 63 V77 M90 63 V77 M98 63 V77" stroke="#133F2E" stroke-width="4" stroke-linecap="round"/></g></svg>
+      <svg width="24" height="24" viewBox="0 0 140 140" aria-hidden="true"><g transform="rotate(-30 70 70)"><path d="M8 70 Q70 2 132 70 Q70 138 8 70 Z" fill="#F3F0E6"/><path d="M30 70 H54 L62 50 L76 90 L84 70 H110" fill="none" stroke="#133F2E" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/></g></svg>
+    </div>
+    <div class="card" style="display:flex;align-items:center;justify-content:center;gap:24px;min-height:150px">
+      <svg width="96" height="96" viewBox="0 0 140 140" role="img" aria-label="Mark on a light ground"><g transform="rotate(-30 70 70)"><path d="M8 70 Q70 2 132 70 Q70 138 8 70 Z" fill="#133F2E"/><path d="M22 54 Q24 70 22 86 M118 54 Q116 70 118 86" fill="none" stroke="#F3F0E6" stroke-width="4" stroke-linecap="round" opacity="0.9"/><path d="M34 70 H54 L60 57 L68 86 L76 48 L83 70 H106" fill="none" stroke="#F3F0E6" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 63 V77 M47 63 V77 M90 63 V77 M98 63 V77" stroke="#F3F0E6" stroke-width="4" stroke-linecap="round"/></g></svg>
+      <svg width="24" height="24" viewBox="0 0 140 140" aria-hidden="true"><g transform="rotate(-30 70 70)"><path d="M8 70 Q70 2 132 70 Q70 138 8 70 Z" fill="#133F2E"/><path d="M30 70 H54 L62 50 L76 90 L84 70 H110" fill="none" stroke="#F3F0E6" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/></g></svg>
+    </div>
+    <div class="card" style="font-size:14px">
+      <p style="margin:0 0 6px"><code>src/app/Logo.tsx</code>: defaults to the cream ball and green pulse; pass <code>color</code>/<code>pulse</code> on light grounds; <code>decorative</code> hides it from screen readers when the name is beside it.</p>
+      <p style="margin:0"><code>src/app/icon.svg</code> (favicon, simple form) and <code>public/logo.svg</code> (full form) are the green ball with a cream pulse.</p>
+    </div>
+  </div>
+</section>
+
+<!-- DO / DON'T -->
+<section class="s" id="dodont" aria-labelledby="dd-h">
+  <h2 class="h" id="dd-h">Do and don't</h2>
+  <p class="sub">The rules that keep the board readable at a glance.</p>
+  <div class="dd">
+    <figure class="yes"><div class="stage on-board"><span class="plate" style="font-size:40px;color:#fff">62%</span></div><figcaption><b>Do</b>Set odds as lit digits straight on the board.</figcaption></figure>
+    <figure class="no"><div class="stage on-board"><span class="plate" style="font-size:28px;color:#fff;border:1px solid var(--board-line);border-radius:999px;padding:6px 14px;background:rgba(255,255,255,.06)">62%</span></div><figcaption><b>Don't</b>Box a number in a pill, badge or tile.</figcaption></figure>
+    <figure class="yes"><div class="stage on-board" style="padding:16px 24px"><button class="out" type="button" aria-pressed="true" style="max-width:280px"><span><span class="l">Indiana wins</span></span><span class="nums"><span class="num"><span class="plate v">71%</span><small>Playoff</small></span></span></button></div><figcaption><b>Do</b>Fill a pick amber, text in <code>plate-ink</code>.</figcaption></figure>
+    <figure class="no"><div class="stage on-board" style="padding:16px 24px"><span class="out" style="max-width:280px;border-color:var(--lamp)"><span><span class="l" style="color:var(--lamp)">Indiana wins</span></span><span class="nums"><span class="num"><span class="plate v">71%</span><small>Playoff</small></span></span></span></div><figcaption><b>Don't</b>Mark a pick with an amber border or amber text alone.</figcaption></figure>
+    <figure class="yes"><div class="stage on-board"><span class="plate" style="font-size:30px;color:#fff">43%<span class="chg up" style="font-size:16px">+5</span></span>&nbsp;&nbsp;&nbsp;<span class="plate" style="font-size:30px;color:#fff">36%<span class="chg down" style="font-size:16px">−2</span></span></div><figcaption><b>Do</b>Green for a gain, red for a loss, with the sign.</figcaption></figure>
+    <figure class="no"><div class="stage on-board"><span class="cond" style="font:800 14px 'Saira Condensed';letter-spacing:.1em;color:var(--root)">Playoff · Alive</span>&nbsp;&nbsp;<span class="plate" style="font-size:30px;color:var(--lamp)">+5</span></div><figcaption><b>Don't</b>Use green for status, or amber for a change.</figcaption></figure>
+    <figure class="yes"><div class="stage"><span style="color:var(--lamp-ink);font-weight:600">Title pick cleared.</span></div><figcaption><b>Do</b>Use <code>lamp-ink</code> for amber text on the ground.</figcaption></figure>
+    <figure class="no"><div class="stage"><span style="color:var(--lamp);font-weight:600">Title pick cleared.</span></div><figcaption><b>Don't</b>Use <code>lamp</code> as text on light grounds (1.5:1).</figcaption></figure>
+  </div>
+</section>
+
+<footer>Tokens copied from <code>src/app/globals.css</code>. When the design moves, update this page and <code>docs/DESIGN.md</code> in the same change. Team logos load from CollegeFootballData.</footer>
+</main>
+
+<script>
+// Picks toggle within their pair, like the site: tap to lock, tap again to clear.
+document.querySelectorAll('.js-pick').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var on = b.getAttribute('aria-pressed') !== 'true';
+    var pair = b.parentElement;
+    pair.querySelectorAll('.js-pick').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
+    b.setAttribute('aria-pressed', String(on));
+  });
+});
+document.querySelectorAll('.js-chip').forEach(function (b) {
+  b.addEventListener('click', function () {
+    b.parentElement.querySelectorAll('.js-chip').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+  });
+});
+// The flip and the glow, replayed on demand.
+var odds = ['38%', '43%', '71%', '24%'], k = 0;
+document.getElementById('replay').addEventListener('click', function () {
+  var f = document.getElementById('flip'), box = document.getElementById('bumpbox');
+  k = (k + 1) % odds.length;
+  f.textContent = odds[k];
+  f.classList.remove('hang'); box.classList.remove('bump');
+  void f.offsetWidth;
+  f.classList.add('hang'); box.classList.add('bump');
+});
+</script>
+</body>
+</html>
