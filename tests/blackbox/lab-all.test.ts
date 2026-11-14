@@ -23,6 +23,7 @@ describe("season lab: the whole projected ranking", () => {
 
   it("labels the fold-back control with the top size", () => {
     expect(lab.topLabel).toBe("Top 25");
+    expect(lab.backLabel).toBe("Back to top 25");
   });
 
   it("a shorter top list is still the head of the whole ranking", () => {
@@ -31,6 +32,7 @@ describe("season lab: the whole projected ranking", () => {
     expect(ten.liveAll).toHaveLength(fbs.length);
     expect(ten.liveAll.slice(0, 10)).toEqual(ten.live);
     expect(ten.topLabel).toBe("Top 10");
+    expect(ten.backLabel).toBe("Back to top 10");
   });
 
   it("every team past 25 has a record to show", () => {
