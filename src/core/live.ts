@@ -217,8 +217,8 @@ export function liveRanking(season: Season, opts: LiveRankingOptions = {}): Live
     if (!conference) continue;
     const i = titleGameIndex(season, new Set(season.teams.filter((t) => t.conference === conference).map((t) => t.id)));
     if (i >= 0 && (decided[i] || m.seen[i])) continue;
-    // A title game not in the data: one more game, picked.
-    open++;
+    // A title game in the data is already counted open above; one not in the data is one more game. Picked either way.
+    if (i < 0 || !m.counts[i]) open++;
     picked++;
     const pWin = loser === null ? 0.5 : gameWinProbability(season, { id: -1, week: 0, start: "", neutralSite: true, conferenceGame: true, homeId: winner, awayId: loser, homePoints: null, awayPoints: null, completed: false, spread: null });
     results.push({ winner, loser, pWin, real: false, title: power.has(conference) });

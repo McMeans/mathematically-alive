@@ -75,7 +75,7 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
   const [locks, setLocks] = useState<Locks>({});
   const [titles, setTitles] = useState<Titles>({});
   const [result, setResult] = useState<R>(initial);
-  // Ranks by name: the committee's latest with no picks, then moved by the picks (the worker's live ranking).
+  // Ranks by name: the current ranking (the committee's latest, moved by real results only). Picks never change it.
   const [ranks, setRanks] = useState(initialRanks);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
