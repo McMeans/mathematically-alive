@@ -247,8 +247,9 @@ export function playoffSignals(season: Season, sim: SimResult, national: Nationa
 
 /**
  * Plays out a bracket's open games: one draw from each game's odds, `picked` winners kept, a first-round game at the
- * higher seed's home and every later one at a neutral site. Returns every game's winner by index. Games already
- * played (`result`) keep their winner when `picked` has it; a game with an unknown side is skipped.
+ * higher seed's home and every later one at a neutral site. Returns every game's winner by index; a game with an
+ * unknown side is skipped. It doesn't read `result`: for a bracket with games already played, pass their winners in
+ * `picked`.
  */
 export function simulateBracket(season: Season, games: BracketGame[], picked: Record<number, number>, seed: number): Record<number, number> {
   const odds = neutralOdds(season);
