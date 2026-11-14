@@ -287,7 +287,14 @@ export type LabMover = {
 };
 
 /** One line of a field change: "In" with "9 Texas Tech · 10 Wake Forest", "Out" with "Oregon · UCLA". */
-export type LabChangeLine = { label: "In" | "Out" | "Up" | "Down"; text: string };
+export type LabChangeLine = {
+  label: "In" | "Out" | "Up" | "Down";
+  text: string;
+  /** The teams named, up to four: the new seed (null on the Out line) and the name. */
+  teams: { seed: number | null; name: string }[];
+  /** Teams past the four named ("+2"). */
+  more: number;
+};
 
 export type LabChanges = {
   /** The lines as one sentence: "In: 9 Texas Tech · 10 Wake Forest. Out: Oregon", or "No change to the field." Empty with no playoff. */
@@ -313,18 +320,22 @@ export function labChanges(season: Season, before: SeasonLab, after: SeasonLab):
     const was = new Map(before.playoff.field.map((s) => [s.teamId, s.seed]));
     const now = new Map(after.playoff.field.map((s) => [s.teamId, s.seed]));
     // Up to four teams a line, then "+2", so a fill's batch fits the header.
-    const list = (items: string[]) => `${items.slice(0, 4).join(" · ")}${items.length > 4 ? ` +${items.length - 4}` : ""}`;
-    const ins = after.playoff.field.filter((s) => !was.has(s.teamId)).sort((x, y) => x.seed - y.seed).map((s) => `${s.seed} ${name(s.teamId)}`);
-    const outs = before.playoff.field.filter((s) => !now.has(s.teamId)).sort((x, y) => x.seed - y.seed).map((s) => name(s.teamId));
+    const line = (label: LabChangeLine["label"], all: { seed: number | null; name: string }[]): LabChangeLine => {
+      const teams = all.slice(0, 4);
+      const more = all.length - teams.length;
+      return { label, teams, more, text: `${teams.map((t) => (t.seed === null ? t.name : `${t.seed} ${t.name}`)).join(" · ")}${more > 0 ? ` +${more}` : ""}` };
+    };
+    const ins = after.playoff.field.filter((s) => !was.has(s.teamId)).sort((x, y) => x.seed - y.seed).map((s) => ({ seed: s.seed, name: name(s.teamId) }));
+    const outs = before.playoff.field.filter((s) => !now.has(s.teamId)).sort((x, y) => x.seed - y.seed).map((s) => ({ seed: null, name: name(s.teamId) }));
     const moved = after.playoff.field.filter((s) => was.has(s.teamId) && was.get(s.teamId) !== s.seed);
-    const up = moved.filter((s) => s.seed < was.get(s.teamId)!).map((s) => `${s.seed} ${name(s.teamId)}`);
-    const down = moved.filter((s) => s.seed > was.get(s.teamId)!).map((s) => `${s.seed} ${name(s.teamId)}`);
+    const up = moved.filter((s) => s.seed < was.get(s.teamId)!).map((s) => ({ seed: s.seed, name: name(s.teamId) }));
+    const down = moved.filter((s) => s.seed > was.get(s.teamId)!).map((s) => ({ seed: s.seed, name: name(s.teamId) }));
     if (ins.length + outs.length > 0) {
-      if (ins.length) lines.push({ label: "In", text: list(ins) });
-      if (outs.length) lines.push({ label: "Out", text: list(outs) });
+      if (ins.length) lines.push(line("In", ins));
+      if (outs.length) lines.push(line("Out", outs));
     } else {
-      if (up.length) lines.push({ label: "Up", text: list(up) });
-      if (down.length) lines.push({ label: "Down", text: list(down) });
+      if (up.length) lines.push(line("Up", up));
+      if (down.length) lines.push(line("Down", down));
     }
     headline = lines.length === 0 ? "No change to the field." : lines.map((l) => `${l.label}: ${l.text}`).join(". ");
   }

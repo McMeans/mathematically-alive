@@ -301,7 +301,9 @@ export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdd
                 {!note && lines.length > 0 ? lines.map((l) => (
                   <p key={l.label} title={headline} className="cond flex min-w-0 items-baseline gap-2 text-base font-bold leading-[1.2] tracking-[0.03em] text-white md:text-lg">
                     <span className={`w-9 shrink-0 text-xs tracking-[0.1em] ${l.label === "In" || l.label === "Up" ? "text-root" : "text-drop"}`}>{l.label}</span>
-                    <span className="truncate">{l.text}</span>
+                    <span className="truncate">{l.teams.map((t, k) => (
+                      <span key={k}>{k > 0 && " · "}{t.seed !== null && <span className="mr-1 text-[0.74em] text-board-muted">{t.seed}</span>}{t.name}</span>
+                    ))}{l.more > 0 && <span className="text-board-muted"> +{l.more}</span>}</span>
                   </p>
                 )) : <b title={headline} className="cond line-clamp-2 text-lg font-bold leading-[1.15] tracking-[0.03em] text-lamp md:text-xl">{headline}</b>}
               </>
@@ -580,7 +582,7 @@ function Bracket({ games, picked, abbr, name, onPick, onReset, onSimulate }: {
     const off = other !== null && picked[g.index] === other.teamId;
     return (
       <button type="button" aria-pressed={on} onClick={() => onPick(g.index, k.teamId)} title={on ? "Picked. Tap again to clear." : `Pick ${abbr(k.teamId)} to win`}
-        className={`${base} text-left ${on ? "border-lamp bg-lamp text-plate-ink" : off ? "border-board-line text-white opacity-40 line-through" : "border-board-line bg-white/[0.04] text-white hover:border-board-muted"}`}>
+        className={`${base} text-left ${on ? "border-lamp bg-lamp text-plate-ink" : off ? "border-board-line text-white opacity-40" : "border-board-line bg-white/[0.04] text-white hover:border-board-muted"}`}>
         {label}
       </button>
     );
@@ -796,7 +798,7 @@ function TeamButton({ id, name, abbr, odds, home, on, lost, onClick }: { id: num
     <button type="button" aria-pressed={on} onClick={onClick} title={on ? "Picked. Tap again to clear." : `Pick ${name} to win`}
       className={`press flex min-h-11 w-full min-w-0 items-center justify-between gap-2 rounded-[3px] border px-2 py-1.5 text-left md:min-h-0 md:px-2.5 ${home ? "flex-row-reverse text-right" : ""} ${
         on ? "border-lamp bg-lamp text-plate-ink" : `border-board-line bg-white/[0.04] text-white hover:border-board-muted [.big_&]:border-2 [.big_&]:border-lamp ${lost ? "opacity-40" : ""}`}`}>
-      <b className={`cond flex min-w-0 items-center gap-1.5 text-base font-bold md:text-lg ${home ? "flex-row-reverse" : ""} ${lost ? "line-through" : ""}`}>
+      <b className={`cond flex min-w-0 items-center gap-1.5 text-base font-bold md:text-lg ${home ? "flex-row-reverse" : ""}`}>
         <TeamLogo id={id} dark={!on} />
         <span className="truncate md:hidden"><Rank id={id} />{abbr}</span>
         <span className="hidden truncate md:inline"><Rank id={id} />{name}</span>
