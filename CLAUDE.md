@@ -10,6 +10,13 @@ Next.js (TypeScript) site: pick a college football team, see what has to happen 
 
 Package manager: pnpm (`corepack enable` once; npm's lockfile drops other platforms' native bindings, which broke CI). Dev: `pnpm dev`. Lint: `pnpm lint`. Types: `pnpm typecheck`. Test: `pnpm test`. Build: `pnpm build`.
 
+## Sessions
+
+- Work in the main checkout (this folder), not a new worktree, unless asked. Branch here as usual.
+- Keep the site running here: at session start, `preview_start` with name `dev` (`pnpm dev`, port 3000). It reuses the server if already up. Don't start a second dev server on another port.
+- After UI changes, check them in that preview; Next.js hot-reloads, so no restart needed.
+- Other docs: `SPEC.md` (what the app does, how numbers are made, rules the code follows; read before changing `src/core`), `PRODUCT.md` (users, purpose, voice; read before UI or copy work), `AGENTS.md` (written by `next dev`: this Next.js version differs from training data, check `node_modules/next/dist/docs/`). Leave `AGENTS.md` to Next.
+
 ## Black-box testing as we go
 
 Every change to `src/core` behavior ships with black-box tests in the same change.
