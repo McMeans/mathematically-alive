@@ -515,7 +515,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
             {view.live.map(row)}
             {view.liveAll.length > view.live.length && (
               <div className="mx-3.5 mb-1 mt-1.5">
-                <button type="button" onClick={() => setAll(!all)} aria-expanded={all} className="cond group flex w-full items-center gap-2 text-xs font-bold tracking-[0.08em] text-lamp">
+                <button id="rank-toggle" type="button" onClick={() => setAll(!all)} aria-expanded={all} className="cond group flex w-full items-center gap-2 text-xs font-bold tracking-[0.08em] text-lamp">
                   <span className="flex-1 border-t border-dashed border-board-line" />
                   <span className="group-hover:underline">{all ? "Top 25 ▴" : `All ${view.liveAll.length} ▾`}</span>
                   <span className="flex-1 border-t border-dashed border-board-line" />
@@ -524,6 +524,14 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
               </div>
             )}
             {all && view.liveAll.slice(view.live.length).map(row)}
+            {all && (
+              <button type="button" aria-expanded onClick={() => { setAll(false); requestAnimationFrame(() => document.getElementById("rank-toggle")?.scrollIntoView({ block: "center" })); }}
+                className="cond group mx-3.5 mb-1 mt-1.5 flex w-[calc(100%-1.75rem)] items-center gap-2 text-xs font-bold tracking-[0.08em] text-lamp">
+                <span className="flex-1 border-t border-dashed border-board-line" />
+                <span className="group-hover:underline">Top 25 ▴</span>
+                <span className="flex-1 border-t border-dashed border-board-line" />
+              </button>
+            )}
           </div>
         </>
       )}
