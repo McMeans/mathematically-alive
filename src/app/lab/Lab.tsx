@@ -468,6 +468,15 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
   const inField = new Set(p?.field.map((s) => s.teamId) ?? []);
   const onBubble = new Set(p?.bubble.map((b) => b.teamId) ?? []);
   const [all, setAll] = useState(false);
+  /** Fold the whole ranking from its foot, then return focus and view to the toggle under #25. */
+  const foldBack = () => {
+    setAll(false);
+    requestAnimationFrame(() => {
+      const t = document.getElementById("rank-toggle");
+      t?.focus({ preventScroll: true });
+      t?.scrollIntoView({ block: "center" });
+    });
+  };
   const row = (r: LabView["live"][number]) => (
     <FieldRow key={r.teamId} seed={r.rank} lit={inField.has(r.teamId)} id={r.teamId} name={name(r.teamId)} record={view.records[r.teamId]} me={r.teamId === focus}
       odds={r.change > 0 ? `▲${r.change}` : r.change < 0 ? `▼${-r.change}` : ""} tone={r.change > 0 ? "text-root" : "text-drop"}
@@ -517,7 +526,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
               <RankToggle id="rank-toggle" open={all} label={all ? `${view.topLabel} ▴` : `${view.allLabel} ▾`} onClick={() => setAll(!all)} />
             )}
             {all && view.liveAll.slice(view.live.length).map(row)}
-            {all && <RankToggle open label={`${view.topLabel} ▴`} name={view.backLabel} onClick={() => { setAll(false); requestAnimationFrame(() => { const t = document.getElementById("rank-toggle"); t?.focus({ preventScroll: true }); t?.scrollIntoView({ block: "center" }); }); }} />}
+            {all && <RankToggle open label={`${view.topLabel} ▴`} name={view.backLabel} onClick={foldBack} />}
           </div>
         </>
       )}

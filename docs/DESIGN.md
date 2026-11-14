@@ -284,6 +284,11 @@ of logo, name, record and odds. The current team's row is `bg-lamp/10` with the 
   `board-muted` before the name, up to four a line then "+N". It never grows the header. A note shows in `lamp` instead.
 - The Lab's seeds and top 25 show each team's record (picks counted, a picked title game too) small in `board-muted`
   after the name. Rank tags are the current ranking only; the Lab shows no projected-seed tags beside names.
+- The Lab's top 25 opens to every FBS team with a `RankToggle` under #25: a dashed `board-line` rule with a centred
+  amber label (`cond`, 12px), "All 138 (projection) ▾" closed and "Top 25 ▴" open (labels from the core's
+  `allLabel`/`topLabel`). "Projection" flags that places past 25 come from our committee stand-in. Open, a second
+  toggle ends the list (named `backLabel`, "Back to top 25", for screen readers); it folds the list, focuses the
+  first toggle and scrolls it into view. Both carry `aria-expanded`. The "Unranked" tag shows only inside the top 25.
 
 ## Layout
 
