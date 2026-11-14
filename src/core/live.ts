@@ -52,10 +52,11 @@ export const anchorAt = (place: number): number => -Math.sqrt(place + 1);
 
 /**
  * The highest place the committee has given a team with this many losses, 2014-2025 (every weekly ranking in
- * fixtures/cfp-<year>.json): with 3 losses #7 (2017 Auburn, 10-3), with 4 #13 (2017 Stanford, 9-4), and with 5 or
- * more, none ranked; #20 here. A linear score can't hold that line, so the ranking enforces it.
+ * fixtures/cfp-<year>.json): with 3 losses #7 (2017 Auburn, 10-3), with 4 #13 (2017 Stanford, 9-4), with 5 #22 (2018
+ * Northwestern, 8-5), and no team with 6 or more has been ranked, so those sit outside the top 25 (#26 at best). A
+ * linear score can't hold that line, so the ranking enforces it.
  */
-export const highestPlace = (losses: number): number => (losses <= 2 ? 1 : losses === 3 ? 7 : losses === 4 ? 13 : 20);
+export const highestPlace = (losses: number): number => (losses <= 2 ? 1 : losses === 3 ? 7 : losses === 4 ? 13 : losses === 5 ? 22 : 26);
 
 /**
  * Reorders `order` (best first) in place so no team sits above the highest place its losses allow (`highestPlace`):
@@ -63,7 +64,7 @@ export const highestPlace = (losses: number): number => (losses <= 2 ? 1 : losse
  * below may hold keeps its team.
  */
 export function holdCeilings<T extends number>(order: { length: number; [k: number]: T }, losses: (x: T) => number): void {
-  const n = Math.min(order.length, 20);
+  const n = Math.min(order.length, 25);
   for (let p = 0; p < n; p++) {
     if (highestPlace(losses(order[p])) - 1 <= p) continue;
     let q = p + 1;
