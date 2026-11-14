@@ -49,7 +49,9 @@ describe("lab records and change headline", () => {
   it("a batch of field changes names three and counts the rest, so the headline stays short", () => {
     const filled = seasonLab(season, { ...opts, locks: fillLabLocks(season, {}, { seed: 9 }, conferences) });
     const h = labChanges(season, lab(), filled).headline;
-    expect(h.split(", ").length).toBeLessThanOrEqual(3);
-    expect(h.length).toBeLessThan(90);
+    const { lines } = labChanges(season, lab(), filled);
+    expect(lines.length).toBeLessThanOrEqual(2);
+    for (const l of lines) expect(l.text.split(" · ").length).toBeLessThanOrEqual(4);
+    expect(h).toBe(lines.length ? lines.map((l) => `${l.label}: ${l.text}`).join(". ") : "No change to the field.");
   });
 });

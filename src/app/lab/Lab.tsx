@@ -280,6 +280,7 @@ export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdd
   const before = focus !== null ? baseOdds[focus] ?? null : null;
   const now = focus === null ? null : picks === 0 ? before : view.focus?.teamId === focus ? view.focus : before;
   const headline = note || view.changes?.headline || "";
+  const lines = view.changes?.lines ?? [];
   const teamPage = focus === null ? "/" : `/team/${focus}${Object.keys(locks.games).length ? `?picks=${encodeLocks(locks.games)}` : ""}`;
   const unpin = () => pin(null);
   const focusConference = focus === null ? null : view.conferences.find((c) => c.standings.some((s) => s.teamId === focus))?.conference ?? null;
@@ -296,8 +297,13 @@ export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdd
           <div aria-live="polite" className={`order-5 min-w-0 flex-[1_0_100%] md:order-none md:flex-1 ${headline ? "" : "hidden md:block"} border-t border-board-line pt-2 md:border-0 md:pt-0`}>
             {headline ? (
               <>
-                <small className="cond block text-xs font-bold tracking-[0.1em] text-board-muted">{note ? "Note" : "Last pick"}</small>
-                <b title={headline} className="cond line-clamp-2 text-lg font-bold leading-[1.15] tracking-[0.03em] text-lamp md:text-xl">{headline}</b>
+                <small className="cond block text-xs font-bold tracking-[0.1em] text-board-muted">{note ? "Note" : "Field change"}</small>
+                {!note && lines.length > 0 ? lines.map((l) => (
+                  <p key={l.label} title={headline} className="cond flex min-w-0 items-baseline gap-2 text-base font-bold leading-[1.2] tracking-[0.03em] text-white md:text-lg">
+                    <span className={`w-9 shrink-0 text-xs tracking-[0.1em] ${l.label === "In" || l.label === "Up" ? "text-root" : "text-drop"}`}>{l.label}</span>
+                    <span className="truncate">{l.text}</span>
+                  </p>
+                )) : <b title={headline} className="cond line-clamp-2 text-lg font-bold leading-[1.15] tracking-[0.03em] text-lamp md:text-xl">{headline}</b>}
               </>
             ) : <span className="text-[15px] text-board-muted">Pick a game, or fill the rest.</span>}
           </div>

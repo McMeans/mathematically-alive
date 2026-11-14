@@ -16,14 +16,15 @@ const upset = seasonLab(season, { ...opts, locks: { games: { [big.id]: underdog 
 
 describe("season lab: what a pick changed", () => {
   it("the change log names the team that entered the field after a pick, and the team that left", () => {
-    const { headline, movers } = labChanges(season, base, upset);
+    const { lines, movers } = labChanges(season, base, upset);
+    const line = (label: string) => lines.find((l) => l.label === label)?.text ?? "";
     const before = new Set(base.playoff!.field.map((s) => s.teamId));
     const after = new Set(upset.playoff!.field.map((s) => s.teamId));
     const entered = upset.playoff!.field.filter((s) => !before.has(s.teamId));
     const left = base.playoff!.field.filter((s) => !after.has(s.teamId));
     expect(entered.length).toBeGreaterThan(0);
-    for (const s of entered) expect(headline).toContain(`${name(s.teamId)} in at ${s.seed}`);
-    for (const s of left) expect(headline).toContain(`${name(s.teamId)} out`);
+    for (const s of entered.slice(0, 4)) expect(line("In")).toContain(`${s.seed} ${name(s.teamId)}`);
+    for (const s of left.slice(0, 4)) expect(line("Out")).toContain(name(s.teamId));
     // The beaten favourite's playoff odds fall, and it is among the movers.
     const fav = movers.find((m) => m.teamId === favourite)!;
     expect(fav.what).toBe("field");
@@ -47,17 +48,19 @@ describe("season lab: what a pick changed", () => {
     }
     if (!found) throw new Error("no pick only reshuffles seeds");
     const was = new Map(base.playoff!.field.map((x) => [x.teamId, x.seed]));
-    const moves = labChanges(season, base, found).headline.replace(/\.$/, "").split(", ");
-    expect(moves.length).toBeGreaterThan(0);
-    expect(moves.length).toBeLessThanOrEqual(2);
-    for (const m of moves) {
-      const s = found.playoff!.field.find((x) => m.startsWith(`${name(x.teamId)} `))!;
-      expect(m).toBe(`${name(s.teamId)} ${s.seed < was.get(s.teamId)! ? "up" : "down"} to ${s.seed}`);
+    const { lines } = labChanges(season, base, found);
+    expect(lines.length).toBeGreaterThan(0);
+    for (const l of lines) {
+      expect(["Up", "Down"]).toContain(l.label);
+      for (const item of l.text.replace(/ \+\d+$/, "").split(" · ")) {
+        const s = found.playoff!.field.find((x) => item === `${x.seed} ${name(x.teamId)}`)!;
+        expect(s.seed < was.get(s.teamId)! ? "Up" : "Down").toBe(l.label);
+      }
     }
   }, 30_000);
 
   it("comparing a run with itself changes nothing", () => {
-    expect(labChanges(season, base, base)).toEqual({ headline: "No change to the projected field.", movers: [] });
+    expect(labChanges(season, base, base)).toEqual({ headline: "No change to the field.", lines: [], movers: [] });
   });
 
   it("with no playoff simulated, the change log has no headline and follows title-game odds", () => {

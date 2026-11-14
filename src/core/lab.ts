@@ -286,9 +286,14 @@ export type LabMover = {
   text: string;
 };
 
+/** One line of a field change: "In" with "9 Texas Tech · 10 Wake Forest", "Out" with "Oregon · UCLA". */
+export type LabChangeLine = { label: "In" | "Out" | "Up" | "Down"; text: string };
+
 export type LabChanges = {
-  /** "Miami in at 11, SMU out", "Oregon up to 2", or "No change to the projected field." At most three changes named, then "+2 more". Empty with no playoff. */
+  /** The lines as one sentence: "In: 9 Texas Tech · 10 Wake Forest. Out: Oregon", or "No change to the field." Empty with no playoff. */
   headline: string;
+  /** Teams into and out of the field, new seeds first, best seed first; or, with the same twelve, the seed moves up and down. Up to four teams a line, then "+2". Empty when nothing changed. */
+  lines: LabChangeLine[];
   /** The biggest moves of at least 2 points, biggest first, up to 5. */
   movers: LabMover[];
 };
@@ -303,21 +308,25 @@ const MOVE = 0.02;
 export function labChanges(season: Season, before: SeasonLab, after: SeasonLab): LabChanges {
   const name = (id: number) => season.teams.find((t) => t.id === id)?.name ?? `Team ${id}`;
   let headline = "";
+  const lines: LabChangeLine[] = [];
   if (before.playoff && after.playoff) {
     const was = new Map(before.playoff.field.map((s) => [s.teamId, s.seed]));
     const now = new Map(after.playoff.field.map((s) => [s.teamId, s.seed]));
-    const ins = after.playoff.field.filter((s) => !was.has(s.teamId)).map((s) => `${name(s.teamId)} in at ${s.seed}`);
-    const outs = before.playoff.field.filter((s) => !now.has(s.teamId)).map((s) => `${name(s.teamId)} out`);
-    const moved = after.playoff.field
-      .filter((s) => was.has(s.teamId) && was.get(s.teamId) !== s.seed)
-      .sort((a, b) => Math.abs(was.get(b.teamId)! - b.seed) - Math.abs(was.get(a.teamId)! - a.seed) || a.seed - b.seed)
-      .slice(0, 2)
-      .map((s) => `${name(s.teamId)} ${s.seed < was.get(s.teamId)! ? "up" : "down"} to ${s.seed}`);
-    const parts = ins.length + outs.length > 0 ? [...ins, ...outs] : moved;
-    // Short, and at most three changes named, so a fill's batch fits the header: "Miami in at 11, SMU out, Duke out +2 more".
-    const more = parts.length - 3;
-    headline = parts.length === 0 ? "No change to the projected field."
-      : `${parts.slice(0, 3).join(", ")}${more > 0 ? ` +${more} more` : ""}`;
+    // Up to four teams a line, then "+2", so a fill's batch fits the header.
+    const list = (items: string[]) => `${items.slice(0, 4).join(" · ")}${items.length > 4 ? ` +${items.length - 4}` : ""}`;
+    const ins = after.playoff.field.filter((s) => !was.has(s.teamId)).sort((x, y) => x.seed - y.seed).map((s) => `${s.seed} ${name(s.teamId)}`);
+    const outs = before.playoff.field.filter((s) => !now.has(s.teamId)).sort((x, y) => x.seed - y.seed).map((s) => name(s.teamId));
+    const moved = after.playoff.field.filter((s) => was.has(s.teamId) && was.get(s.teamId) !== s.seed);
+    const up = moved.filter((s) => s.seed < was.get(s.teamId)!).map((s) => `${s.seed} ${name(s.teamId)}`);
+    const down = moved.filter((s) => s.seed > was.get(s.teamId)!).map((s) => `${s.seed} ${name(s.teamId)}`);
+    if (ins.length + outs.length > 0) {
+      if (ins.length) lines.push({ label: "In", text: list(ins) });
+      if (outs.length) lines.push({ label: "Out", text: list(outs) });
+    } else {
+      if (up.length) lines.push({ label: "Up", text: list(up) });
+      if (down.length) lines.push({ label: "Down", text: list(down) });
+    }
+    headline = lines.length === 0 ? "No change to the field." : lines.map((l) => `${l.label}: ${l.text}`).join(". ");
   }
   const old = new Map(before.national.teams.map((t) => [t.teamId, t]));
   const movers: LabMover[] = [];
@@ -332,7 +341,7 @@ export function labChanges(season: Season, before: SeasonLab, after: SeasonLab):
     movers.push({ teamId: t.teamId, ...best, text: `${name(t.teamId)}: ${label} ${formatOdds(best.before)} → ${formatOdds(best.after)}` });
   }
   movers.sort((a, b) => Math.abs(b.after - b.before) - Math.abs(a.after - a.before) || a.teamId - b.teamId);
-  return { headline, movers: movers.slice(0, 5) };
+  return { headline, lines, movers: movers.slice(0, 5) };
 }
 
 /** One seed on the share card. `color`: the team's colour from the data ("#ba0c2f"), or null. */
