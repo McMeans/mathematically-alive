@@ -1,6 +1,6 @@
 # Plan: fix the projected ranking
 
-Status: diagnosis done, waiting for approval. No code has changed.
+Status: done. Fix B and the ceilings are in; results at the end. The owner chose fix B.
 
 Data: the 2026 snapshot (`data/season-2026.json`, fetched Nov. 11, committee ranking of week 11, 204 games open) and
 `fixtures/cfp-2014..2025.json` (70 pairs of an earlier committee ranking and a later one). Everything below was run
@@ -177,3 +177,31 @@ Then lint, typecheck, tests, the coverage gate, the `pr-review` skill, and the P
 2. Are the ceilings right: five losses no higher than #22, six or more never in the top 25?
 3. Leave the order among unranked teams unfitted? A truth for it would need another source (the AP poll's "others
    receiving votes" reaches about #40); that is a separate change and needs new CFBD calls.
+
+## Results
+
+Fix B and the ceilings landed as tasks 1–3; the weights were not refitted. Measured on the same 2026 snapshot.
+
+| One team wins out, nothing else picked | Before | After |
+|---|---|---|
+| Duke, 7-2 (#27) | #7 | #13 |
+| Kentucky, 7-2 (#11) | #2 | #3 |
+| SMU, 7-2 (#26) | #10 | #13 |
+| Michigan, 5-4 (#41) | #14 | #20 |
+| Arkansas, 3-6 (#69) | #25 | #42 |
+| Vanderbilt, 4-5 (#66) | #29 | #40 |
+| Boston College, 4-5 (#70) | #29 | #44 |
+| Unranked teams that can reach the top 25 this way | 21 | 14 |
+
+| A single picked loss, 404 cases | Before | After |
+|---|---|---|
+| Loser's rank unchanged | 9 | 3 (Akron twice, already last; Army–Navy, which never counts) |
+| Unranked, under 10% chance: average drop | 0.9 | 10.6 |
+| Unranked, 10–25%: average drop | 2.9 | 10.4 |
+| Ranked, under 25%: average drop | 1.3 | 5.0 |
+
+- No pick set tried puts a six-loss team in the top 25.
+- Backtest, 58 cases: 11.0 of the top 12 and 23.0 of the top 25, unchanged by the fix, now held by
+  `tests/blackbox/live-backtest.test.ts`. `tests/blackbox/committee.test.ts` passes untouched.
+- Not done: the simulation's per-season check of the six-loss ceiling (the public API gives each simulated season's
+  ranking but not its records), and any fit of the order among unranked teams (open question 3).
