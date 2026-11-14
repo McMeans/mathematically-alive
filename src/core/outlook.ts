@@ -300,7 +300,7 @@ export function seasonOutlook(season: Season, opts: OutlookOptions, shared?: Sim
       groupOfSix,
       postseasonBan: barred.has(id),
       autoBid: format?.autoBids === "power4G6" && !groupOfSix && !barred.has(id)
-        && (opts.titleLocks?.[conference] === id || (data.decided?.completed === true && titleResult(season, conference, data.decided, id)?.won === true)),
+        && ((opts.titleLocks?.[conference] === id && titleGame.get(id)! > 0) || (data.decided?.completed === true && titleResult(season, conference, data.decided, id)?.won === true)),
       titleResult: titleResult(season, conference, data.decided, id),
     })),
   };

@@ -46,12 +46,20 @@ describe("lab records and change headline", () => {
     expect(parse(after[l])).toEqual([parse(before[l])[0], parse(before[l])[1] + 1]);
   });
 
-  it("a batch of field changes names three and counts the rest, so the headline stays short", () => {
+  it("a batch of field changes names up to four a line and counts the rest, so the headline stays short", () => {
     const filled = seasonLab(season, { ...opts, locks: fillLabLocks(season, {}, { seed: 9 }, conferences) });
     const h = labChanges(season, lab(), filled).headline;
     const { lines } = labChanges(season, lab(), filled);
     expect(lines.length).toBeLessThanOrEqual(2);
     for (const l of lines) expect(l.text.split(" · ").length).toBeLessThanOrEqual(4);
     expect(h).toBe(lines.length ? lines.map((l) => `${l.label}: ${l.text}`).join(". ") : "No change to the field.");
+  });
+
+  it("a title pick the simulation can't honor gives no automatic bid", () => {
+    const c = lab().conferences.find((x) => x.conference === "SEC")!;
+    const out = c.standings.find((t) => !c.teams.some((x) => x.teamId === t.teamId))!.teamId;
+    const me = explore(season, { conference: "SEC", iterations: 200, seed: 3, teamId: out, locks: {}, titleLocks: { SEC: out } })
+      .outlook.find((t) => t.teamId === out)!;
+    expect(me.autoBid).toBe(false);
   });
 });
