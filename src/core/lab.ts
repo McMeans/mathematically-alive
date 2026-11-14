@@ -146,8 +146,8 @@ export type SeasonLab = {
   /** The committee stand-in's ranking by average place, best first. Modelled, not the committee. */
   ranking: LabRanked[];
   /**
-   * The projected ranking (projected.ts): the committee's latest, moved by results since and the picks (each scored
-   * against what was expected). Its top 25 (or `top`), best first; `change` is the move from the current ranking.
+   * The projected ranking (projected.ts): the committee's latest, moved by results since and the picks (a pick
+   * counts as if it had been played). Its top 25 (or `top`), best first; `change` is the move from the current ranking.
    */
   live: LiveRanked[];
   /** The whole projected ranking, every FBS team, best first. Places past the committee's 25 are our estimate. */
