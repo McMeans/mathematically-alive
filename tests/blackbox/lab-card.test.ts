@@ -39,15 +39,12 @@ describe("season lab: the share card", () => {
   });
 
   it("tags the best-seeded Group of Six team as the G6 bid, and only one", () => {
+    // In this projection Boise State (Pac-12, outside the 2026 power conferences) is the field's only Group of Six team.
     const card = labCard(season, base)!;
-    const power = ["ACC", "Big 12", "SEC", "Big Ten"];
     const g6 = card.field.filter((s) => s.tag === "G6 bid");
-    expect(g6.length).toBeLessThanOrEqual(1);
-    const first = card.field.find((s) => {
-      const c = team(s.teamId).conference;
-      return !base.champions[s.teamId] && c !== null && c !== "FBS Independents" && !power.includes(c);
-    });
-    expect(g6[0]?.teamId).toBe(first?.teamId);
+    expect(g6.map((s) => [s.seed, s.name])).toEqual([[12, "Boise State"]]);
+    // Power-conference at-large teams carry no tag.
+    expect(card.field.filter((s) => s.tag === null).map((s) => s.name)).toEqual(["Indiana", "Kentucky", "Texas", "LSU", "BYU", "Alabama", "USC"]);
   });
 
   it("counts picks, and says so once every game is picked", () => {
