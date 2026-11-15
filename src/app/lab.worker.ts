@@ -9,7 +9,8 @@ import data from "./data/season.json";
  * What the page shows. `changes`: what the last pick changed, from the quick runs (null before any). `focus`: the
  * pinned team's odds in this run (null when none is pinned).
  */
-export type LabView = Omit<SeasonLab, "national"> & { changes: LabChanges | null; focus: LabTeamOdds | null };
+// Big games are the no-picks list the page is built with (`Props.bigGames`), so runs don't send their own.
+export type LabView = Omit<SeasonLab, "national" | "bigGames"> & { changes: LabChanges | null; focus: LabTeamOdds | null };
 export type LabRequest =
   | { kind: "run"; id: number; locks: LabLocks; focus: number | null }
   /** A link's picks: the Lab's own (`picks`), or a team page's game picks (`games`) and title-game pick (`title`, `<conference>~<team>`). */
@@ -43,7 +44,7 @@ function run(locks: LabLocks, iterations: number, reuse: NationalResult | undefi
 }
 const strip = (lab: SeasonLab, changes: LabChanges | null, focus: number | null): LabView => ({
   summary: lab.summary, fieldTexts: lab.fieldTexts, loaded: lab.loaded, picks: lab.picks, open: lab.open, playoff: lab.playoff, champions: lab.champions, conferences: lab.conferences,
-  ranking: lab.ranking, live: lab.live, liveAll: lab.liveAll, allLabel: lab.allLabel, topLabel: lab.topLabel, backLabel: lab.backLabel, bigGames: lab.bigGames, records: lab.records, changes, focus: focus === null ? null : labTeamOdds(lab.national, focus),
+  ranking: lab.ranking, live: lab.live, liveAll: lab.liveAll, allLabel: lab.allLabel, topLabel: lab.topLabel, backLabel: lab.backLabel, records: lab.records, changes, focus: focus === null ? null : labTeamOdds(lab.national, focus),
 });
 
 self.onmessage = async (e: MessageEvent<LabRequest>) => {

@@ -5,8 +5,8 @@
 import type { NationalResult } from "./national";
 import { powerConferences } from "./committee";
 import { liveRanking } from "./live";
-import { fieldPicker } from "./playoff";
-import type { Season } from "./season";
+import { fieldPicker, playoffFormat } from "./playoff";
+import { INDEPENDENTS, type Season } from "./season";
 
 export type Projected = {
   /** Every FBS team, best first. */
@@ -17,7 +17,24 @@ export type Projected = {
   champions: Map<number, string>;
   /** The field the format picks, seed 1 first (the announced field once there is one). Empty with no playoff. */
   field: number[];
+  /**
+   * The automatic bid each field team holds, as the race card and the Lab's seeds mark it: a power champion's
+   * conference ("SEC", "B1G", "B12", "ACC"), "G6" for the Group of Six bid, "ND" when the top-12 rule is what puts
+   * Notre Dame in. Empty in a format without those bids.
+   */
+  tags: Map<number, string>;
+  /** The last team in at large (the cut line goes under it); the last seed when no bid is tagged. Null with no field. */
+  lastAtLarge: number | null;
 };
+
+// The power conferences' short tags.
+const BID_TAGS: Record<string, string> = { "Big Ten": "B1G", "Big 12": "B12" };
+
+/** Whether the team is in a Group of Six conference that season: FBS, in a conference, not a power one. */
+export function isGroupOfSix(season: Season, id: number): boolean {
+  const t = season.teams.find((x) => x.id === id);
+  return t !== undefined && t.classification === "fbs" && t.conference !== null && t.conference !== INDEPENDENTS && !powerConferences(season.year).includes(t.conference);
+}
 
 /**
  * Not part of the public API. `locks`: the game picks `national` was run with. Its title picks are read from it: a
@@ -57,5 +74,20 @@ export function projectedField(season: Season, national: NationalResult, locks: 
     if (id !== undefined) champions.set(id, c);
   }
   const field = !national.playoff ? [] : national.announced?.seeds ?? fieldPicker(season)(order, (id) => champions.has(id));
-  return { order, place: new Map(order.map((id, k) => [id, k + 1])), champions, field };
+  const placeOf = new Map(order.map((id, k) => [id, k + 1]));
+  const tags = new Map<number, string>();
+  if (field.length > 0 && playoffFormat(season.year).autoBids === "power4G6") {
+    const inField = new Set(field);
+    for (const id of field) if (champions.has(id)) tags.set(id, BID_TAGS[champions.get(id)!] ?? champions.get(id)!);
+    const g6 = order.find((id) => inField.has(id) && !tags.has(id) && isGroupOfSix(season, id));
+    if (g6 !== undefined) tags.set(g6, "G6");
+    const nd = field.find((id) => season.teams.find((t) => t.id === id)!.name === "Notre Dame" && placeOf.get(id)! <= 12);
+    if (nd !== undefined) tags.set(nd, "ND");
+  }
+  const atLarge = field.filter((id) => !tags.has(id));
+  const lastAtLarge = field.length === 0 ? null
+    : atLarge.length > 0 && tags.size > 0 ? atLarge.reduce((a, b) => (placeOf.get(a)! > placeOf.get(b)! ? a : b)) : field.at(-1)!;
+  // Notre Dame keeps its tag only when the top-12 rule is what gets it in: ranked below the last at-large team.
+  if (lastAtLarge !== null) for (const [id, tag] of tags) if (tag === "ND" && placeOf.get(id)! < placeOf.get(lastAtLarge)!) tags.delete(id);
+  return { order, place: placeOf, champions, field, tags, lastAtLarge };
 }

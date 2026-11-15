@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  mustWinConference, oddsLabels, pathTree, playoffRoute, playoffSignals, seasonFromCfbd, seasonOutlook, simulateNational, simulateSeason,
+  mustWinConference, oddsLabels, pathTree, playoffRoute, playoffSignals, seasonFromCfbd, seasonLab, seasonOutlook, simulateNational, simulateSeason,
   type CfbdSnapshot,
 } from "@/core";
 
@@ -161,5 +161,53 @@ describe("Group of Six conferences in the national simulation (all six: the MAC,
       const top = s.ranking.find((id) => g6.has(id))!;
       expect(s.field).toContain(top);
     });
+  });
+});
+
+describe("the Season Lab's bubbles and automatic bids", { timeout: 120_000 }, () => {
+  const POWER = new Set(["ACC", "Big 12", "SEC", "Big Ten"]);
+  const groupOfSix = (id: number) => {
+    const t = season.teams.find((x) => x.id === id)!;
+    return t.classification === "fbs" && t.conference !== null && !POWER.has(t.conference) && t.conference !== "FBS Independents";
+  };
+  const opts = { iterations: 50, seed: 3, conferences: [...POWER] };
+  const lab = seasonLab(season, opts);
+  const playoff = lab.playoff!;
+  const field = playoff.field.map((f) => f.teamId);
+  const g6Holder = (p: typeof playoff) => p.field.find((f) => f.tag === "G6")?.teamId;
+
+  it("marks each automatic bid on its seed: a power champion by its conference, the best-placed Group of Six team in the field as G6", () => {
+    const SHORT: Record<string, string> = { "Big Ten": "B1G", "Big 12": "B12", SEC: "SEC", ACC: "ACC" };
+    for (const f of playoff.field) {
+      const champion = lab.champions[f.teamId];
+      if (champion !== undefined) expect(f.tag).toBe(SHORT[champion]);
+    }
+    const order = lab.liveAll.map((t) => t.teamId);
+    expect(g6Holder(playoff)).toBe(order.find((id) => field.includes(id) && groupOfSix(id) && lab.champions[id] === undefined));
+    expect(playoff.field.filter((f) => f.tag === "G6")).toHaveLength(1);
+    expect(playoff.field.some((f) => f.tag === null)).toBe(true);
+  });
+
+  it("splits the bubble in two: the next teams out at large, and the best-placed Group of Six teams out for the bid", () => {
+    expect(playoff.bubbleTitle).toBe("At-large bubble");
+    expect(playoff.bubbleNote).toBe("Next in line for an at-large spot.");
+    const race = playoff.g6!;
+    expect(race.title).toBe("Group of Six bubble");
+    expect(race.note).toBe("Next in line for the Group of Six bid.");
+    const order = lab.liveAll.map((t) => t.teamId);
+    expect(race.teams.map((t) => t.teamId)).toEqual(order.filter((id) => groupOfSix(id) && !field.includes(id)).slice(0, 4));
+    for (const t of race.teams) expect(t.text).toMatch(/^In .+%$/);
+  });
+
+  it("picking the bid holder to lose its remaining games hands the G6 mark to another Group of Six team", () => {
+    const leader = g6Holder(playoff)!;
+    const losses = Object.fromEntries(season.games.filter((g) => !g.completed && !g.titleGame && (g.homeId === leader || g.awayId === leader))
+      .map((g) => [g.id, g.homeId === leader ? g.awayId : g.homeId]));
+    expect(Object.keys(losses).length).toBeGreaterThan(0);
+    const picked = seasonLab(season, { ...opts, locks: { games: losses, titles: {}, bracket: {} } }).playoff!;
+    const next = g6Holder(picked);
+    expect(next).toBeDefined();
+    expect(next).not.toBe(leader);
+    expect(groupOfSix(next!)).toBe(true);
   });
 });

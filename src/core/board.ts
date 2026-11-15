@@ -1,12 +1,12 @@
 // The team page's board: the playoff odds by final record and the ways in, help from elsewhere grouped by the team
 // to root against, the likeliest title-game matchup, and the playoff race around the cut line. Read from one season
 // simulation and the national run over the same seasons. All wording the page shows is here.
-import { projectedField } from "./projected";
+import { isGroupOfSix, projectedField } from "./projected";
 import type { NationalResult } from "./national";
 import { conferenceName, formatOdds, formatRecord, formatSideOdds, shownChange, winsLabel } from "./paths";
 import { powerConferences } from "./committee";
 import { playoffFormat } from "./playoff";
-import { INDEPENDENTS, teamRecord, type Game, type Season } from "./season";
+import { teamRecord, type Game, type Season } from "./season";
 import { gameWinProbability, type SimResult } from "./sim";
 import { OVERALL, isClear } from "./signal";
 import type { Likeliest } from "./tree";
@@ -207,9 +207,15 @@ export type ShotStep = {
 
 /** The likeliest way into the title game as a ladder, each step with what it does for the title game and the playoff. */
 export type BestShot = {
-  /** "Way into the ACC title game". */
+  /**
+   * "Way to win the ACC" when it ends with the title game; "Way into the ACC title game" when too few seasons reach
+   * the title game to show it; "Way in" without a title game.
+   */
   title: string;
-  /** "The likeliest results that put Louisville in it. Each row adds to the rows above." */
+  /**
+   * "The likeliest results that put Louisville in the title game, then the title game. Each row adds to the rows
+   * above." ("…that put Louisville in it." when it stops short of the title game.)
+   */
   sub: string;
   /** The way in one line: "Win out, Wake Forest loses once". */
   headline: string;
@@ -218,8 +224,9 @@ export type BestShot = {
   /** Today first, then each step, then the title game. */
   steps: ShotStep[];
   /**
-   * "All of it happens in about 1 in 30 seasons. The champion gets a playoff spot.", after the way's own note when it
-   * has one: "With these results Louisville gets in about 33% of the time, depending on the ranking tiebreak."
+   * "All of it happens in about 1 in 30 seasons. The champion gets a playoff spot." (a Group of Six team's: "The
+   * champion still has to be the top Group of Six team."), after the way's own note when it has one: "With these
+   * results Louisville gets in about 33% of the time, depending on the ranking tiebreak."
    */
   note: string;
   /** "Fill in this path". */
@@ -284,8 +291,6 @@ const FIRST_OUT = 2;
 const NEAR_OUT = 5;
 // A Group of Six page's race: the top Group of Six teams it lists before skipping down to the page's team.
 const G6_SHOWN = 4;
-// The power conferences' tags on the race.
-const BID_TAGS: Record<string, string> = { "Big Ten": "B1G", "Big 12": "B12" };
 
 /**
  * The board for `teamId` (`conference` null for an independent). `sim` and `national` must be the same simulated
@@ -548,7 +553,8 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
       opp.set(o, (opp.get(o) ?? 0) + 1);
       if (champ[it]) { won++; wonIn += inField[it]; }
     }
-    if (titled && played >= MIN_MATCHUP) {
+    const ends = titled && played >= MIN_MATCHUP;
+    if (ends) {
       const rival = [...opp].sort((x, y) => y[1] - x[1] || x[0] - y[0])[0][0];
       const F = autoBid ? 1 : won >= MIN_MATCHUP ? wonIn / won : null;
       steps.push({
@@ -559,14 +565,16 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
     const p = titled && played > 0 ? (all / n) * (won / played) : all / n;
     const often = p >= 0.5 ? `in ${formatOdds(p)} of seasons` : p < 0.01 ? "in fewer than 1 in 100 seasons" : `in about ${oneIn(p)} seasons`;
     const conf = conference !== null ? conferenceName(conference) : "";
+    // The champion's playoff spot: automatic in a power conference; a Group of Six champion still has to be the top one.
+    const g6Bid = ends && format.autoBids === "power4G6" && isGroupOfSix(season, teamId);
     bestShot = {
-      title: titled ? `Way into the ${conf} title game` : "Way in",
-      sub: `The likeliest results that put ${me} in it. Each row adds to the rows above.`,
+      title: ends ? `Way to win the ${conf}` : titled ? `Way into the ${conf} title game` : "Way in",
+      sub: `The likeliest results that put ${me} ${ends ? "in the title game, then the title game" : "in it"}. Each row adds to the rows above.`,
       headline: likeliest!.summary,
       columns: ["After", "Title game", "Playoff"],
       steps,
       // A way that leaves a ranking tiebreak to chance says so: it's why the title-game odds stop short of In.
-      note: [likeliest!.note ?? "", `All of it happens ${often}.`, autoBid ? "The champion gets a playoff spot." : ""].filter(Boolean).join(" "),
+      note: [likeliest!.note ?? "", `All of it happens ${often}.`, autoBid ? "The champion gets a playoff spot." : g6Bid ? "The champion still has to be the top Group of Six team." : ""].filter(Boolean).join(" "),
       fill: "Fill in this path", left: "Your picks leave this path.",
     };
   }
@@ -583,30 +591,13 @@ function playoffRace(season: Season, national: NationalResult, teamId: number, l
   if (national.teams.length <= format.teams) return null;
   const name = (id: number) => season.teams.find((t) => t.id === id)!.name;
   // The projected ranking, champions and field (projected.ts): the current picture moved by the picks, shared with the Season Lab.
-  const { order, place: projected, champions, field } = projectedField(season, national, locks);
+  const { order, place: projected, field, tags, lastAtLarge } = projectedField(season, national, locks);
   if (!projected.has(teamId)) return null;
-  const champs = new Map([...champions].map(([id, c]) => [id, BID_TAGS[c] ?? c]));
   const inField = new Set(field);
-  // The automatic bids the field holds, and the last at-large team (the cut line goes under it).
-  const conf = new Map(season.teams.map((t) => [t.id, t]));
-  const power = new Set(powerConferences(season.year));
-  const groupOfSix = (id: number) => {
-    const t = conf.get(id)!;
-    return t.classification === "fbs" && t.conference !== null && t.conference !== INDEPENDENTS && !power.has(t.conference);
-  };
-  const tags = new Map<number, string>();
-  if (format.autoBids === "power4G6") {
-    for (const id of field) if (champs.has(id)) tags.set(id, champs.get(id)!);
-    const g6 = order.find((id) => inField.has(id) && !tags.has(id) && groupOfSix(id));
-    if (g6 !== undefined) tags.set(g6, "G6");
-    const nd = field.find((id) => conf.get(id)!.name === "Notre Dame" && projected.get(id)! <= 12);
-    if (nd !== undefined) tags.set(nd, "ND");
-  }
-  const atLarge = field.filter((id) => !tags.has(id));
-  const last = atLarge.length > 0 && tags.size > 0 ? atLarge.reduce((a, b) => (projected.get(a)! > projected.get(b)! ? a : b)) : field.at(-1)!;
+  const groupOfSix = (id: number) => isGroupOfSix(season, id);
+  // The automatic bids the field holds (`tags`), and the last at-large team (the cut line goes under it).
+  const last = lastAtLarge!;
   const lastRank = projected.get(last)!;
-  // Notre Dame keeps its tag only when the top-12 rule is what gets it in: ranked below the last at-large team.
-  for (const [id, tag] of tags) if (tag === "ND" && projected.get(id)! < lastRank) tags.delete(id);
   const odds = new Map(national.teams.map((t) => [t.teamId, t.playoff?.field ?? 0]));
   const row = (id: number): RaceRow => {
     const seed = field.indexOf(id) + 1 || null;

@@ -449,7 +449,7 @@ function Frame({ teamId, conference, teams, conferences, names, abbreviations, r
       <div className="flex min-h-dvh flex-col tall:md:h-dvh tall:md:overflow-hidden">
         <header className="contents">
           <div className="board-dots text-board-text">
-            <SiteBar current="teams" teams={`/team/${teamId}`} lab={lab} through={through} asOf={asOf} find={conferences.flatMap((c) => c.teams)} />
+            <SiteBar current="teams" teams={`/team/${teamId}`} lab={lab} through={through} asOf={asOf} find={conferences.flatMap((c) => c.teams).map((t) => ({ ...t, abbr: abbreviations[t.id] }))} />
           </div>
 
           {/* The compact strip: picker, the numbers on one line and Reset. It is what sticks while the page scrolls. */}

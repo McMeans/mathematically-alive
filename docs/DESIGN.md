@@ -367,8 +367,11 @@ Short, eased, never bouncy. Defined in `globals.css`:
 - `.plate-hang`: a lit number flips once (180ms, two steps) when it changes. Re-key the element on its value so it
   runs.
 - `.bump`: a 900ms amber glow that fades into the board, for the phone dock when odds move.
-- `animate-pop` (160ms) for floating panels (the team sheet). `animate-rise` (220ms, content rising 4px as it fades
-  in) is defined for new content; nothing uses it today.
+- `animate-pop` (160ms) for floating panels (the team sheet) and the pick mark. `animate-rise` (220ms, content rising
+  4px as it fades in) for new content: the Lab's panes as a phone tab shows them, a Field view switch, the games list
+  when its filter changes, the field-change headline and opened standings. Use `motion-safe:`.
+- The Lab's field, at-large and Group of Six bubbles and top 25 rows glide to their new place (360ms) when a pick reorders them,
+  and new rows rise in (`useFlip` in `Lab.tsx`, keyed by `data-flip`). Their numbers flip (`.plate-hang`) as they change.
 - `.press`: 180ms color transitions and a 0.97 press scale on buttons.
 - `prefers-reduced-motion: reduce` cuts every animation and transition to 1ms and drops the press scale.
 
