@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { explore, formatFine, formatOdds, gameWinProbability, pathTree, seasonOutlook, teamPath, teamRecord, winProbability } from "@/core";
+import { explore, formatFine, formatOdds, formatSideOdds, gameWinProbability, pathTree, seasonOutlook, teamPath, teamRecord, winProbability } from "@/core";
 import type { Game, Season, TreeNode } from "@/core";
 
 function team(id: number, conference: string, rating: number | null = null) {
@@ -297,7 +297,7 @@ describe("help from elsewhere", () => {
     expect(loss.odds).toBeGreaterThan(0);
     expect(loss.odds).toBeLessThan(0.01);
     expect(loss.outcome).toBeNull();
-    expect(loss.verdict).toBe(formatOdds(loss.odds!));
+    expect(loss.verdict).toBe(formatSideOdds(loss.odds!, "alive"));
     expect(win.outcome).toBeNull();
     const h = t.help.find((x) => x.gameId === other.id)!;
     expect(h.now).toBe(true);

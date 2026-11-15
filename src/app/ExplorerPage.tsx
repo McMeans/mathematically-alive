@@ -11,7 +11,8 @@ export function ExplorerPage({ teamId }: { teamId: number }) {
   const info = (c: string): TeamInfo[] => conferenceTeams(c).map((t) => ({ id: t.id, name: t.name, color: t.color, altColor: t.altColor }));
   const teams = info(conference);
   const openGames = season.games.filter((g) => !g.completed).map(({ id, homeId, awayId }) => ({ id, homeId, awayId }));
-  const common = { teamId, conference, teams, names, ranks: liveRanks(season), asOf, through, openGames };
+  const abbreviations = Object.fromEntries(season.teams.flatMap((t) => (t.abbreviation ? [[t.id, t.abbreviation]] : [])));
+  const common = { teamId, conference, teams, names, abbreviations, ranks: liveRanks(season), asOf, through, openGames };
 
   if (conference === INDEPENDENTS) {
     const base = baseExploreIndependent(teamId);

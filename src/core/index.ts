@@ -27,7 +27,7 @@ export { gameWinProbability, simulateSeason } from "./sim";
 export type { OddsOptions, SimOptions, SimResult, TeamSimStats } from "./sim";
 export { seasonOutlook } from "./outlook";
 export type { OutlookOptions, SeasonOutlook, TeamOutlook } from "./outlook";
-export { conferenceName, conferenceShort, formatChampion, formatChance, formatFine, formatOdds, formatPlayoff, formatRecord, formatSideOdds, formatTitleOdds, mustWinConference, oddsLabels, playoffDetail, playoffRoute, goalStatus, statusTags, teamPath, type StatusTag } from "./paths";
+export { conferenceName, conferenceShort, formatChampion, formatChance, formatFine, formatOdds, formatPlayoff, formatRecord, formatSideOdds, formatTitleOdds, mustWinConference, oddsLabels, playoffDetail, playoffRoute, goalStatus, statusTags, teamPath, titleGameOutLine, winsLabel, type StatusTag } from "./paths";
 export { explore } from "./explore";
 export { committeeRanks, oneIn } from "./board";
 export type { BestShot, HelpGame as BoardHelpGame, HelpGroup, HelpSide, OwnChance, PlayoffRace, RaceItem, ShotStep, RaceRow, RecordOdds, TeamBoard, TitleWeek, WayIn } from "./board";

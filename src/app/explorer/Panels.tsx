@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import { INDEPENDENTS, conferenceName, conferenceShort } from "@/core";
 import { type ConferenceList } from "./Explorer";
 import { TeamLogo } from "./Board";
-import { useConference } from "./conference";
+import { inConferenceOrder, useConference } from "./conference";
 
 export function TeamList({ conferences, names, selectedId, onSelect }: {
   conferences: ConferenceList[];
@@ -41,14 +41,14 @@ export function TeamList({ conferences, names, selectedId, onSelect }: {
         {conferences.length > 1 && (
           // Every FBS conference plus the independents: short names, the full name on hover.
           <div role="group" aria-label="Conference" className="flex flex-wrap gap-1 px-3 pt-3">
-            {conferences.map((c) => (
+            {inConferenceOrder(conferences).map((c) => (
               <button
                 key={c.conference}
                 type="button"
                 aria-pressed={query === "" && c.conference === shown}
                 title={conferenceName(c.conference)}
                 onClick={() => { setShown(c.conference); setQ(""); }}
-                className="cond min-h-9 whitespace-nowrap rounded-[2px] border border-board-line px-2.5 text-[15px] font-bold tracking-[0.03em] text-board-muted hover:border-board-muted hover:text-white aria-pressed:border-plate aria-pressed:bg-plate aria-pressed:text-plate-ink md:min-h-7"
+                className="cond whitespace-nowrap rounded-[2px] border border-board-line px-2.5 text-[15px] font-bold tracking-[0.03em] text-board-muted hover:border-board-muted hover:text-white aria-pressed:border-plate aria-pressed:bg-plate aria-pressed:text-plate-ink min-h-11 lg:min-h-7"
               >
                 {conferenceShort(c.conference)}
               </button>
@@ -57,7 +57,7 @@ export function TeamList({ conferences, names, selectedId, onSelect }: {
         )}
         <div className="p-3">
           <label htmlFor={searchId} className="sr-only">Find a team</label>
-          <span className="flex min-h-11 items-center gap-2 rounded-[3px] border border-board-line bg-white/[0.06] px-3 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-lamp focus-within:border-board-muted md:min-h-10">
+          <span className="flex min-h-11 items-center gap-2 rounded-[3px] border border-board-line bg-white/[0.06] px-3 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-lamp focus-within:border-board-muted lg:min-h-10">
             <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4 shrink-0 text-board-muted"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M13 13l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
             <input
               id={searchId}
@@ -76,7 +76,7 @@ export function TeamList({ conferences, names, selectedId, onSelect }: {
             const on = c === "title" ? sortTitle : !sortTitle;
             return (
               <button key={c} type="button" aria-pressed={on} onClick={() => setBy(c)} title={`Sort by ${c === "title" ? "title-game" : "playoff"} odds`}
-                className={`cond flex w-14 items-center justify-end gap-0.5 text-right leading-tight tracking-[0.08em] hover:text-white ${on ? "text-lamp" : ""}`}>
+                className={`cond flex min-h-11 w-14 items-center justify-end gap-0.5 text-right leading-tight tracking-[0.08em] hover:text-white lg:min-h-0 ${on ? "text-lamp" : ""}`}>
                 {c === "title" ? "Title game" : "Playoff"}
                 {on && <svg aria-hidden viewBox="0 0 12 12" className="h-2.5 w-2.5 shrink-0"><path d="M2.5 4.5 6 8 9.5 4.5" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="square" /></svg>}
               </button>

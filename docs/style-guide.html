@@ -21,7 +21,9 @@
 html, body { margin: 0; }
 body { background: var(--ground); color: var(--ink); font: 15px/1.5 "Public Sans", system-ui, sans-serif; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
 ::selection { background: var(--lamp); color: var(--plate-ink); }
-:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+:root { --focus: var(--board); }
+.board, .board-dots, .board > * { --focus: var(--lamp); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 a { color: inherit; }
 code { font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: rgba(21,32,27,.06); padding: 1px 4px; border-radius: 2px; }
@@ -327,7 +329,7 @@ footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--rule);
     <span class="plate" style="font-size:22px;color:var(--root)">+1 pt</span>
     <span class="plate" style="font-size:22px;color:var(--drop)">−0.3</span>
   </div>
-  <p class="note">From <code>formatSideOdds</code>, <code>formatTitleOdds</code>, <code>shownChange</code> and <code>labOddsChange</code> in <code>@/core</code>. "In" and "Out" appear only when proven. A move is counted in points of the odds as shown.</p>
+  <p class="note">From <code>formatSideOdds</code>, <code>formatTitleOdds</code>, <code>shownChange</code> and <code>labOddsChange</code> in <code>@/core</code>. "In" and "Out" appear only when proven. A move is counted in points of the odds as shown. Beside a number in a result button it is a bare <code>+1</code>; alone it carries its unit, <code>+1 pt</code>. Moves are green or red everywhere, the Lab's pin strip and dock included.</p>
 </section>
 
 <!-- HEADER -->
@@ -404,7 +406,7 @@ footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--rule);
       <button class="tb home big" type="button" aria-pressed="false"><b><img class="logo" src="https://cdn.collegefootballdata.com/logos-dark/64/2.png" alt="">Auburn</b><span class="plate o">26%</span></button>
     </div>
   </div>
-  <p class="note">Picked: amber fill, the check mark, the light <code>logos</code> version. Beaten side: 40% opacity, struck through. Amber 2px outline: a big game, one that moves the field most.</p>
+  <p class="note">Picked: amber fill, the check mark, the light <code>logos</code> version. Beaten side: 40% opacity, no strike-through. Amber 2px outline: a big game, one that moves the field most.</p>
 </section>
 
 <!-- RACES -->
@@ -538,7 +540,7 @@ footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--rule);
 <!-- A11Y -->
 <section class="s" id="a11y" aria-labelledby="a11y-h">
   <h2 class="h" id="a11y-h">Contrast</h2>
-  <p class="sub">WCAG ratios computed from the tokens. Small text needs 4.5. The focus ring is a 2px amber outline, offset 2px.</p>
+  <p class="sub">WCAG ratios computed from the tokens. Small text needs 4.5. The focus ring is a 2px outline, offset 2px: board green on light surfaces, amber on the board.</p>
   <div class="table-wrap">
     <table class="ct">
       <thead><tr><th>Sample</th><th>Pair</th><th style="text-align:right">Ratio</th></tr></thead>
@@ -557,7 +559,7 @@ footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--rule);
       </tbody>
     </table>
   </div>
-  <p class="note">Known gap: the amber focus ring is 1.5:1 on <code>ground</code> and 1.8:1 on <code>paper</code>, under the 3:1 WCAG asks of focus indicators. It reads well on the board.</p>
+  <p class="note">The focus ring is <code>--focus</code>: board green on <code>ground</code> and <code>paper</code> (amber would be 1.5:1 there), amber inside board surfaces, where green would vanish.</p>
 </section>
 
 <!-- MARK -->

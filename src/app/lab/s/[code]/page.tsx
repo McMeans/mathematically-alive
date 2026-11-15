@@ -24,7 +24,7 @@ export default async function SharedLab({ params }: Props) {
   return (
     <main className="p-6 text-sm text-ink-soft">
       <Forward to={to} />
-      <Link href={to} className="font-bold text-navy underline">Open these picks in the Season Lab</Link>
+      <Link href={to} className="font-bold text-ink underline">Open these picks in the Season Lab</Link>
     </main>
   );
 }

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  conferenceName, conferenceShort, decodeLocks, encodeLocks, formatChampion, formatOdds, formatPlayoff, formatRecord, formatTitleOdds, oddsLabels, playoffDetail, statusTags, type StatusTag,
+  conferenceName, conferenceShort, decodeLocks, encodeLocks, formatChampion, formatPlayoff, formatRecord, formatTitleOdds, oddsLabels, playoffDetail, statusTags, titleGameOutLine, type StatusTag,
   type BoardHelpGame, type HelpGroup, type IndependentGame, type IndependentOutlook, type Locks, type PathTree, type PlayoffSignal, type SeasonWeek, type TeamBoard, type TeamOutlook, type TeamPath,
 } from "@/core";
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
@@ -10,7 +10,7 @@ import { SiteBar } from "@/app/SiteBar";
 import { ShareButton } from "./Share";
 import { ITERATIONS } from "@/app/config";
 import { TeamList } from "./Panels";
-import { BestShotCard, ConferenceRace, RanksContext, Heading, HelpElsewhere, IndependentWeeks, PlayoffRaceCard, TeamLogo, WeekByWeek, WhatItTakes, YourPicks } from "./Board";
+import { AbbreviationsContext, BestShotCard, ConferenceRace, RanksContext, Heading, HelpElsewhere, IndependentWeeks, PlayoffRaceCard, TeamLogo, WeekByWeek, WhatItTakes, YourPicks } from "./Board";
 import { ConferenceProvider } from "./conference";
 
 export type GameInfo = { id: number; homeId: number; awayId: number; week: number; start: string };
@@ -40,6 +40,8 @@ type Common = {
   teams: TeamInfo[];
   conferences: ConferenceList[];
   names: Record<number, string>;
+  /** Every team's abbreviation ("FIU"), for narrow buttons and columns; a team without one is missing. */
+  abbreviations: Record<number, string>;
   /** This week's committee ranking by team: "#16". */
   ranks: Record<number, string>;
   asOf: string;
@@ -48,6 +50,9 @@ type Common = {
   /** Every game left in the season, to check the picks in a shared link. */
   openGames: OpenGame[];
 };
+
+/** "Data through Nov 10." from the header's "Through Nov 10". */
+const dataNote = (through: string) => `Data ${through.charAt(0).toLowerCase()}${through.slice(1)}.`;
 
 /**
  * The Season Lab with this page's picks (game results, and a title-game winner as `title=<conference>~<team>`), and the
@@ -63,7 +68,6 @@ const labHref = (locks: Locks, teamId: number, titles: Titles = {}) => {
 };
 /** Title-game picks: conference -> the team that wins it. */
 type Titles = Record<string, number>;
-export const pct = (p: number | null) => (p === null ? "—" : formatOdds(p));
 
 /**
  * Picks and the what-if worker. `conference` null: an independent's page. `read` takes the worker's answer for this
@@ -214,7 +218,7 @@ function track(board: TeamBoard | null, kept: Kept, gameId: number, winner: numb
 
 /** A conference team's page. */
 export function Explorer({ initial, ...common }: Common & { initial: Result }) {
-  const { teamId, conference, teams, names } = common;
+  const { teamId, conference, teams, names, through } = common;
   // A title-game pick stands while its matchup is the same two teams (in either order); then it clears, with a note.
   const titleKey = useRef<string | null>(null);
   const [note, setNote] = useState("");
@@ -272,6 +276,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
     } else onPick(Number(id.slice(1)), undefined);
   }
   const short = conferenceShort(conference);
+  const outLine = titleGameOutLine(conference, me);
   const numLabels = { titleGame: "Title game", playoff: labels.playoff, projected: labels.projected, projectedNote: labels.projectedNote };
   return (
     <Frame
@@ -286,18 +291,19 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
       status={status}
       failed={failed}
       scores={[
-        { value: formatPlayoff(me.playoff, me.cfp, me.status, me.autoBid), label: `${labels.playoff}*`, lead: true, detail: playoffDetail(me) },
-        { value: formatTitleOdds(me.titleGame, me.status), label: `${short} title game` },
+        { value: formatPlayoff(me.playoff, me.cfp, me.status, me.autoBid, me.postseasonBan), label: `${labels.playoff}*`, lead: true, detail: playoffDetail(me) },
+        { value: formatTitleOdds(me.titleGame, me.status), label: `${short} title game`, short: "Title game" },
         { value: formatChampion(me), label: labels.champion },
       ]}
       main={
         <>
           {board && board.records.length > 0 && <WhatItTakes board={board} />}
           <section aria-labelledby="weeks">
-            <Heading id="weeks" sub={`${team.name}’s playoff and ${short} title-game odds after each of its own results. Tap one to lock it.`}>Week by week</Heading>
+            <Heading id="weeks" sub={`${team.name}’s playoff and ${conferenceName(conference)} title-game odds after each of its own results. Tap one to lock it.`}>Week by week</Heading>
             {note && <p role="status" className="mb-2 text-sm font-semibold text-lamp-ink">{note}</p>}
+            {outLine && <p className="mb-2 text-[13px] text-ink-muted">{outLine}</p>}
             <WeekByWeek weeks={tree.weeks} outlook={me} board={board} teamId={teamId} team={team.name} names={names} locks={locks} onPick={onPick}
-              title={titlePick} onTitle={onTitle} labels={numLabels} />
+              title={titlePick} onTitle={onTitle} labels={numLabels} settled={outLine !== null} />
             {tree.footnote && <p className="mt-2 text-xs text-ink-muted">{tree.footnote}</p>}
           </section>
           {helpBoard && helpBoard.help.length > 0 && <HelpElsewhere board={helpBoard} locks={locks} onPick={onHelpPick} labels={numLabels} />}
@@ -309,7 +315,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
           {board?.race && <PlayoffRaceCard race={board.race} lab={labHref(locks, teamId, titles)} />}
           <ConferenceRace outlook={outlook} names={names} teamId={teamId} label={`${conferenceName(conference)} race`} sub="Title-game odds" />
           <YourPicks picks={picks} lab={lab} onRemove={remove} onReset={reset} />
-          <p className="text-xs text-ink-muted">* Playoff odds are our own estimate, not the committee. Odds from {ITERATIONS.toLocaleString("en-US")} simulated seasons; “In” and “Out” are proven.</p>
+          <p className="text-xs text-ink-muted">* Playoff odds are our own estimate, not the committee. Odds from {ITERATIONS.toLocaleString("en-US")} simulated seasons; “In” and “Out” are proven. {dataNote(through)}</p>
         </>
       }
     />
@@ -318,7 +324,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
 
 /** An FBS independent's page: no conference, so no title game; its own games and the playoff. */
 export function IndependentExplorer({ initial, ...common }: Common & { initial: IndependentResult }) {
-  const { teamId, teams, names } = common;
+  const { teamId, teams, names, through } = common;
   const { locks, result, ranks, busy, failed, status, update, pick } = useWhatIf<IndependentResult>(initial, common.ranks, null, teamId, common.openGames, (r) =>
     r.independent ? { outlook: r.outlook, games: r.games, playoffGames: r.playoffGames, board: r.board } : null);
   const me = result.outlook.find((o) => o.teamId === teamId)!;
@@ -342,7 +348,7 @@ export function IndependentExplorer({ initial, ...common }: Common & { initial: 
       busy={busy}
       status={status}
       failed={failed}
-      scores={[{ value: formatPlayoff(me.playoff, me.cfp, me.postseasonBan ? "eliminated" : "alive"), label: "Playoff*", lead: true, detail: playoffDetail(me) }]}
+      scores={[{ value: formatPlayoff(me.playoff, me.cfp, "alive", false, me.postseasonBan), label: "Playoff*", lead: true, detail: playoffDetail(me) }]}
       main={
         <>
           {board && board.records.length > 0 && <WhatItTakes board={board} />}
@@ -357,16 +363,23 @@ export function IndependentExplorer({ initial, ...common }: Common & { initial: 
         <>
           {board?.race && <PlayoffRaceCard race={board.race} lab={lab} />}
           <YourPicks picks={picks} lab={lab} onRemove={(id) => pick(Number(id.slice(1)), undefined)} onReset={() => update({})} />
-          <p className="text-xs text-ink-muted">* Playoff odds are our own estimate, not the committee.</p>
+          <p className="text-xs text-ink-muted">* Playoff odds are our own estimate, not the committee. {dataNote(through)}</p>
         </>
       }
     />
   );
 }
 
-type Score = { value: string; label: string; lead?: boolean; detail?: { label: string; value: string }[] };
+type Score = {
+  value: string; label: string; lead?: boolean; detail?: { label: string; value: string }[];
+  /** A shorter label for the compact strip ("Title game" for "Big Ten title game"). */
+  short?: string;
+};
 
-function Frame({ teamId, conference, teams, conferences, names, ranks, through, asOf, record, tags, picks, lab, onReset, busy, failed, status, scores, main, rail }: Common & {
+/** The names on a team's header from here on wrap instead of truncating: past this many letters it steps down a size. */
+const LONG_NAME = 18;
+
+function Frame({ teamId, conference, teams, conferences, names, abbreviations, ranks, through, asOf, record, tags, picks, lab, onReset, busy, failed, status, scores, main, rail }: Common & {
   /** The team's record: "6-3 (5-2 ACC)". */
   record: string;
   /** One per goal: "Playoff · Needs a miracle", "ACC title game · Out". */
@@ -385,13 +398,16 @@ function Frame({ teamId, conference, teams, conferences, names, ranks, through, 
   rail: ReactNode;
 }) {
   const [sheet, setSheet] = useState(false);
-  const pickerRef = useRef<HTMLButtonElement>(null);
+  // Two pickers share one state: the strip's (phones, and screens too short for the one-screen layout) and the header's.
+  const stripPicker = useRef<HTMLButtonElement>(null);
+  const deskPicker = useRef<HTMLButtonElement>(null);
+  const focusPicker = () => [deskPicker.current, stripPicker.current].find((b) => b && b.offsetParent !== null)?.focus();
   useEffect(() => {
     if (!sheet) return;
     const close = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       setSheet(false);
-      pickerRef.current?.focus();
+      focusPicker();
     };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
@@ -409,66 +425,100 @@ function Frame({ teamId, conference, teams, conferences, names, ranks, through, 
     };
   }, [going]);
   const team = teams.find((t) => t.id === teamId)!;
+  const long = team.name.length > LONG_NAME;
   const openLab = (
     <><span className="sm:hidden">Lab</span><span className="hidden sm:inline">Open picks in Lab</span>{picks > 0 && <span className="font-sans text-xs font-semibold normal-case tracking-normal text-board-muted"> · {picks} pick{picks === 1 ? "" : "s"}</span>} <span aria-hidden className="text-lamp">→</span></>
   );
-  // The page's own actions, the same on every screen, on the board: the Lab (outlined), Share (the cream plate), and
-  // Reset, lit amber once there are picks to clear.
-  const reset = (
-    <button type="button" onClick={onReset} disabled={picks === 0} aria-label="Reset picks"
-      className={`cond flex h-9 items-center gap-1.5 rounded-[3px] border px-2.5 text-base font-bold tracking-[0.05em] transition-colors sm:px-3 ${picks > 0 ? "border-lamp bg-lamp text-plate-ink hover:bg-[#f5c056]" : "border-board-line text-board-muted opacity-50"}`}>
-      <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10a6 6 0 1 0 1.8-4.3" /><path d="M4 3.5V7h3.5" /></svg>
-      <span className="hidden sm:inline">Reset</span>
-    </button>
+  const resetIcon = <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10a6 6 0 1 0 1.8-4.3" /><path d="M4 3.5V7h3.5" /></svg>;
+  // Reset, lit amber once there are picks to clear: an icon in the strip, a labelled button in the header.
+  const resetState = picks > 0 ? "border-lamp bg-lamp text-plate-ink hover:brightness-105" : "border-board-line text-board-muted opacity-50";
+  const chevron = (cls: string) => <svg aria-hidden viewBox="0 0 12 12" className={`transition-transform ${cls} ${sheet ? "rotate-180" : ""}`}><path d="M2.5 4.5 6 8 9.5 4.5" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="square" /></svg>;
+  const pickerLabel = `${team.name}: change team`;
+  const list = (
+    <TeamList conferences={conferences} names={names} selectedId={going ?? teamId} onSelect={(id) => { if (id !== teamId) setGoing(id); setSheet(false); }} />
   );
+  const closeSheet = () => { setSheet(false); focusPicker(); };
+  const panel = "scroll-thin absolute z-30 mt-2 max-h-[min(70dvh,34rem)] w-[min(24rem,calc(100vw-1.75rem))] origin-top animate-pop overflow-y-auto rounded-md border border-board-line bg-board-deep shadow-[0_12px_32px_rgba(10,36,26,0.4),0_2px_6px_rgba(10,36,26,0.3)]";
 
   return (
     <ConferenceProvider value={conference}>
       <RanksContext.Provider value={ranks}>
-      <div className="flex min-h-dvh flex-col md:h-dvh md:overflow-hidden">
-        <header className="board-dots sticky top-0 z-30 text-board-text md:static">
-          <SiteBar current="teams" teams={`/team/${teamId}`} lab={lab} through={through} asOf={asOf} find={conferences.flatMap((c) => c.teams)} />
-          {/* Phones stack the header: picker, tags, the numbers, then the actions. From md the picker column sits beside the numbers. */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-4 pb-3 pt-2.5 md:flex-nowrap md:gap-8 md:px-6 md:pb-5 md:pt-4">
-            <div className="contents md:relative md:flex md:min-w-0 md:flex-col md:items-start md:gap-2.5">
-              {/* The team picker: the name in a field, like a select, with the chevron in its own cell. */}
-              <button type="button" ref={pickerRef} aria-expanded={sheet} aria-controls="team-sheet" aria-label={`${team.name}: change team`} onClick={() => setSheet(!sheet)}
-                className={`order-1 flex min-w-0 max-w-full items-stretch rounded-[3px] border md:order-none bg-white/[0.04] text-left transition-colors hover:border-board-muted hover:bg-white/[0.07] ${sheet ? "border-board-muted" : "border-board-line"}`}>
-                <span className="cond flex min-w-0 items-center gap-2 px-2.5 py-1.5 text-2xl font-extrabold leading-none text-white md:px-3 md:py-2 md:text-[40px]">
+      <AbbreviationsContext.Provider value={abbreviations}>
+      {/* The one-screen layout (static header, columns that scroll on their own) needs a screen at least 640px tall as well
+          as 768 wide; shorter ones scroll as one page, with the compact strip as the only sticky part. */}
+      <div className="flex min-h-dvh flex-col tall:md:h-dvh tall:md:overflow-hidden">
+        <header className="contents">
+          <div className="board-dots text-board-text">
+            <SiteBar current="teams" teams={`/team/${teamId}`} lab={lab} through={through} asOf={asOf} find={conferences.flatMap((c) => c.teams)} />
+          </div>
+
+          {/* The compact strip: picker, the numbers on one line and Reset. It is what sticks while the page scrolls. */}
+          <div className="board-dots sticky top-0 z-30 flex h-[52px] items-center gap-2 border-b border-board-line pl-3.5 pr-0.5 text-board-text tall:md:hidden">
+            <button type="button" ref={stripPicker} aria-expanded={sheet} aria-controls="team-sheet-strip" aria-label={pickerLabel} onClick={() => setSheet(!sheet)}
+              className="relative z-30 flex h-11 min-w-0 flex-1 items-center gap-2 text-left">
+              <TeamLogo id={teamId} size="1.2em" />
+              <span className={`cond min-w-0 font-extrabold tracking-[0.03em] text-white ${long ? "line-clamp-2 text-[15px] leading-[1.05]" : "truncate text-xl leading-none"}`}>{team.name}</span>
+              <span className="shrink-0 text-board-muted">{chevron("h-3.5 w-3.5")}</span>
+            </button>
+            <div className="flex shrink-0 gap-2.5 text-center">
+              {scores.map((s) => (
+                <div key={s.label}>
+                  <div key={s.value} className={`plate plate-hang text-white ${s.lead ? "text-[22px]" : "text-[17px]"}`}>{s.value}</div>
+                  <span className={`cond mt-0.5 block whitespace-nowrap text-[9px] font-bold tracking-[0.06em] ${s.lead ? "text-white" : "text-board-muted"}`}>{s.short ?? s.label}</span>
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={onReset} disabled={picks === 0} aria-label="Reset picks"
+              className={`flex h-11 w-11 shrink-0 items-center justify-center ${picks > 0 ? "text-lamp" : "text-board-muted opacity-50"}`}>{resetIcon}</button>
+            {sheet && (
+              <>
+                <button type="button" aria-label="Close team list" tabIndex={-1} onClick={closeSheet} className="fixed inset-0 z-20 cursor-default" />
+                <div id="team-sheet-strip" className={`${panel} left-3.5 top-full tall:md:hidden`}>{list}</div>
+              </>
+            )}
+          </div>
+
+          <div className="board-dots text-board-text tall:md:grid tall:md:grid-cols-[minmax(0,1fr)_auto] tall:md:items-end tall:md:gap-5 tall:md:px-6 tall:md:pb-5 tall:md:pt-4 tall:lg:gap-8">
+            <div className="min-w-0 tall:md:relative tall:md:flex tall:md:flex-col tall:md:items-start tall:md:gap-2.5">
+              {/* The team picker, as a field with the chevron in its own cell. The name is never cut: it steps down a size, then wraps. */}
+              <button type="button" ref={deskPicker} aria-expanded={sheet} aria-controls="team-sheet" aria-label={pickerLabel} onClick={() => setSheet(!sheet)}
+                className={`hidden max-w-full items-stretch rounded-[3px] border bg-white/[0.04] text-left transition-colors hover:border-board-muted hover:bg-white/[0.07] tall:md:flex ${sheet ? "border-board-muted" : "border-board-line"}`}>
+                <span className={`cond flex min-w-0 items-center gap-2.5 px-3 py-2 font-extrabold leading-[1.05] text-white tall:md:text-[32px] ${long ? "" : "tall:lg:text-[40px]"}`}>
                   <TeamLogo id={teamId} size="1.1em" />
-                  <span className="truncate">{team.name}</span>
+                  <span className="min-w-0 break-words">{team.name}</span>
                 </span>
-                <span className="flex items-center border-l border-board-line px-2 text-board-text md:px-3">
-                  <svg aria-hidden viewBox="0 0 12 12" className={`h-4 w-4 transition-transform md:h-5 md:w-5 ${sheet ? "rotate-180" : ""}`}><path d="M2.5 4.5 6 8 9.5 4.5" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="square" /></svg>
-                </span>
+                <span className="flex w-11 items-center justify-center border-l border-board-line text-board-text">{chevron("h-5 w-5")}</span>
               </button>
-              <span className="order-2 -mt-1 flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs text-board-muted md:order-none md:w-auto md:text-sm">
-                {record}
+              {/* The record and the status tags on one line, which scrolls sideways when it must. */}
+              <div className="flex min-h-11 items-center gap-x-2 gap-y-1 overflow-x-auto whitespace-nowrap px-4 text-xs text-board-muted [scrollbar-width:none] tall:md:min-h-0 tall:md:flex-wrap tall:md:overflow-visible tall:md:whitespace-normal tall:md:px-0 tall:md:text-sm">
+                <span className="shrink-0">{record}</span>
                 {tags.map((t) => (
-                  <span key={t.label} className={`cond whitespace-nowrap rounded-[2px] border px-1.5 text-xs font-extrabold tracking-[0.1em] ${t.live ? "border-lamp text-lamp" : "border-board-line text-board-muted"}`}>{t.label}</span>
+                  <span key={t.label} className={`cond shrink-0 whitespace-nowrap rounded-[2px] border px-1.5 text-xs font-extrabold tracking-[0.1em] ${t.live ? "border-lamp text-lamp" : "border-board-line text-board-muted"}`}>{t.label}</span>
                 ))}
-              </span>
-              <div className="order-4 flex w-full flex-wrap items-center gap-2 md:order-none md:w-auto">
-                <Link href={lab} className="cond flex h-9 items-center gap-1.5 rounded-[3px] border border-board-line px-3 text-base font-bold tracking-[0.05em] text-white hover:border-lamp">{openLab}</Link>
+              </div>
+              <div className="flex items-center gap-2 px-4 pb-3.5 pt-0.5 tall:md:flex-wrap tall:md:p-0">
+                <Link href={lab} className="cond flex h-11 items-center gap-1.5 rounded-[3px] border border-board-line px-3.5 text-base font-bold tracking-[0.05em] text-white hover:border-lamp lg:h-9">{openLab}</Link>
                 <ShareButton board label="Share" />
-                {reset}
+                <button type="button" onClick={onReset} disabled={picks === 0} aria-label="Reset picks"
+                  className={`cond hidden h-11 items-center gap-1.5 rounded-[3px] border px-3 text-base font-bold tracking-[0.05em] transition-colors tall:md:flex lg:h-9 ${resetState}`}>
+                  {resetIcon}
+                  <span>Reset</span>
+                </button>
               </div>
               {sheet && (
                 <>
-                  <button type="button" aria-label="Close team list" tabIndex={-1} onClick={() => { setSheet(false); pickerRef.current?.focus(); }} className="fixed inset-0 z-20 cursor-default" />
-                  <div id="team-sheet" className="scroll-thin absolute left-4 top-full md:left-0 z-30 mt-2 max-h-[min(70dvh,34rem)] w-[min(24rem,calc(100vw-2rem))] origin-top animate-pop overflow-y-auto rounded-md border border-board-line bg-board-deep shadow-[0_12px_32px_rgba(10,36,26,0.4),0_2px_6px_rgba(10,36,26,0.3)]">
-                    <TeamList conferences={conferences} names={names} selectedId={going ?? teamId} onSelect={(id) => { if (id !== teamId) setGoing(id); setSheet(false); }} />
-                  </div>
+                  <button type="button" aria-label="Close team list" tabIndex={-1} onClick={closeSheet} className="fixed inset-0 z-20 hidden cursor-default tall:md:block" />
+                  <div id="team-sheet" className={`${panel} left-0 top-full hidden tall:md:block`}>{list}</div>
                 </>
               )}
             </div>
-            <div className="order-3 flex w-full shrink-0 items-start justify-between gap-2.5 md:order-none md:ml-auto md:w-auto md:justify-start md:gap-5">
+            <div className="hidden items-start gap-5 tall:md:flex">
               {scores.map((s) => (
                 <div key={s.label} className="text-center">
-                  <div key={s.value} className={`plate plate-hang text-white ${s.lead ? "text-[32px] md:text-[56px]" : "text-[22px] md:text-4xl"}`}>{s.value}</div>
-                  <span className={`cond mt-1 block max-w-[5.5em] text-[11px] font-semibold tracking-[0.02em] md:max-w-none md:text-sm md:tracking-[0.08em] ${s.lead ? "text-white" : "text-board-muted"}`}>{s.label}</span>
+                  <div key={s.value} className={`plate plate-hang text-white ${s.lead ? "tall:md:text-[44px] tall:lg:text-[56px]" : "tall:md:text-4xl"}`}>{s.value}</div>
+                  <span className={`cond mt-1 block text-sm font-semibold tracking-[0.08em] ${s.lead ? "text-white" : "text-board-muted"}`}>{s.label}</span>
                   {s.detail && s.detail.length > 0 && (
-                    <span className="mt-0.5 hidden text-xs text-board-muted md:block">{s.detail.map((d) => <span key={d.label}>{d.label} <b className="font-semibold text-white">{d.value}</b></span>).reduce<ReactNode[]>((acc, x, k) => (k ? [...acc, " · ", x] : [x]), [])}</span>
+                    <span className="mt-0.5 block text-xs text-board-muted">{s.detail.map((d) => <span key={d.label}>{d.label} <b className="font-semibold text-white">{d.value}</b></span>).reduce<ReactNode[]>((acc, x, k) => (k ? [...acc, " · ", x] : [x]), [])}</span>
                   )}
                 </div>
               ))}
@@ -476,18 +526,19 @@ function Frame({ teamId, conference, teams, conferences, names, ranks, through, 
           </div>
         </header>
 
-        {/* On desktop the page is one screen tall and each column scrolls on its own. */}
-        <div className="grid flex-1 md:min-h-0 md:grid-cols-[minmax(0,1fr)_300px]">
-          <main aria-busy={going !== null || busy} className={`scroll-thin relative min-w-0 p-4 transition-opacity duration-200 md:overflow-y-auto md:p-6 ${busy ? "opacity-80" : ""}`}>
+        {/* On a tall desktop the page is one screen and each column scrolls on its own. */}
+        <div className="grid flex-1 tall:md:min-h-0 tall:md:grid-cols-[minmax(0,1fr)_300px]">
+          <main aria-busy={going !== null || busy} className={`scroll-thin relative min-w-0 p-4 transition-opacity duration-200 tall:md:overflow-y-auto tall:md:p-6 ${busy ? "opacity-80" : ""}`}>
             {going !== null && <Loading name={names[going]} />}
             {status && <p role="status" className={`mb-2 text-xs ${failed ? "text-hurt" : "text-ink-muted"}`}>{status}</p>}
             {main}
           </main>
-          <aside aria-label="Summary" className="scroll-thin border-t border-rule bg-paper p-4 pb-10 md:overflow-y-auto md:border-l md:border-t-0 md:px-5 md:py-6">
+          <aside aria-label="Summary" className="scroll-thin border-t border-rule bg-paper p-4 pb-10 tall:md:overflow-y-auto tall:md:border-l tall:md:border-t-0 tall:md:px-5 tall:md:py-6">
             {rail}
           </aside>
         </div>
       </div>
+      </AbbreviationsContext.Provider>
       </RanksContext.Provider>
     </ConferenceProvider>
   );
@@ -497,7 +548,7 @@ function Frame({ teamId, conference, teams, conferences, names, ranks, through, 
 function Loading({ name }: { name?: string }) {
   return (
     // Sticks to the top of the column, so it covers what's on screen however far the column is scrolled.
-    <div className="sticky top-0 z-10 -mx-4 -mt-4 h-0 md:-mx-6 md:-mt-6">
+    <div className="sticky top-0 z-10 -mx-4 -mt-4 h-0 tall:md:-mx-6 tall:md:-mt-6">
       <div className="flex h-dvh justify-center bg-ground/75 pt-24">
         {/* A small board: three lamps light in turn, then the team's name in board lettering. */}
         <div role="status" className="board-dots cond flex h-fit items-center gap-3 rounded px-4 py-2.5 text-[15px] font-bold tracking-wide text-board-text shadow-lg">

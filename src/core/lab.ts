@@ -5,9 +5,10 @@ import { liveRanking, type LiveRanked } from "./live";
 import { projectedField } from "./projected";
 import { simulateNational, titleRace, type NationalResult } from "./national";
 import { COMMITTEE_WEIGHTS as W } from "./committee-weights";
+import { powerConferences } from "./committee";
 import { conferenceName, conferenceShort, formatFine, formatOdds, formatSideOdds, shownChange } from "./paths";
 import { announcedField, bracketGames, findFormat } from "./playoff";
-import { teamRecord, type Game, type Season } from "./season";
+import { INDEPENDENTS, teamRecord, type Game, type Season } from "./season";
 import { gameWinProbability, mix, mulberry32, neutralOdds } from "./sim";
 import { pairKey } from "./steps";
 import { conferenceData, decidedTitleGame } from "./tiebreak";
@@ -47,6 +48,9 @@ export type LabTitleTeam = {
   champion: number;
   /** "Title game 64% · champion 41%". */
   text: string;
+  /** Each share for display: never a flat 0% or 100% for a team still alive ("<0.1%", ">99%"). */
+  titleGameText: string;
+  championText: string;
 };
 
 export type LabStanding = {
@@ -137,10 +141,16 @@ export type SeasonLab = {
   picks: number;
   /** Regular-season games neither final nor picked. 0: every game is set ("Every game picked" in the summary). */
   open: number;
+  /** Each team's playoff chance for display, by team: "72%", ">99%", "<0.1%" (a live team is never a flat 0% or 100%). */
+  fieldTexts: Record<number, string>;
+  /** What to say when the Lab opens from a link with picks and no field change is known: "5 picks loaded." */
+  loaded: string;
   /** "3 picks · 20,000 simulated seasons", or "No picks yet · 20,000 simulated seasons". */
   summary: string;
   /** The field and bracket; null when the season's playoff isn't simulated. */
   playoff: NationalView | null;
+  /** The projected conference champions the field was seeded with: team id to its conference. */
+  champions: Record<number, string>;
   /** Each simulated conference's title race, in the order given. */
   conferences: LabConference[];
   /** The committee stand-in's ranking by average place, best first. Modelled, not the committee. */
@@ -208,6 +218,7 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
       .map((t) => ({
         teamId: t.teamId, titleGame: t.titleGame!, champion: t.champion!,
         text: `Title game ${formatSideOdds(t.titleGame!, "alive")} · champion ${formatSideOdds(t.champion!, "alive")}`,
+        titleGameText: formatSideOdds(t.titleGame!, "alive"), championText: formatSideOdds(t.champion!, "alive"),
       })),
     ...tables.get(conference)!,
     final: null,
@@ -244,8 +255,11 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     backLabel: `Back to top ${live.length}`,
     picks,
     open,
+    fieldTexts: Object.fromEntries(national.teams.flatMap((t) => (t.playoff ? [[t.teamId, formatSideOdds(t.playoff.field, "alive")]] : []))),
+    loaded: `${picks} ${picks === 1 ? "pick" : "picks"} loaded.`,
     summary: `${picks === 0 ? "No picks yet" : picks === 1 ? "1 pick" : `${picks} picks`}${open === 0 && picks > 0 ? " · every game picked" : ""} · ${seasons}`,
     playoff: nationalView(national, { season, ranking: { order, champions } }),
+    champions: Object.fromEntries(projected.champions),
     conferences,
     ranking,
     bigGames,
@@ -369,7 +383,11 @@ export function labChanges(season: Season, before: SeasonLab, after: SeasonLab):
 }
 
 /** One seed on the share card. `color`: the team's colour from the data ("#ba0c2f"), or null. */
-export type LabCardSeed = { seed: number; teamId: number; name: string; color: string | null };
+export type LabCardSeed = {
+  seed: number; teamId: number; name: string; color: string | null;
+  /** "SEC champ" when the seed is its conference's projected champion, else null. */
+  tag: string | null;
+};
 
 /** What a Lab link's share image shows: the projected field and who is favoured to win it all. */
 export type LabCard = {
@@ -395,7 +413,17 @@ export function labCard(season: Season, lab: SeasonLab): LabCard | null {
   if (!p || p.field.length === 0) return null;
   const team = new Map(season.teams.map((t) => [t.id, t]));
   const name = (id: number) => team.get(id)?.name ?? `Team ${id}`;
-  const field = p.field.map((s) => ({ seed: s.seed, teamId: s.teamId, name: name(s.teamId), color: team.get(s.teamId)?.color ?? null }));
+  const field = p.field.map((s) => ({ seed: s.seed, teamId: s.teamId, name: name(s.teamId), color: team.get(s.teamId)?.color ?? null,
+    tag: lab.champions[s.teamId] ? `${conferenceShort(lab.champions[s.teamId])} champ` : null as string | null }));
+  // The Group of Six bid: the best-seeded team from outside the power conferences (independents aside) not already tagged.
+  if (findFormat(season.year)?.autoBids === "power4G6") {
+    const power = new Set(powerConferences(season.year));
+    const g6 = field.find((s) => {
+      const c = team.get(s.teamId)?.conference ?? null;
+      return s.tag === null && c !== null && c !== INDEPENDENTS && !power.has(c);
+    });
+    if (g6) g6.tag = "G6 bid";
+  }
   const picks = lab.open === 0 ? "Every game picked" : lab.picks === 0 ? "No picks" : `${lab.picks} pick${lab.picks === 1 ? "" : "s"}`;
   const best = [...p.field].sort((a, b) => b.champion - a.champion || a.seed - b.seed)[0];
   const champion = best.champion >= 1 ? `National champion: ${name(best.teamId)}` : `Title favorite: ${name(best.teamId)}, ${formatOdds(best.champion)}`;

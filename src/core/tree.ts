@@ -187,7 +187,7 @@ export type WayWeek = {
   favorites: string | null;
   /** Team's odds once every pick through this week happens; null when too few simulated seasons go this way. */
   after: number | null;
-  /** `after` for display: "In", "12%", "<1%", or "—" when unknown. */
+  /** `after` for display: "In", "12%", "<0.1%", or "—" when unknown. */
   afterLabel: string;
 };
 
@@ -199,7 +199,7 @@ const ROOT_BUDGET = 150_000;
 // Search nodes the rest of a tree's proofs share (branches, game sides, locked games' full proofs; each locked game's
 // QUICK_BUDGET check comes first, outside the pool). A team its proofs can't settle would otherwise spend a full
 // budget on every one for nothing (Penn State, 2026: 2 million nodes, 40 s). Once these run out, the rest show their
-// odds (">99%", "<1%") instead of In or Out, so which ones do depends on the order the tree asks. Sized from 2026
+// odds (">99%", "<0.1%") instead of In or Out, so which ones do depends on the order the tree asks. Sized from 2026
 // data: above every ACC, Big 12 and SEC page then (the most, Auburn: 212,000), so those don't reach it. Big Ten pages
 // do by design: Penn State and Rutgers (about 2 million uncapped) stop here, and Nebraska and Wisconsin (about
 // 300,000) lose a few In/Out labels.
@@ -445,7 +445,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
     if (node.odds === null) return level === 0 ? node : stop("rare", "Rare", "Too few simulated seasons go this way to put odds on it.");
     const proof = node.odds === 1 || node.odds === 0 ? proven(prefixLocks(path)) : "open";
     if (proof === "open" && node.odds === 1) return { ...node, verdict: ">99%" };
-    if (proof === "open" && node.odds === 0) return { ...node, verdict: "<1%" };
+    if (proof === "open" && node.odds === 0) return { ...node, verdict: "<0.1%" };
     if (node.odds === 1) return stop("in", "In", `In the title game whatever else happens.${left}`);
     if (node.odds === 0) return stop("out", "Out", `Can't make the title game from here: no combination of other results gets there.${left}`);
     return node;
@@ -462,7 +462,7 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
       reach: n / total,
       odds,
       outcome: null,
-      verdict: odds === null ? "—" : formatOdds(odds),
+      verdict: odds === null ? "—" : formatSideOdds(odds, "alive"),
       note: null,
       rest: 0,
       record: last && level > 0 && covered
@@ -911,7 +911,7 @@ function wayParts(
       root: named.map((x) => ({ what: `${name(x.winner)} over ${name(loserOf(x))}`, chance: x.p })),
       favorites: fav > 0 ? `Favorites win ${fav === 1 ? "1 other" : `${fav} others`}` : null,
       after,
-      afterLabel: after === null ? "—" : after === 1 ? "In" : after === 0 ? "<1%" : formatOdds(after),
+      afterLabel: after === null ? "—" : after === 1 ? "In" : after === 0 ? "<0.1%" : formatSideOdds(after, "alive"),
     };
   });
   return { ownJob, ownSummary, ownGames, ownChance, rivals, weeks };
