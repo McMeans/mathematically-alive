@@ -14,8 +14,21 @@ const logo = `data:image/svg+xml;base64,${Buffer.from("<svg xmlns=\"http://www.w
 // here: the default sans, bold and tightly spaced, stands in.
 const BOARD = "#133F2E", DEEP = "#0C2C20", MUTED = "#9FBCAE", LAMP = "#F2B134", INK = "#121A16";
 
-export function cardImage(card: LabCard | null, through: string): ImageResponse {
+// Each team logo as a data URI, fetched here with a short timeout so one slow or missing logo leaves its row
+// without a logo instead of failing the whole image.
+async function logoData(teamId: number): Promise<string | null> {
+  try {
+    const res = await fetch(`https://cdn.collegefootballdata.com/logos-dark/64/${teamId}.png`, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return null;
+    return `data:image/png;base64,${Buffer.from(await res.arrayBuffer()).toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+export async function cardImage(card: LabCard | null, through: string): Promise<ImageResponse> {
   const field = card?.field ?? [];
+  const logos = new Map(await Promise.all(field.map(async (s) => [s.teamId, await logoData(s.teamId)] as const)));
   const half = Math.ceil(field.length / 2);
   const column = (seeds: LabCard["field"]) => (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
@@ -23,9 +36,9 @@ export function cardImage(card: LabCard | null, through: string): ImageResponse 
         <div key={s.seed} style={{ display: "flex", alignItems: "center", gap: 14, height: 48, padding: "0 16px", background: DEEP, borderRadius: 3 }}>
           <div style={{ display: "flex", width: 36, justifyContent: "center", fontSize: 32, fontWeight: 700, color: s.seed <= 4 ? LAMP : MUTED }}>{s.seed}</div>
           {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse draws plain img only */}
-          <img src={`https://cdn.collegefootballdata.com/logos-dark/64/${s.teamId}.png`} width={36} height={36} alt="" />
-          <div style={{ display: "flex", fontSize: 28, fontWeight: 700, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: -0.3, whiteSpace: "nowrap" }}>{s.name}</div>
-          {s.tag && <div style={{ display: "flex", marginLeft: "auto", padding: "2px 8px", border: `1px solid ${MUTED}`, borderRadius: 2, fontSize: 16, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: 1, whiteSpace: "nowrap" }}>{s.tag}</div>}
+          {logos.get(s.teamId) ? <img src={logos.get(s.teamId)!} width={36} height={36} alt="" /> : <div style={{ display: "flex", width: 36, flexShrink: 0 }} />}
+          <div style={{ display: "block", flex: 1, minWidth: 0, fontSize: 28, fontWeight: 700, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: -0.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+          {s.tag && <div style={{ display: "flex", flexShrink: 0, padding: "2px 8px", border: `1px solid ${MUTED}`, borderRadius: 2, fontSize: 16, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: 1, whiteSpace: "nowrap" }}>{s.tag}</div>}
         </div>
       ))}
     </div>
