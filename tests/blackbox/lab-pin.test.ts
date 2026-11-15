@@ -29,7 +29,7 @@ describe("season lab: a pinned team's odds", () => {
 
   it("a team the picks put out of its title game reads 0%, not <0.1%, and the two in it read 100%", () => {
     // Every game picked: each title game with an exact matchup is settled.
-    const lab = seasonLab(season, { ...base, locks: fillLabLocks(season, {}, "favorites") });
+    const lab = seasonLab(season, { ...base, locks: fillLabLocks(season, {}, "favorites", base.conferences) });
     const settled = lab.conferences.filter((c) => c.matchup?.exact);
     expect(settled.length).toBeGreaterThan(0);
     for (const c of settled) {
@@ -38,6 +38,9 @@ describe("season lab: a pinned team's odds", () => {
         if (c.matchup!.teams.includes(s.teamId)) {
           expect(o.titleGameText).toBe("100%");
           expect(c.teams.find((t) => t.teamId === s.teamId)!.titleGameText).toBe("100%");
+          // The fill picks each settled title game's winner: it reads 100% to win the conference, the team it beats 0%.
+          expect(o.championText).toBe(c.picked === s.teamId ? "100%" : "0%");
+          expect(c.teams.find((t) => t.teamId === s.teamId)!.championText).toBe(o.championText);
         } else {
           expect([o.titleGameText, o.championText]).toEqual(["0%", "0%"]);
           // Out of the title game isn't proven out of the playoff: an at-large spot stays open.
@@ -46,7 +49,6 @@ describe("season lab: a pinned team's odds", () => {
       }
     }
   });
-
 });
 
 describe("season lab: how a pinned team's odds moved", () => {

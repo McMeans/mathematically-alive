@@ -221,11 +221,15 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
       .map((t) => {
         // A team the picks settle into the title game plays in it for sure: "100%", not ">99%".
         const m = tables.get(conference)!.matchup;
-        const game = formatSideOdds(t.titleGame!, m?.exact && m.teams.includes(t.teamId) ? "clinched" : "alive");
+        const settled = m?.exact === true && m.teams.includes(t.teamId);
+        const game = formatSideOdds(t.titleGame!, settled ? "clinched" : "alive");
+        // With the settled game's winner picked, the title is settled too.
+        const pick = locks.titles[conference];
+        const title = formatSideOdds(t.champion!, settled && pick !== undefined ? (pick === t.teamId ? "clinched" : "eliminated") : "alive");
         return {
           teamId: t.teamId, titleGame: t.titleGame!, champion: t.champion!,
-          text: `Title game ${game} · champion ${formatSideOdds(t.champion!, "alive")}`,
-          titleGameText: game, championText: formatSideOdds(t.champion!, "alive"),
+          text: `Title game ${game} · champion ${title}`,
+          titleGameText: game, championText: title,
         };
       }),
     ...tables.get(conference)!,
@@ -484,7 +488,8 @@ export type LabTeamOdds = {
 /**
  * A team's odds in a Lab run, null when the run doesn't have the team. A title-game share the sample puts at 0% or
  * 100% is checked exactly against the run's picks: a team no remaining result can send to its title game reads "0%"
- * (its title too), one every result sends there "100%"; otherwise "<0.1%" or ">99%". Its playoff odds never read a
+ * (its title too), one every result sends there "100%" (and, with that game's winner picked, "100%" or "0%" for the
+ * title); otherwise "<0.1%" or ">99%". Its playoff odds never read a
  * flat 0%: out of the title game is not proven out of the playoff (`formatPlayoff`).
  */
 export function labTeamOdds(season: Season, lab: SeasonLab, teamId: number): LabTeamOdds | null {
@@ -493,11 +498,14 @@ export function labTeamOdds(season: Season, lab: SeasonLab, teamId: number): Lab
   const titled = t.titleGame !== null && t.conference !== null && t.conference !== INDEPENDENTS;
   const proven = titled && (t.titleGame === 0 || t.titleGame === 1) ? provenStatus(season, t.conference!, teamId, lab.locks.games) : "open";
   const status = proven === "open" ? "alive" : proven;
+  // A picked winner of a title game the team is sure to play in settles the title: won by the pick, lost by the other.
+  const picked = titled ? lab.locks.titles[t.conference!] : undefined;
+  const title = status === "eliminated" ? "eliminated" : status === "clinched" && picked !== undefined ? (picked === teamId ? "clinched" : "eliminated") : "alive";
   const show = (p: number | null, s: "alive" | "clinched" | "eliminated" = "alive") => (p === null ? "—" : formatSideOdds(p, s));
   const playoff = t.playoff?.field ?? null;
   return {
     teamId, playoff, titleGame: t.titleGame, champion: t.champion,
-    playoffText: show(playoff), titleGameText: show(t.titleGame, status), championText: show(t.champion, status === "eliminated" ? status : "alive"),
+    playoffText: show(playoff), titleGameText: show(t.titleGame, status), championText: show(t.champion, title),
   };
 }
 
