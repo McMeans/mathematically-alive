@@ -324,14 +324,22 @@ describe("the best shot", { timeout: 60_000 }, () => {
   const way = r.tree.likeliest!;
   const ladder = shot.steps.filter((s) => s.kind === "step" || s.kind === "rest");
 
-  it("names its goal, winning the ACC when it ends with the title game, and sums up the way in one line", () => {
-    if (shot.steps.at(-1)!.kind === "title") {
-      expect(shot.title).toBe("Way to win the ACC");
-      expect(shot.sub).toBe("The likeliest results that put Louisville in the title game, then the title game. Each row adds to the rows above.");
-    } else {
-      expect(shot.title).toBe("Way into the ACC title game");
-      expect(shot.sub).toBe("The likeliest results that put Louisville in it. Each row adds to the rows above.");
-    }
+  it("stops at the ACC title game, and says so, when too few seasons on the way reach it to show the game", () => {
+    // Louisville's way happens in too few of these seasons to show the title game, so the card ends short of it.
+    expect(shot.steps.at(-1)!.kind).not.toBe("title");
+    expect(shot.title).toBe("Way into the ACC title game");
+    expect(shot.sub).toBe("The likeliest results that put Louisville in it. Each row adds to the rows above.");
+  });
+
+  it("ending with the title game, it is the way to win the ACC", () => {
+    const miami = explore(season, { ...base, teamId: byName(season, "Miami") }).board!.bestShot!;
+    expect(miami.steps.at(-1)!.kind).toBe("title");
+    expect(miami.title).toBe("Way to win the ACC");
+    expect(miami.sub).toBe("The likeliest results that put Miami in the title game, then the title game. Each row adds to the rows above.");
+    expect(miami.note).toMatch(/The champion gets a playoff spot\.$/);
+  });
+
+  it("sums up the way in one line, with the card's columns and controls", () => {
     expect(shot.headline).toBe(way.summary);
     expect(shot.columns).toEqual(["After", "Title game", "Playoff"]);
     expect(shot.fill).toBe("Fill in this path");

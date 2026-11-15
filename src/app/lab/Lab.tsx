@@ -3,11 +3,11 @@
 // left and the conference races side by side (tabs on phones); a pinned team followed as you pick.
 import Link from "next/link";
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { conferenceShort, encodeLocks, labOddsChange, type BracketGame, type BracketSide, type LabConference, type LabFill, type LabLocks, type LabTeamOdds } from "@/core";
+import { conferenceShort, encodeLocks, labOddsChange, teamMatch, type BracketGame, type BracketSide, type LabBigGame, type LabConference, type LabFill, type LabLocks, type LabTeamOdds } from "@/core";
 import type { LabRequest, LabResponse, LabView } from "@/app/lab.worker";
 import { ShareButton } from "@/app/explorer/Share";
 import { TeamLogo } from "@/app/explorer/Board";
-import { SiteBar, teamMatch, type FindTeam } from "@/app/SiteBar";
+import { SiteBar, type FindTeam } from "@/app/SiteBar";
 
 /** The address to share: a link with its own preview image (`/lab/s/<code>`) once there are picks. */
 function labLink(): string {
@@ -30,6 +30,8 @@ export type LabGame = {
 
 type Props = {
   initial: LabView;
+  /** The games that swing the field most before any pick: one fixed list, whatever the picks. */
+  bigGames: LabBigGame[];
   games: LabGame[];
   names: Record<number, string>;
   /** Short names, for phones. */
@@ -280,7 +282,7 @@ type FieldView = "seeds" | "bracket" | "top25";
 
 const PIN_ICON = <svg viewBox="0 0 16 16" aria-hidden className="h-3.5 w-3.5"><path d="M6 1.5h4l-.6 4.2 2.6 2.6v1.2H8.6V15H7.4V9.5H4V8.3l2.6-2.6z" fill="currentColor" /></svg>;
 
-export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdds, through, asOf }: Props) {
+export function Lab({ initial, bigGames, games, names, abbrs, teams, paged, ranks, baseOdds, through, asOf }: Props) {
   const { locks, view, status, refining, note, fromLink, focus, canUndo, pickGame, pickTitle, pickBracket, bracketPicks, fill, undo, pin, reset, resetBracket, simulateBracket } = useLab(initial);
   const [tab, setTab] = useState<Tab>("field");
   const [fieldView, setFieldView] = useState<FieldView>("seeds");
@@ -382,7 +384,7 @@ export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdd
         <section aria-labelledby="games-h" className={`scroll-thin motion-safe:animate-rise p-3.5 pb-10 md:p-5 lg:tall:block lg:tall:overflow-y-auto ${tab === "games" ? "" : "hidden"}`}>
           <MarksContext.Provider value={ranks}>
           <Games games={games} picked={locks.games} titles={locks.titles} conferences={view.conferences} name={name} abbr={(id) => abbrs[id] ?? name(id)}
-            onPick={pickGame} onTitle={pickTitle} open={view.open} onFill={fill} big={initial.bigGames} focus={focus} focusConference={focusConference} teams={teams} />
+            onPick={pickGame} onTitle={pickTitle} open={view.open} onFill={fill} big={bigGames} focus={focus} focusConference={focusConference} teams={teams} />
           </MarksContext.Provider>
         </section>
         <section aria-labelledby="races-h" className={`scroll-thin motion-safe:animate-rise bg-paper p-3.5 pb-10 md:p-5 lg:tall:block lg:tall:overflow-y-auto lg:tall:border-l lg:tall:border-rule ${tab === "races" ? "" : "hidden"}`}>
@@ -749,7 +751,7 @@ function Games({ games, picked, titles, conferences, name, abbr, onPick, onTitle
   games: LabGame[]; picked: Record<number, number>; titles: Record<string, number>; conferences: LabConference[];
   name: (id: number) => string; abbr: (id: number) => string;
   onPick: (gameId: number, winner: number) => void; onTitle: (conference: string, winner: number) => void;
-  open: number; onFill: (how: LabFill) => void; big: LabView["bigGames"];
+  open: number; onFill: (how: LabFill) => void; big: LabBigGame[];
   focus: number | null; focusConference: string | null;
   teams: FindTeam[];
 }) {

@@ -4,25 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 import { Logo } from "@/app/Logo";
+import { teamMatch } from "@/core";
 import { TeamLogo } from "@/app/explorer/Board";
 
 /** A team a search can open. */
 export type FindTeam = { id: number; name: string; /** "UVA": found by it too. */ abbr?: string };
-
-/**
- * How well a team fits a search, best first, or null when it doesn't: its abbreviation exactly ("uva"), its name's
- * start, then its abbreviation's or any word's start, then anywhere in its name.
- */
-export function teamMatch(query: string, name: string, abbr?: string): number | null {
-  const q = query.trim().toLowerCase();
-  if (q === "") return null;
-  const n = name.toLowerCase(), a = abbr?.toLowerCase() ?? "";
-  if (a === q) return 0;
-  if (n.startsWith(q)) return 1;
-  if (a.startsWith(q) || n.split(/[\s&.'-]+/).some((w) => w.startsWith(q))) return 2;
-  if (n.includes(q)) return 3;
-  return null;
-}
 
 /**
  * The top bar, the same on every page: the mark, Teams and Season Lab (the current one lit as a cream plate), a team

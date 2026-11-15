@@ -51,3 +51,4 @@ export type { IndependentExploration, IndependentGame, IndependentOptions, Indep
 export type { BracketGame, BracketSide, BubbleTeam, FieldSpot, GroupOfSixRace, NationalView, PlayoffSignal } from "./view";
 export { decodeLocks, encodeLocks } from "./share";
 export type { Locks } from "./share";
+export { teamMatch } from "./search";
