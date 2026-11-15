@@ -10,7 +10,7 @@ const free = seasonLab(season, base);
 
 describe("season lab: a pinned team's odds", () => {
   it("reads the team's playoff, title-game and title odds from the run, worded for display", () => {
-    const o = labTeamOdds(free.national, LOU)!;
+    const o = labTeamOdds(season, free, LOU)!;
     expect(o.teamId).toBe(LOU);
     expect(o.playoff).toBeGreaterThan(0);
     expect(o.titleGame).toBeGreaterThanOrEqual(o.champion!);
@@ -19,13 +19,34 @@ describe("season lab: a pinned team's odds", () => {
 
   it("follows the picks: Louisville winning out raises its playoff odds", () => {
     const wins = Object.fromEntries(season.games.filter((g) => !g.completed && (g.homeId === LOU || g.awayId === LOU)).map((g) => [g.id, LOU]));
-    const after = labTeamOdds(seasonLab(season, { ...base, locks: { games: wins } }).national, LOU)!;
-    expect(after.playoff!).toBeGreaterThan(labTeamOdds(free.national, LOU)!.playoff!);
+    const after = labTeamOdds(season, seasonLab(season, { ...base, locks: { games: wins } }), LOU)!;
+    expect(after.playoff!).toBeGreaterThan(labTeamOdds(season, free, LOU)!.playoff!);
   });
 
   it("a team the run doesn't have gives no odds", () => {
-    expect(labTeamOdds(free.national, -1)).toBeNull();
+    expect(labTeamOdds(season, free, -1)).toBeNull();
   });
+
+  it("a team the picks put out of its title game reads 0%, not <0.1%, and the two in it read 100%", () => {
+    // Every game picked: each title game with an exact matchup is settled.
+    const lab = seasonLab(season, { ...base, locks: fillLabLocks(season, {}, "favorites") });
+    const settled = lab.conferences.filter((c) => c.matchup?.exact);
+    expect(settled.length).toBeGreaterThan(0);
+    for (const c of settled) {
+      for (const s of c.standings) {
+        const o = labTeamOdds(season, lab, s.teamId)!;
+        if (c.matchup!.teams.includes(s.teamId)) {
+          expect(o.titleGameText).toBe("100%");
+          expect(c.teams.find((t) => t.teamId === s.teamId)!.titleGameText).toBe("100%");
+        } else {
+          expect([o.titleGameText, o.championText]).toEqual(["0%", "0%"]);
+          // Out of the title game isn't proven out of the playoff: an at-large spot stays open.
+          expect(o.playoffText).not.toBe("0%");
+        }
+      }
+    }
+  });
+
 });
 
 describe("season lab: how a pinned team's odds moved", () => {

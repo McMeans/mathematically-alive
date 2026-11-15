@@ -16,7 +16,7 @@ const names = Object.fromEntries(season.teams.map((t) => [t.id, t.name]));
 /** Short names where space is tight (phones): the abbreviation, else the first four letters. */
 const abbrs = Object.fromEntries(season.teams.map((t) => [t.id, t.abbreviation ?? t.name.slice(0, 4).toUpperCase()]));
 /** Each team with a page: its odds with no picks, for following a pinned team before any pick. */
-const baseOdds = Object.fromEntries(supportedTeams.flatMap((t) => { const o = labTeamOdds(baseLab.national, t.id); return o ? [[t.id, o]] : []; }));
+const baseOdds = Object.fromEntries(supportedTeams.flatMap((t) => { const o = labTeamOdds(season, baseLab, t.id); return o ? [[t.id, o]] : []; }));
 const DATE = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
 /** Each week's date: the day most of its games are played (the Saturday, not a midweek game). */
 const weekDates: Record<number, string> = (() => {

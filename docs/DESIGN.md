@@ -318,7 +318,7 @@ of logo, name, record and odds. The current team's row is `bg-lamp/10` with the 
   amber label (`cond`, 12px), "All 138 (projection) ▾" closed and "Top 25 ▴" open (labels from the core's
   `allLabel`/`topLabel`). "Projection" flags that places past 25 come from our committee stand-in. Open, a second
   toggle ends the list (named `backLabel`, "Back to top 25", for screen readers); it folds the list, focuses the
-  first toggle and scrolls it into view. Both carry `aria-expanded`. The "Unranked" tag shows only inside the top 25.
+  first toggle and scrolls it into view. Both carry `aria-expanded`. The "Unranked" tag shows only inside the top 25. A pinned team ranked below the folded list shows under #25 behind a dashed rule with its place and an amber "Pinned" tag, as the seeds view shows it under the bubble; opening the whole ranking drops that row.
 
 ## Layout
 
