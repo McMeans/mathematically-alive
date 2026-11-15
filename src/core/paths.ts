@@ -54,13 +54,11 @@ export type TeamPath = {
 const MAX_KEY_GAMES = 5;
 const DATE_FORMAT = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
 
-/** Odds as shown: "In" / "Out" only when proven, otherwise whole percent, never 0% or 100% for a sample. */
+/** Odds as shown: "In" / "Out" only when proven, otherwise the page's one-decimal format ("0.4%", "<0.1%"), never a flat 0% or 100% for a sample. */
 export function formatChance(p: number, status: PathStatus): string {
   if (status === "clinched") return "In";
   if (status === "eliminated") return "Out";
-  if (p <= 0) return "<1%";
-  if (p >= 1) return ">99%";
-  return formatOdds(p);
+  return formatSideOdds(p, "alive");
 }
 
 /** Title-game odds for display: In or Out when proven; otherwise never a flat 0% or 100% (under 0.1%, over 99%). */
@@ -151,7 +149,7 @@ export function oddsLabels(key: string): OddsLabels {
   const conference = conferenceName(key);
   return {
     titleGame: "Title game",
-    champion: `Win ${conference}`,
+    champion: `Win ${conferenceShort(key)}`,
     playoff: "Playoff",
     winOut: "Win out",
     beta: "Beta",
@@ -243,12 +241,14 @@ export function playoffDetail(o: { cfp: NationalPlayoff | null }): { label: stri
 
 /**
  * Playoff odds as shown: "In" or "Out" once the committee has announced the field; "In" for a team with a sure
- * automatic bid (`TeamOutlook.autoBid`); before, the odds, given the team's title-game status (`formatSideOdds`).
+ * automatic bid (`TeamOutlook.autoBid`); before, the odds, given the team's title-game status (`formatSideOdds`). A
+ * team out of its title game is not out of the playoff: its 0% in the sample shows "<0.1%", and a flat "0%" only for
+ * a team barred from the postseason (`TeamOutlook.postseasonBan`, `barred`).
  */
-export function formatPlayoff(p: number, cfp: NationalPlayoff | null, status: PathStatus, autoBid = false): string {
+export function formatPlayoff(p: number, cfp: NationalPlayoff | null, status: PathStatus, autoBid = false, barred = false): string {
   if (cfp?.run) return cfp.run.seed === null ? "Out" : "In";
   if (autoBid) return "In";
-  return formatSideOdds(p, status);
+  return formatSideOdds(p, status === "eliminated" && !barred ? "alive" : status);
 }
 
 /** "27-20": a final score, the winner's points first. Not part of the public API. */
@@ -272,11 +272,28 @@ export function titleResult(season: Season, conference: string, game: Game | nul
 
 /**
  * Its chance to win the conference, as shown: "Won" or "Lost" once it has played the title game, otherwise the odds
- * (`formatSideOdds`).
+ * (`formatSideOdds`). A team proven out of the title game can't win the conference: a flat "0%".
  */
 export function formatChampion(o: Pick<TeamOutlook, "champion" | "status" | "titleResult">): string {
   if (o.titleResult) return o.titleResult.won ? "Won" : "Lost";
   return formatSideOdds(o.champion, o.status);
+}
+
+/**
+ * One line for a team that is proven out of its conference title game, to stand over its games in place of an "Out"
+ * on every result: "Out of the Big Ten title game. Playoff odds only." Null while the team can still play in it, and
+ * once it has played it.
+ */
+export function titleGameOutLine(conference: string, o: Pick<TeamOutlook, "status" | "titleResult">): string | null {
+  if (o.status !== "eliminated" || o.titleResult) return null;
+  return `Out of the ${conferenceName(conference)} title game. Playoff odds only.`;
+}
+
+/**
+ * "Florida International wins" and, for a narrow button, "FIU wins". A team without an abbreviation keeps its name.
+ */
+export function winsLabel(name: string, abbreviation: string | null): { full: string; short: string } {
+  return { full: `${name} wins`, short: `${abbreviation || name} wins` };
 }
 
 /** Whole-percent odds. "<1%" and ">99%" stand in for 0 or 100 when the true value isn't exact. */

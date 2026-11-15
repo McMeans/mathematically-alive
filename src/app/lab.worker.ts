@@ -42,7 +42,7 @@ function run(locks: LabLocks, iterations: number, reuse: NationalResult | undefi
   return seasonLab(season, { ...base, iterations, locks, reuse });
 }
 const strip = (lab: SeasonLab, changes: LabChanges | null, focus: number | null): LabView => ({
-  summary: lab.summary, picks: lab.picks, open: lab.open, playoff: lab.playoff, conferences: lab.conferences,
+  summary: lab.summary, fieldTexts: lab.fieldTexts, loaded: lab.loaded, picks: lab.picks, open: lab.open, playoff: lab.playoff, champions: lab.champions, conferences: lab.conferences,
   ranking: lab.ranking, live: lab.live, liveAll: lab.liveAll, allLabel: lab.allLabel, topLabel: lab.topLabel, backLabel: lab.backLabel, bigGames: lab.bigGames, records: lab.records, changes, focus: focus === null ? null : labTeamOdds(lab.national, focus),
 });
 

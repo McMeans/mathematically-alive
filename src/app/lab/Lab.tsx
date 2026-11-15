@@ -57,6 +57,8 @@ function useLab(initial: LabView) {
   const [refining, setRefining] = useState(false);
   const [failed, setFailed] = useState(false);
   const [note, setNote] = useState("");
+  /** The Lab opened from a link with picks, and nothing has changed since. */
+  const [fromLink, setFromLink] = useState(false);
   const [focus, setFocusState] = useState<number | null>(null);
   const worker = useRef<Worker | null>(null);
   const latest = useRef(0);
@@ -109,6 +111,7 @@ function useLab(initial: LabView) {
           ? { games: { ...r.locks.games, ...l.games }, titles: { ...r.locks.titles, ...l.titles }, bracket: { ...r.locks.bracket, ...l.bracket } }
           : r.locks;
         setNote(r.note);
+        setFromLink(count(next) > 0);
         for (const c of Object.keys(next.titles)) if (titleKeys.current[c] === undefined) linkTitles.current.add(c);
         current.current = next;
         setLocks(next);
@@ -187,6 +190,7 @@ function useLab(initial: LabView) {
     current.current = next;
     setLocks(next);
     setNote("");
+    setFromLink(false);
     run(next);
   }
   function fill(how: LabFill) {
@@ -212,6 +216,7 @@ function useLab(initial: LabView) {
     if (!prev) return;
     setHistory((h) => h.slice(0, -1));
     setNote("");
+    setFromLink(false);
     current.current = prev;
     setLocks(prev);
     run(prev);
@@ -258,7 +263,7 @@ function useLab(initial: LabView) {
     if (team !== null && count(current.current) > 0) run(current.current);
   }
   const status = failed ? "Couldn’t update. Showing the last result." : refining ? "Refining…" : "";
-  return { locks, view, status, refining, note, focus, canUndo: history.length > 0, pickGame, pickTitle, pickBracket, bracketPicks, fill, undo, pin,
+  return { locks, view, status, refining, note, fromLink, focus, canUndo: history.length > 0, pickGame, pickTitle, pickBracket, bracketPicks, fill, undo, pin,
     resetBracket: () => setBracketState({ key: "", picks: {} }),
     /** Play out the bracket's open games once, its picks kept. */
     simulateBracket: () => view.playoff && worker.current?.postMessage({ kind: "bracket", id: 0, games: view.playoff.bracket, picked: bracketPicks, seed: Math.floor(Math.random() * 2 ** 31) } satisfies LabRequest),
@@ -271,7 +276,7 @@ type FieldView = "seeds" | "bracket" | "top25";
 const PIN_ICON = <svg viewBox="0 0 16 16" aria-hidden className="h-3.5 w-3.5"><path d="M6 1.5h4l-.6 4.2 2.6 2.6v1.2H8.6V15H7.4V9.5H4V8.3l2.6-2.6z" fill="currentColor" /></svg>;
 
 export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdds, through, asOf }: Props) {
-  const { locks, view, status, refining, note, focus, canUndo, pickGame, pickTitle, pickBracket, bracketPicks, fill, undo, pin, reset, resetBracket, simulateBracket } = useLab(initial);
+  const { locks, view, status, refining, note, fromLink, focus, canUndo, pickGame, pickTitle, pickBracket, bracketPicks, fill, undo, pin, reset, resetBracket, simulateBracket } = useLab(initial);
   const [tab, setTab] = useState<Tab>("field");
   const [fieldView, setFieldView] = useState<FieldView>("seeds");
   const pagedSet = useMemo(() => new Set(paged), [paged]);
@@ -281,33 +286,52 @@ export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdd
   const now = focus === null ? null : picks === 0 ? before : view.focus?.teamId === focus ? view.focus : before;
   const headline = note || view.changes?.headline || "";
   const lines = view.changes?.lines ?? [];
+  const idle = fromLink && picks > 0 && view.picks > 0 ? view.loaded : "Pick a game, or fill the rest.";
   const teamPage = focus === null ? "/" : `/team/${focus}${Object.keys(locks.games).length ? `?picks=${encodeLocks(locks.games)}` : ""}`;
   const unpin = () => pin(null);
   const focusConference = focus === null ? null : view.conferences.find((c) => c.standings.some((s) => s.teamId === focus))?.conference ?? null;
 
   return (
-    <div className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
-      <header className="board-dots sticky top-0 z-30 text-board-text lg:static">
+    <div className="flex min-h-dvh flex-col lg:tall:h-dvh lg:tall:overflow-hidden">
+      <header className="board-dots sticky top-0 z-30 text-board-text lg:tall:static">
         <SiteBar current="lab" teams={focus !== null ? teamPage : "/"} lab="/lab" through={through} asOf={asOf} find={teams} />
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5 px-3.5 py-2.5 md:px-6 md:py-3.5">
           <div className="hidden xl:block">
-            <h1 className="cond flex items-center gap-2.5 text-4xl font-extrabold leading-none text-white">Season Lab <Beta /></h1>
+            <h1 className="cond flex items-center gap-2.5 text-4xl font-extrabold leading-none text-white">Season Lab</h1>
             <p className="mt-1 text-[13px] text-board-muted">Play out the rest of the season.</p>
           </div>
-          <div aria-live="polite" className={`order-5 min-w-0 flex-[1_0_100%] md:order-none md:flex-1 ${headline ? "" : "hidden md:block"} border-t border-board-line pt-2 md:border-0 md:pt-0`}>
+          <div aria-live="polite" className="order-5 flex h-7 min-w-0 flex-[1_0_100%] items-center border-t border-board-line md:hidden">
+            {!note && lines.length > 0 ? (
+              <p title={headline} className="cond min-w-0 truncate text-sm font-bold leading-none tracking-[0.03em] text-white">
+                {lines.map((l, i) => (
+                  <span key={l.label}>
+                    {i > 0 && <span className="text-board-muted"> · </span>}
+                    <span className={`mr-1 text-xs tracking-[0.1em] ${l.label === "In" || l.label === "Up" ? "text-root" : "text-drop"}`}>{l.label}</span>
+                    {l.teams.map((t, k) => (
+                      <span key={k}>{k > 0 && <span className="text-board-muted">, </span>}{t.seed !== null && <span className="mr-0.5 text-[0.74em] text-board-muted">{t.seed}</span>}{t.name}</span>
+                    ))}
+                    {l.more > 0 && <span className="text-board-muted"> +{l.more}</span>}
+                  </span>
+                ))}
+              </p>
+            ) : (
+              <span className={`min-w-0 truncate text-sm ${note ? "cond font-bold text-lamp" : headline ? "text-white" : "text-board-muted"}`}>{headline || idle}</span>
+            )}
+          </div>
+          <div aria-live="polite" className="hidden min-w-0 md:block md:flex-1">
             {headline ? (
               <>
                 <small className="cond block text-xs font-bold tracking-[0.1em] text-board-muted">{note ? "Note" : "Field change"}</small>
                 {!note && lines.length > 0 ? lines.map((l) => (
-                  <p key={l.label} title={headline} className="cond flex min-w-0 items-baseline gap-2 text-base font-bold leading-[1.2] tracking-[0.03em] text-white md:text-lg">
+                  <p key={l.label} title={headline} className="cond flex min-w-0 items-baseline gap-2 text-lg font-bold leading-[1.2] tracking-[0.03em] text-white">
                     <span className={`w-9 shrink-0 text-xs tracking-[0.1em] ${l.label === "In" || l.label === "Up" ? "text-root" : "text-drop"}`}>{l.label}</span>
                     <span className="truncate">{l.teams.map((t, k) => (
                       <span key={k}>{k > 0 && " · "}{t.seed !== null && <span className="mr-1 text-[0.74em] text-board-muted">{t.seed}</span>}{t.name}</span>
                     ))}{l.more > 0 && <span className="text-board-muted"> +{l.more}</span>}</span>
                   </p>
-                )) : <b title={headline} className="cond line-clamp-2 text-lg font-bold leading-[1.15] tracking-[0.03em] text-lamp md:text-xl">{headline}</b>}
+                )) : <b title={headline} className="cond line-clamp-2 text-xl font-bold leading-[1.15] tracking-[0.03em] text-lamp">{headline}</b>}
               </>
-            ) : <span className="text-[15px] text-board-muted">Pick a game, or fill the rest.</span>}
+            ) : <span className="text-[15px] text-board-muted">{idle}</span>}
           </div>
           <div className="flex min-w-0 flex-1 items-center gap-2.5 md:flex-none">
             <span key={picks} className="plate plate-hang text-[30px] text-white md:text-[40px]">{picks}</span>
@@ -318,7 +342,7 @@ export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdd
           </div>
           <div className="flex gap-1.5">
             <BoardButton onClick={undo} disabled={!canUndo}>Undo</BoardButton>
-            <BoardButton onClick={reset} disabled={picks === 0 && Object.keys(bracketPicks).length === 0}>Reset</BoardButton>
+            <BoardButton lit={picks > 0 || Object.keys(bracketPicks).length > 0} onClick={reset} disabled={picks === 0 && Object.keys(bracketPicks).length === 0}>Reset</BoardButton>
             <ShareButton board label="Share" link={labLink} className={picks === 0 ? "opacity-55" : ""} />
           </div>
         </div>
@@ -328,34 +352,34 @@ export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdd
             <PinOdds label="Playoff" before={before.playoffText} after={now.playoffText} up={(now.playoff ?? 0) > (before.playoff ?? 0)} />
             {now.titleGame !== null && <PinOdds label="Title game" before={before.titleGameText} after={now.titleGameText} up={(now.titleGame ?? 0) > (before.titleGame ?? 0)} />}
             <span className="flex-1" />
-            <Link href={teamPage} className="whitespace-nowrap text-[13px] font-semibold text-board-text hover:text-white">{name(focus)}’s page <span className="text-lamp">→</span></Link>
-            <button type="button" onClick={unpin} aria-label={`Unpin ${name(focus)}`} className="flex h-[30px] w-[30px] items-center justify-center rounded-[3px] text-board-muted hover:bg-white/[0.07] hover:text-white">
+            <Link href={teamPage} className="inline-flex min-h-11 items-center whitespace-nowrap text-[13px] font-semibold text-board-text hover:text-white lg:min-h-0">{name(focus)}’s page <span className="text-lamp">→</span></Link>
+            <button type="button" onClick={unpin} aria-label={`Unpin ${name(focus)}`} className="flex h-11 w-11 items-center justify-center rounded-[3px] text-board-muted lg:h-[30px] lg:w-[30px] hover:bg-white/[0.07] hover:text-white">
               <svg viewBox="0 0 16 16" aria-hidden className="h-3.5 w-3.5"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>
             </button>
           </div>
         )}
-        <div role="tablist" aria-label="Season Lab" className="flex gap-1.5 bg-ground px-3.5 pb-2 pt-2.5 lg:hidden">
+        <div role="tablist" aria-label="Season Lab" className="flex border-t border-board-line px-3.5 md:px-6 lg:tall:hidden">
           {(["field", "games", "races"] as const).map((t) => (
             <button key={t} role="tab" type="button" aria-selected={tab === t} onClick={() => { setTab(t); window.scrollTo(0, 0); }}
-              className={`cond h-11 flex-1 rounded-[3px] border text-base font-bold tracking-[0.04em] ${tab === t ? "border-board bg-board text-white" : "border-rule bg-white text-ink-soft"}`}>
+              className={`cond h-11 flex-1 border-b-[3px] text-base font-bold tracking-[0.04em] ${tab === t ? "border-lamp text-white" : "border-transparent text-board-muted hover:text-white"}`}>
               {t === "field" ? "Field" : t === "games" ? "Games" : "Races"}
             </button>
           ))}
         </div>
       </header>
 
-      <div className={`grid flex-1 grid-cols-[minmax(0,1fr)] lg:min-h-0 lg:grid-cols-[minmax(320px,380px)_minmax(0,1fr)_300px] ${focus !== null ? "pb-24 md:pb-0" : ""}`}>
-        <section aria-labelledby="field-h" className={`scroll-thin bg-paper p-3.5 pb-10 md:p-5 lg:block lg:overflow-y-auto lg:border-r lg:border-rule ${tab === "field" ? "" : "hidden"}`}>
+      <div className={`grid flex-1 grid-cols-[minmax(0,1fr)] lg:tall:min-h-0 lg:tall:grid-cols-[minmax(320px,380px)_minmax(0,1fr)_300px] ${focus !== null ? "pb-24 md:pb-0" : ""}`}>
+        <section aria-labelledby="field-h" className={`scroll-thin bg-paper p-3.5 pb-10 md:p-5 lg:tall:block lg:tall:overflow-y-auto lg:tall:border-r lg:tall:border-rule ${tab === "field" ? "" : "hidden"}`}>
           <Field view={view} ranks={ranks} fieldView={fieldView} setFieldView={setFieldView} name={name} abbr={(id) => abbrs[id] ?? name(id)} focus={focus} focusOdds={now}
             picked={bracketPicks} onPick={(g, w) => view.playoff && pickBracket(view.playoff.bracket, g, w)} onResetBracket={resetBracket} onSimulateBracket={simulateBracket} />
         </section>
-        <section aria-labelledby="games-h" className={`scroll-thin p-3.5 pb-10 md:p-5 lg:block lg:overflow-y-auto ${tab === "games" ? "" : "hidden"}`}>
+        <section aria-labelledby="games-h" className={`scroll-thin p-3.5 pb-10 md:p-5 lg:tall:block lg:tall:overflow-y-auto ${tab === "games" ? "" : "hidden"}`}>
           <MarksContext.Provider value={ranks}>
           <Games games={games} picked={locks.games} titles={locks.titles} conferences={view.conferences} name={name} abbr={(id) => abbrs[id] ?? name(id)}
             onPick={pickGame} onTitle={pickTitle} open={view.open} onFill={fill} big={view.bigGames} focus={focus} focusConference={focusConference} teams={teams} />
           </MarksContext.Provider>
         </section>
-        <section aria-labelledby="races-h" className={`scroll-thin bg-paper p-3.5 pb-10 md:p-5 lg:block lg:overflow-y-auto lg:border-l lg:border-rule ${tab === "races" ? "" : "hidden"}`}>
+        <section aria-labelledby="races-h" className={`scroll-thin bg-paper p-3.5 pb-10 md:p-5 lg:tall:block lg:tall:overflow-y-auto lg:tall:border-l lg:tall:border-rule ${tab === "races" ? "" : "hidden"}`}>
           <MarksContext.Provider value={ranks}>
             <Races conferences={view.conferences} name={name} paged={pagedSet} focus={focus} />
           </MarksContext.Provider>
@@ -369,12 +393,11 @@ export function Lab({ initial, games, names, abbrs, teams, paged, ranks, baseOdd
   );
 }
 
-const Beta = () => <span className="cond rounded-[2px] border border-current px-1.5 text-[11px] font-bold leading-[15px] tracking-[0.06em] text-board-muted">Beta</span>;
-
-function BoardButton({ children, onClick, disabled }: { children: ReactNode; onClick: () => void; disabled?: boolean }) {
+function BoardButton({ children, onClick, disabled, lit }: { children: ReactNode; onClick: () => void; disabled?: boolean; lit?: boolean }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled}
-      className="cond h-9 rounded-[3px] border border-board-line px-3 text-base font-bold tracking-[0.05em] text-white hover:border-board-muted disabled:opacity-40 md:h-[38px] md:px-3.5">
+      className={`cond h-11 rounded-[3px] border px-3 text-base font-bold tracking-[0.05em] lg:h-[38px] md:px-3.5 ${lit === undefined ? "border-board-line text-white hover:border-board-muted disabled:opacity-40"
+        : lit ? "border-lamp bg-lamp text-plate-ink" : "border-board-line text-board-muted opacity-50"}`}>
       {children}
     </button>
   );
@@ -384,7 +407,7 @@ function PinOdds({ label, before, after, up }: { label: string; before: string; 
   return (
     <span className="cond flex items-baseline gap-1.5 whitespace-nowrap text-[19px] font-extrabold text-white">
       <small className="text-xs font-bold tracking-[0.08em] text-board-muted">{label}</small>
-      {before === after ? <b>{after}</b> : <><s className="text-[15px] font-bold text-board-muted">{before}</s><span aria-hidden className="text-[13px] text-board-muted">→</span><b className={up ? "text-lamp" : "text-[#f08a7e]"}>{after}</b></>}
+      {before === after ? <b>{after}</b> : <><s className="text-[15px] font-bold text-board-muted">{before}</s><span aria-hidden className="text-[13px] text-board-muted">→</span><b className={up ? "text-root" : "text-drop"}>{after}</b></>}
     </span>
   );
 }
@@ -430,7 +453,7 @@ function DockNum({ label, value, delta }: { label: string; value: string; delta:
     <span className="ml-1.5 grid grid-cols-[auto_auto] items-baseline gap-x-1">
       <small className="cond col-span-2 text-[11px] font-bold tracking-[0.08em] text-board-muted">{label}</small>
       <b className="plate text-[22px]">{value}</b>
-      {delta && <em className={`cond text-sm font-bold not-italic ${delta.startsWith("+") ? "text-lamp" : "text-[#f08a7e]"}`}>{delta}</em>}
+      {delta && <em className={`cond text-sm font-bold not-italic ${delta.startsWith("+") ? "text-root" : "text-drop"}`}>{delta}</em>}
     </span>
   );
 }
@@ -450,7 +473,7 @@ function Seg<T extends string>({ options, value, onChange, label }: { options: {
     <div role="group" aria-label={label} className="flex gap-1">
       {options.map((o) => (
         <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)}
-          className={`cond h-10 flex-1 whitespace-nowrap rounded-[2px] border px-3 text-[15px] font-bold tracking-[0.04em] md:h-[34px] ${value === o.id ? "border-board bg-board text-white" : "border-rule bg-white text-ink-soft"}`}>
+          className={`cond h-11 flex-1 whitespace-nowrap rounded-[2px] border px-3 text-[15px] font-bold tracking-[0.04em] lg:h-[34px] ${value === o.id ? "border-board bg-board text-white" : "border-rule bg-white text-ink-soft"}`}>
           {o.label}
         </button>
       ))}
@@ -464,7 +487,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
   focus: number | null; focusOdds: LabTeamOdds | null; picked: Record<number, number>; onPick: (gameIndex: number, winner: number) => void; onResetBracket: () => void; onSimulateBracket: () => void;
 }) {
   const p = view.playoff;
-  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  const pct = (id: number) => view.fieldTexts[id] ?? "—";
   const inField = new Set(p?.field.map((s) => s.teamId) ?? []);
   const onBubble = new Set(p?.bubble.map((b) => b.teamId) ?? []);
   const [all, setAll] = useState(false);
@@ -489,7 +512,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
           <Seg label="Show" value={fieldView} onChange={setFieldView} options={[{ id: "seeds", label: "Seeds" }, { id: "bracket", label: "Bracket" }, { id: "top25", label: "Top 25" }]} />
         </div>
       }>{p?.heading ?? "Playoff field"}</PaneHeading>
-      <p className="mb-3 text-[13px] text-ink-muted"><span className="cond mr-1 rounded-[2px] border border-current px-1.5 text-[11px] font-bold tracking-[0.06em]">Beta</span>Modelled, not the committee.</p>
+      <p className="mb-3 text-[13px] text-ink-muted">Our model, not the committee.</p>
       {fieldView === "seeds" && p && (
         <>
           <div className="rounded bg-board-deep py-1.5 text-board-text">
@@ -497,7 +520,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
             {p.field.map((s, k) => (
               <div key={s.teamId}>
                 {k === 4 && <><div className="mx-3.5 my-1.5 h-px bg-board-line" /><p className="cond px-3.5 pb-1 text-xs font-bold tracking-[0.08em] text-board-muted">First round</p></>}
-                <FieldRow seed={s.seed} lit={k < 4} id={s.teamId} rank={ranks[s.teamId]} name={name(s.teamId)} record={view.records[s.teamId]} odds={pct(s.field)} me={s.teamId === focus} />
+                <FieldRow seed={s.seed} lit={k < 4} id={s.teamId} rank={ranks[s.teamId]} name={name(s.teamId)} record={view.records[s.teamId]} odds={pct(s.teamId)} me={s.teamId === focus} />
               </div>
             ))}
           </div>
@@ -505,7 +528,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
             <>
               <h3 className="cond mb-2 mt-4 text-[17px] font-extrabold">On the bubble</h3>
               <div className="rounded bg-board-deep py-1.5">
-                {p.bubble.map((b) => <FieldRow key={b.teamId} id={b.teamId} rank={ranks[b.teamId]} name={name(b.teamId)} record={view.records[b.teamId]} odds={pct(b.field)} me={b.teamId === focus} />)}
+                {p.bubble.map((b) => <FieldRow key={b.teamId} id={b.teamId} rank={ranks[b.teamId]} name={name(b.teamId)} record={view.records[b.teamId]} odds={pct(b.teamId)} me={b.teamId === focus} />)}
                 {focus !== null && focusOdds && !inField.has(focus) && !onBubble.has(focus) && (
                   <div className="mt-1 border-t border-dashed border-board-line pt-1">
                     <FieldRow id={focus} rank={ranks[focus]} name={name(focus)} record={view.records[focus]} odds={focusOdds.playoffText} me tag="Pinned" />
@@ -539,7 +562,7 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
 function RankToggle({ id, open, label, name, onClick }: { id?: string; open: boolean; label: string; name?: string; onClick: () => void }) {
   return (
     <button id={id} type="button" aria-expanded={open} aria-label={name} onClick={onClick}
-      className="cond group mx-3.5 mb-1 mt-1.5 flex w-[calc(100%-1.75rem)] items-center gap-2 text-xs font-bold tracking-[0.08em] text-lamp">
+      className="cond group mx-3.5 mb-1 mt-1.5 flex min-h-11 w-[calc(100%-1.75rem)] items-center gap-2 lg:min-h-0 text-xs font-bold tracking-[0.08em] text-lamp">
       <span className="flex-1 border-t border-dashed border-board-line" />
       <span className="group-hover:underline">{label}</span>
       <span className="flex-1 border-t border-dashed border-board-line" />
@@ -602,10 +625,10 @@ function Bracket({ games, picked, abbr, name, onPick, onReset, onSimulate }: {
   walk(games[games.length - 1]);
   const champion = picked[games[games.length - 1].index] as number | undefined;
   const slot = (g: BracketGame, k: ReturnType<typeof known>, s: BracketSide, other: ReturnType<typeof known>) => {
-    if (!k) return <div className="flex h-7 min-w-0 items-center justify-center truncate rounded-[3px] border border-dashed border-board-line px-0.5 text-[10.5px] text-board-muted">{feed(s)}</div>;
+    if (!k) return <div className="flex h-11 min-w-0 items-center justify-center truncate rounded-[3px] border border-dashed border-board-line px-0.5 text-[10.5px] lg:h-7 text-board-muted">{feed(s)}</div>;
     const on = picked[g.index] === k.teamId;
     const label = <><span className={`w-3.5 shrink-0 text-center text-[11px] ${on ? "text-plate-ink/70" : "text-board-muted"}`}>{k.seed ?? ""}</span><TeamLogo id={k.teamId} dark={!on} size="14px" /><b className="truncate">{abbr(k.teamId)}</b></>;
-    const base = "cond flex h-7 min-w-0 items-center gap-1 rounded-[3px] border px-0.5 text-[13px] font-bold";
+    const base = "cond flex h-11 min-w-0 items-center gap-1 rounded-[3px] border px-0.5 text-[13px] font-bold lg:h-7";
     if (g.result) return <div className={`${base} border-board-line text-white`}>{label}</div>;
     const off = other !== null && picked[g.index] === other.teamId;
     return (
@@ -642,11 +665,11 @@ function Bracket({ games, picked, abbr, name, onPick, onReset, onSimulate }: {
           <p className="w-full text-[13px] text-board-muted">{Object.keys(picked).length > 0 ? "Pick the final to crown a champion." : "Tap a team to move it on. Shown only: the odds don’t change."}</p>
         )}
         <button type="button" onClick={onSimulate} disabled={Object.keys(picked).length >= games.length}
-          className="cond ml-auto h-7 shrink-0 rounded-[3px] border border-board-line px-2.5 text-[13px] font-bold tracking-[0.05em] text-board-text hover:border-board-muted disabled:opacity-40">
+          className="cond ml-auto h-11 shrink-0 lg:h-7 rounded-[3px] border border-board-line px-2.5 text-[13px] font-bold tracking-[0.05em] text-board-text hover:border-board-muted disabled:opacity-40">
           Simulate
         </button>
         <button type="button" onClick={onReset} disabled={Object.keys(picked).length === 0}
-          className="cond h-7 shrink-0 rounded-[3px] border border-board-line px-2.5 text-[13px] font-bold tracking-[0.05em] text-board-text hover:border-board-muted disabled:opacity-40">
+          className="cond h-11 shrink-0 lg:h-7 rounded-[3px] border border-board-line px-2.5 text-[13px] font-bold tracking-[0.05em] text-board-text hover:border-board-muted disabled:opacity-40">
           Reset bracket
         </button>
       </div>
@@ -721,21 +744,21 @@ function Games({ games, picked, titles, conferences, name, abbr, onPick, onTitle
       <div className="mb-2.5 flex gap-2">
         <div className="relative">
           <button type="button" aria-expanded={menu} disabled={open === 0} onClick={() => setMenu(!menu)}
-            className="cond flex h-[42px] items-center gap-1.5 rounded-[3px] bg-board px-3.5 text-[17px] font-bold tracking-[0.05em] text-white hover:bg-board-deep disabled:opacity-40">
+            className="cond flex h-11 items-center gap-1.5 rounded-[3px] bg-board px-3.5 text-[17px] font-bold tracking-[0.05em] text-white hover:bg-board-deep disabled:opacity-40">
             Fill the rest <span aria-hidden className="text-xs">▾</span>
           </button>
           {menu && (
             <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded border border-rule bg-white p-1 shadow-[0_8px_20px_rgba(21,32,27,0.18)]">
-              <button type="button" onClick={() => { setMenu(false); onFill("favorites"); }} className="block w-full rounded-[2px] px-2.5 py-2 text-left hover:bg-ground">
+              <button type="button" onClick={() => { setMenu(false); onFill("favorites"); }} className="block min-h-11 w-full rounded-[2px] px-2.5 py-2 text-left hover:bg-ground">
                 <b className="block font-semibold">Favorites win</b><span className="text-[13px] text-ink-muted">The likelier side wins every game left.</span>
               </button>
-              <button type="button" onClick={() => { setMenu(false); onFill({ seed: Math.floor(Math.random() * 2 ** 31) }); }} className="block w-full rounded-[2px] px-2.5 py-2 text-left hover:bg-ground">
+              <button type="button" onClick={() => { setMenu(false); onFill({ seed: Math.floor(Math.random() * 2 ** 31) }); }} className="block min-h-11 w-full rounded-[2px] px-2.5 py-2 text-left hover:bg-ground">
                 <b className="block font-semibold">One possible season</b><span className="text-[13px] text-ink-muted">Each game drawn from its odds.</span>
               </button>
             </div>
           )}
         </div>
-        <label className="flex h-[42px] min-w-0 flex-1 items-center gap-2 rounded-[3px] border border-rule bg-white px-3 text-ink-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-lamp focus-within:border-ink-muted">
+        <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-[3px] border border-rule bg-white px-3 text-ink-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-lamp focus-within:border-ink-muted">
           <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4 shrink-0"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M13 13l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
           <span className="sr-only">Find a team</span>
           <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find a team" list="lab-teams" className="min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-muted" />
@@ -804,7 +827,7 @@ const conferenceShortOf = (c: LabConference) => conferenceShort(c.conference);
 function Chip({ on, lamp, onClick, children }: { on: boolean; lamp?: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button type="button" aria-pressed={on} onClick={onClick}
-      className={`cond flex h-9 shrink-0 items-center gap-1.5 rounded-[2px] border px-2.5 text-[15px] font-bold tracking-[0.03em] md:h-7 ${
+      className={`cond flex h-11 shrink-0 items-center gap-1.5 rounded-[2px] border px-2.5 text-[15px] font-bold tracking-[0.03em] lg:h-7 ${
         on ? (lamp ? "border-lamp bg-lamp text-plate-ink" : "border-board bg-board text-white") : lamp ? "border-lamp bg-white text-ink" : "border-rule bg-white text-ink-soft"}`}>
       {children}
     </button>
@@ -817,22 +840,22 @@ const MarksContext = createContext<Record<number, string>>({});
 /** The team's current rank before its name ("#16"), when it has one. Picks never change it. */
 function Rank({ id }: { id: number }) {
   const rank = useContext(MarksContext)[id];
-  return rank ? <span className="mr-1 text-[0.74em] font-bold opacity-70">{rank}</span> : null;
+  return rank ? <span className="mr-1 text-[0.74em] font-bold opacity-70 @max-[149px]:hidden">{rank}</span> : null;
 }
 
 /** One side of a game: the team and its odds; picked fills amber and shows the pick mark; the beaten side fades. */
 function TeamButton({ id, name, abbr, odds, home, on, lost, onClick }: { id: number; name: string; abbr: string; odds: string; home: boolean; on: boolean; lost: boolean; onClick: () => void }) {
   return (
     <button type="button" aria-pressed={on} onClick={onClick} title={on ? "Picked. Tap again to clear." : `Pick ${name} to win`}
-      className={`press flex min-h-11 w-full min-w-0 items-center justify-between gap-2 rounded-[3px] border px-2 py-1.5 text-left md:min-h-0 md:px-2.5 ${home ? "flex-row-reverse text-right" : ""} ${
+      className={`@container press flex min-h-11 w-full min-w-0 items-center justify-between gap-2 rounded-[3px] border px-2 py-1.5 text-left md:min-h-0 md:px-2.5 ${home ? "flex-row-reverse text-right" : ""} ${
         on ? "border-lamp bg-lamp text-plate-ink" : `border-board-line bg-white/[0.04] text-white hover:border-board-muted [.big_&]:border-2 [.big_&]:border-lamp ${lost ? "opacity-40" : ""}`}`}>
-      <b className={`cond flex min-w-0 items-center gap-1.5 text-base font-bold md:text-lg ${home ? "flex-row-reverse" : ""}`}>
+      <b className={`cond flex min-w-0 items-center gap-1.5 text-base font-bold @max-[149px]:gap-1 @max-[149px]:text-[15px] md:text-lg @max-[149px]:md:text-[15px] [&_img]:@max-[149px]:!h-4 [&_img]:@max-[149px]:!w-4 ${home ? "flex-row-reverse" : ""}`}>
         <TeamLogo id={id} dark={!on} />
-        <span className="truncate md:hidden"><Rank id={id} />{abbr}</span>
-        <span className="hidden truncate md:inline"><Rank id={id} />{name}</span>
+        <span className="@[220px]:hidden"><Rank id={id} />{abbr}</span>
+        <span className="hidden leading-tight @[220px]:inline"><Rank id={id} />{name}</span>
       </b>
       {on ? <span className="shrink-0 text-[19px] text-plate-ink md:text-[21px]"><PickMark /></span>
-        : <span className="plate shrink-0 text-[15px] text-board-muted md:text-[17px]">{odds}</span>}
+        : <span className="plate shrink-0 text-[15px] text-board-muted @max-[149px]:text-sm md:text-[17px]">{odds}</span>}
     </button>
   );
 }
@@ -852,7 +875,6 @@ function Races({ conferences, name, paged, focus }: { conferences: LabConference
           // The pinned team and the picked title-game winner join the two leaders when they aren't already there.
           const extra = [focus, c.picked].filter((id, k, all): id is number => id !== null && all.indexOf(id) === k && !lead.some((t) => t.teamId === id))
             .flatMap((id) => odds.get(id) ?? []);
-          const pct = (x: number) => (x > 0 && x < 0.01 ? "<1%" : `${Math.round(x * 100)}%`);
           return (
             <div key={c.conference} className="rounded bg-board-deep text-board-text">
               <button type="button" aria-expanded={isOpen} onClick={() => setOpen((s) => { const n = new Set(s); if (n.has(c.conference)) n.delete(c.conference); else n.add(c.conference); return n; })}
@@ -865,7 +887,7 @@ function Races({ conferences, name, paged, focus }: { conferences: LabConference
                   <span key={t.teamId} className="contents">
                     <span className={`cond flex min-w-0 items-center gap-1.5 truncate text-[17px] font-bold ${t.teamId === focus ? "text-lamp" : k === 0 ? "text-white" : "text-board-text"}`}><TeamLogo id={t.teamId} /> <span className="truncate"><Rank id={t.teamId} />{name(t.teamId)}</span>
                       {t.teamId === c.picked && <span className="shrink-0 text-[15px] text-lamp"><PickMark /></span>}</span>
-                    <span className={`plate text-right text-[17px] ${t.teamId === focus ? "text-lamp" : k === 0 ? "text-white" : "text-board-text"}`}>{pct(t.titleGame)}</span>
+                    <span className={`plate text-right text-[17px] ${t.teamId === focus ? "text-lamp" : k === 0 ? "text-white" : "text-board-text"}`}>{t.titleGameText}</span>
                   </span>
                 ))}
               </button>
@@ -883,8 +905,8 @@ function Races({ conferences, name, paged, focus }: { conferences: LabConference
                               {paged.has(s.teamId) ? <Link href={`/team/${s.teamId}`} className="font-semibold text-white hover:underline">{name(s.teamId)}</Link> : <span className="font-semibold text-white">{name(s.teamId)}</span>}
                               <i className="block text-xs not-italic text-board-muted">{s.text}</i>
                             </td>
-                            <td className="text-right">{t ? pct(t.titleGame) : "—"}</td>
-                            <td className="text-right">{t ? pct(t.champion) : "—"}</td>
+                            <td className="text-right">{t ? t.titleGameText : "—"}</td>
+                            <td className="text-right">{t ? t.championText : "—"}</td>
                           </tr>
                         );
                       })}

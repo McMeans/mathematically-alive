@@ -11,3 +11,5 @@ export function useConference(): { conference: string; labels: OddsLabels } {
   if (conference === null) throw new Error("useConference needs a ConferenceProvider");
   return useMemo(() => ({ conference, labels: oddsLabels(conference) }), [conference]);
 }
+
+export { CONFERENCE_ORDER, inConferenceOrder } from "./conferenceOrder";

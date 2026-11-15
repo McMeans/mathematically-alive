@@ -63,7 +63,7 @@ All colors are Tailwind v4 tokens in the `@theme` block of `src/app/globals.css`
 
 | Token | Hex | Use |
 | --- | --- | --- |
-| `lamp` | `#F2B134` | Amber. A pick (button fill), the page's own team in a race (left edge and its numbers), the cut line, a big game's 2px outline, the focus ring, "live" status tags, a reset button that has something to reset, text selection. |
+| `lamp` | `#F2B134` | Amber. A pick (button fill), the page's own team in a race (left edge and its numbers), the cut line, a big game's 2px outline, the focus ring on the board, "live" status tags, a reset button that has something to reset, text selection. |
 | `lamp-ink` | `#8A5D00` | Amber as text on the ground, where `lamp` is too light (1.5:1). Used for notes like "title pick cleared". |
 | `plate` | `#F3F0E6` | The cream plate: the current nav item, Share on the board, the selected conference tab in the team sheet, the mark's ball. |
 | `plate-ink` | `#121A16` | Text on `plate` and on `lamp`. |
@@ -119,9 +119,10 @@ with `font-sans normal-case tracking-normal`.
 
 | Role | Classes |
 | --- | --- |
-| Team name in the header (picker) | `cond text-2xl md:text-[40px] font-extrabold` |
-| Lead number in the header (Playoff) | `plate text-[32px] md:text-[56px]` |
-| Other header numbers | `plate text-[22px] md:text-4xl` |
+| Team name in the header (picker), 768px up | `cond text-[32px] lg:text-[40px] font-extrabold`; names over 18 letters stay 32px. It wraps and is never truncated. |
+| Lead number in the header (Playoff), 768px up | `plate text-[44px] lg:text-[56px]` |
+| Other header numbers, 768px up | `plate text-4xl` |
+| Sticky strip (team page below that) | name `cond text-xl` (15px over 18 letters, two lines), lead number `plate text-[22px]`, others `text-[17px]` |
 | Section heading on the ground (`Heading`) | `cond text-2xl font-extrabold tracking-[0.02em]` |
 | Lab pane heading (`PaneHeading`) | `cond text-[26px] font-extrabold` |
 | Rail heading (`RailHeading`) | `cond text-lg font-extrabold tracking-[0.03em]` |
@@ -140,20 +141,30 @@ Formatters to reach for:
 
 | Function | What it shows |
 | --- | --- |
-| `formatSideOdds(p, status)` | Any odds on the board. One decimal under 1% (`"0.4%"`), whole percents otherwise. A live team never shows a flat 0% or 100%: `"<0.1%"` and `">99%"`. A team that's out can show `0%`. |
+| `formatSideOdds(p, status)` | Any odds on the board. One decimal under 1% (`"0.4%"`), whole percents otherwise. A live team never shows a flat 0% or 100%: `"<0.1%"` and `">99%"`. A team that's out can show `0%`. The Lab's text fields (`fieldTexts`, `titleGameText`, `championText`) are built from it. |
 | `formatTitleOdds(p, status)` | Title-game odds: `"In"` once clinched, `"Out"` once eliminated (both proven), else `formatSideOdds`. |
 | `formatFine(p)` | The same one-decimal precision, without a status. |
 | `formatOdds(p)` | Whole percents only (`"<1%"`, `">99%"`), for the team list and older views. |
 | `formatPlayoff`, `formatChampion`, `formatRecord`, `statusTags`, `playoffDetail`, `oddsLabels` | The header's numbers, record line, status tags and labels. |
 | `shownChange(before, after)` | How far odds moved, **in points of the odds as shown** (`">99%"` counts as 99, `"<0.1%"` as 0.1), so the move matches the two numbers on screen: `"+4"`, `"−0.3"`, or `null` when they read the same. Uses a real minus sign (`−`). |
-| `labOddsChange(before, after)` | The same move with its unit, for the Lab: `"+4 pts"`, `"+1 pt"`. |
+| `labOddsChange(before, after)` | The same move with its unit, for where the move stands alone (the Lab's pin strip and dock): `"+4 pts"`, `"+1 pt"`. |
+| `winsLabel(name, abbreviation)` | A result button's label as `{ full, short }`: `"Florida International wins"` and `"FIU wins"`. The button picks one by width. |
+| `titleGameOutLine(conference, outlook)` | Once the title game is proven Out: `"Out of the Big Ten title game. Playoff odds only."`; `null` while the team can still play in it. |
+| `conferenceShort(c)`, `conferenceName(c)` | The short form (`"SBC"`) and the full name. |
 
 Rules that follow from this:
 
-- "In" and "Out" (and a flat 100% or 0%) appear only when the core has proven them. Never round your way there.
+- "In" and "Out" (and a flat 100% or 0%) appear only when the core has proven them. Never round your way there. Every
+  live team reads `"<0.1%"` or `">99%"` on every page, the Lab's field and races and the team sheet included.
+- An odds move is green (`root`) or red (`drop`) wherever it shows, the Lab's pin strip and dock too. Beside a number
+  inside a result button it is a bare `+1`; where it stands alone it carries its unit, `+1 pt`.
+- Conference names: the short form on board labels and tags ("Win SBC"), the full name in headings and sentences. One
+  conference order everywhere, `CONFERENCE_ORDER` in `src/app/explorer/conference.tsx`: ACC, Big Ten, SEC, Big 12,
+  American, Pac 12, MW, SBC, MAC, CUSA, Independents.
+- Footnotes end with "Data through <date>." so the date is reachable on phones, where the site bar hides it.
 - An odds change is a difference of the two numbers shown, never of the raw probabilities.
 - The playoff estimate is the site's own model, not the committee. Label it: the team page marks Playoff with `*` and a
-  footnote; the Lab shows a "Beta" tag and "Modelled, not the committee."
+  footnote; the Lab's note reads "Our model, not the committee." There is no "Beta" tag anywhere.
 - Terms: "In", "Out", "Must win [conference]", "Non-con", "likeliest way in", "help from elsewhere" (`PRODUCT.md`).
 
 ## Surfaces, shape and depth
@@ -180,8 +191,22 @@ Shared building blocks live in `src/app/explorer/Board.tsx` and are reused by th
 - `TeamLogo({ id, dark, size })` loads CollegeFootballData's 64px logo: `logos-dark` (the default, `dark`) on the board,
   `logos` (`dark={false}`) on the ground, on white, or on an amber pick. When a button fills amber, flip it:
   `<TeamLogo id={id} dark={!on} />`. Logos are decorative (`alt=""`); the name is always next to them.
-- `TeamName({ id, name, dark })` is logo (`gap-1`), then this week's committee rank (`#16`, from `RanksContext`, smaller and
+- `TeamName({ id, name, dark, abbreviate })` is logo (`gap-1`), then this week's committee rank (`#16`, from `RanksContext`, smaller and
   dimmer), then the name, truncating. Use it wherever the page names a team.
+
+#### Team names
+
+Full name or abbreviation depends on where the name sits. A name never ends in an ellipsis where an abbreviation can
+stand in, except in race rows.
+
+| Where | Rule |
+| --- | --- |
+| Team page header | Always the full name. It steps down in size and wraps; never an ellipsis. |
+| Pick buttons in the Lab (`TeamButton`) | Full name when the button is about 200px or wider (the switch is at 220px), else the abbreviation, by container query. |
+| Result buttons on the team page | Labels use the abbreviation ("FIU wins") below 280px (`winsLabel`). |
+| Race rows in the rail | The name truncates with an ellipsis; when the name column is under 120px it switches to the abbreviation. |
+| Dock and bracket | Always the abbreviation. |
+| Headings and sentences | Always the full name. |
 
 ### Result buttons (the pick)
 
@@ -191,12 +216,14 @@ Shared building blocks live in `src/app/explorer/Board.tsx` and are reused by th
   ("Lock: …", "Picked. Tap again to clear.");
 - rest as `border-board-line bg-white/[0.04]`, hover to `border-board-muted bg-white/[0.07]`;
 - fill when picked: `border-lamp bg-lamp text-plate-ink`, every child switching to `plate-ink`;
-- are at least 44px tall on phones (`min-h-11`);
+- are at least 44px tall below `lg` (`min-h-11`);
 - use `.press` for the short color transition and a 0.97 scale on press.
 
 `Outcome` shows the result's label (`cond`), its chance (Public Sans, `text-xs`), then one or two lit numbers, each with
 a `cond` label under it. A number may carry an odds change, `plate text-[13px]`: `text-root` when it starts with `+`,
-`text-drop` otherwise. In the Lab, a picked `TeamButton` swaps its odds for `PickMark` (a heavy square-ended check,
+`text-drop` otherwise. Once the title game is proven Out, the buttons show only the Playoff number under the
+`titleGameOutLine` sentence, and record tiles that all read the same fold into one "Any finish: <value> playoff" block
+(from the core's board). In the Lab, a picked `TeamButton` swaps its odds for `PickMark` (a heavy square-ended check,
 `role="img" aria-label="Picked"`), and the beaten side fades to `opacity-40` (no strike-through: the fade and the amber winner say it).
 
 ### Week-by-week and help cards
@@ -239,7 +266,7 @@ button is solid `lamp`; once filled it turns to an amber outline, "Undo this pat
 | --- | --- |
 | Board action (Undo, Reset, Lab link in the header) | `cond h-9 rounded-[3px] border border-board-line text-white`, hover `border-board-muted` (Lab link hovers to `border-lamp`). Disabled: `opacity-40`. |
 | Share on the board | The cream plate: `bg-plate text-plate-ink`, no border, hover `bg-white`. |
-| Reset with picks to clear | Lit: `border-lamp bg-lamp text-plate-ink`. Without: `border-board-line text-board-muted opacity-50`, disabled. |
+| Reset with picks to clear | Lit: `border-lamp bg-lamp text-plate-ink`. Without: `border-board-line text-board-muted opacity-50`, disabled. The team page and the Lab match. |
 | Primary on the ground | `bg-board text-white`, hover `bg-board-deep` ("Fill the rest", "Pick a team"). |
 | Secondary on the ground | `border border-rule bg-white`, hover `border-ink-muted` (Share picks, Open in Lab, Reset in the rail). |
 | Segmented control / chips | `rounded-[2px] border`. Off: `border-rule bg-white text-ink-soft`. On: `border-board bg-board text-white`. An amber chip (the pinned team's games) is `border-lamp` and fills `lamp` when on. On the board (team sheet tabs) the on state is the cream plate. |
@@ -255,8 +282,9 @@ A live goal is `border-lamp text-lamp`; a settled one `border-board-line text-bo
 
 ### Site bar and search
 
-`SiteBar` (`src/app/SiteBar.tsx`) is the same on every page: the mark (with the name from `md`), the nav, team search,
-and "Through Oct 31" (with the as-of time in its `title`). The current nav item is a `span` on the cream plate with
+`SiteBar` (`src/app/SiteBar.tsx`) is the same on every page: the mark (with the name from `lg`), the nav, team search,
+and "Through Oct 31" (from `md`, with the as-of time in its `title`). Nav items and the date never wrap. Nav items
+keep a 28px look; below `lg` an extended hit area makes them 44px. The not-found page has the bar too. The current nav item is a `span` on the cream plate with
 `aria-current="page"`; the others are links in `board-muted` that light to white on hover.
 
 Team search is a combobox: `role="combobox"`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, a
@@ -279,6 +307,8 @@ of logo, name, record and odds. The current team's row is `bg-lamp/10` with the 
 - A what-if in flight dims the main column (`opacity-80`) and sets `aria-busy`; a `role="status"` line says
   "Updating…", or "Couldn't update. Showing the last result." in `hurt`.
 - Opening another team covers the column with a white veil and a "Loading [team]…" pill (`role="status"`).
+- On phones the Lab header's field-change row is a fixed 28px, one line, so the header never changes height; the full
+  block shows from `md`. Opened from a link with picks, it reads "N picks loaded." (from the core).
 - The Lab header's "Field change" block is `aria-live="polite"`: the core's `LabChanges.lines` as up to two short
   lines, a small label (`In`/`Up` in `root`, `Out`/`Down` in `drop`) then the teams in white, each new seed small in
   `board-muted` before the name, up to four a line then "+N". It never grows the header. A note shows in `lamp` instead.
@@ -296,32 +326,39 @@ Phone first: most use is on a phone around Saturdays. Three shapes matter.
 
 ### Phone (about 375px)
 
-- Team page: one column. The sticky header stacks the picker, record and tags, the numbers (spread across the width),
-  then the actions (Lab, Share, Reset; labels shorten to "Lab" and an icon-only Reset). The rail follows the main
-  column under a `rule` border.
-- Lab: a Field / Games / Races tab strip (`role="tablist"`, 44px tabs) under the header; one pane at a time. A pinned
+- Team page: one column. The full header scrolls away; a sticky 52px strip stays (picker, the three numbers on one
+  line, a Reset icon). Under the full header, the record and tags sit on one line that scrolls sideways, then the
+  actions (Lab, Share). The rail follows the main column under a `rule` border.
+- Lab: a Field / Games / Races tab strip (`role="tablist"`) under the header; one pane at a time. A pinned
   team docks at the bottom as a ticket in thumb reach (`fixed`, above `env(safe-area-inset-bottom)`), opening upward,
   and flashes amber (`.bump`) when its odds change. Game rows show team abbreviations instead of full names.
 - Site bar: search collapses to a button; the "Through" date and the site name hide.
-- Every tap target is at least 44px (`min-h-11`, `h-11`) on phones; some shrink to 28 to 36px from `md`, where a
-  pointer is likely.
+- Every control is at least 44px (`min-h-11`, `h-11`) below `lg` (1024px), tablets included, not just phones; compact
+  sizes (28 to 40px) start at `lg`.
 - Content must fit 375px with no horizontal page scroll. Wide content scrolls inside its own box (the bracket, the
   chip row, which fades out at its right edge on phones).
 
-### Desktop (`md` and up for the team page, `lg` and up for the Lab)
+### Desktop (`tall:md` for the team page, `lg:tall` for the Lab)
+
+One screen needs width **and** 640px of height (the `tall:` variant, `min-height: 640px`, in `globals.css`). The team
+page needs 768px wide, the Lab 1024px.
 
 - The page is exactly one screen tall (`h-dvh overflow-hidden`); the header is static and **each column scrolls on its
   own** (`overflow-y-auto` with `.scroll-thin`).
-- Team page: main column plus a 300px `paper` rail (`md:grid-cols-[minmax(0,1fr)_300px]`). The picker column sits
-  beside the numbers in the header.
+- Team page: main column plus a 300px `paper` rail (`md:grid-cols-[minmax(0,1fr)_300px]`). The picker sits beside the
+  numbers in the header; the actions (Lab, Share, Reset) share one row.
 - Lab: three panes, field (320 to 380px, `paper`), games (flexible, on the ground), races (300px, `paper`). The "Season
   Lab" title shows from `xl`. A pinned team gets a strip under the header with before → after odds.
 
-### Short desktop
+### Short desktop and tablets
 
-On a laptop around 1280×720 the header is fixed height, so the columns get what's left and scroll inside. Keep the
-header compact; don't add rows to it. A `tall:` variant (`min-height: 640px`) exists in `globals.css` for pinning a
-block above a scrolling list only when the screen has room; nothing uses it today.
+Below those sizes, or on a screen under 640px tall (a laptop window around 1280×600), the page scrolls as one. The team
+page's compact strip is the only sticky part; the Lab's header is sticky. The Lab's pane tabs are the header's last
+row on the board: text tabs, `cond` 16px bold, 44px tall, `board-muted`, the selected one white with a 3px `lamp`
+underline. They show whenever the three panes aren't side by side.
+
+Keep the header compact; don't add rows to it. On a tall screen the fixed header leaves the columns what's left, and
+they scroll inside.
 
 ## Motion
 
@@ -337,8 +374,10 @@ Short, eased, never bouncy. Defined in `globals.css`:
 
 ## Accessibility
 
-- **Focus ring**: `:focus-visible` draws a 2px `lamp` outline, offset 2px, in `@layer base` so a field wrapper can
-  show the ring itself and its input can opt out with `outline-none`. Never remove the outline without moving it to a
+- **Focus ring**: `:focus-visible` draws a 2px outline in `var(--focus)`, offset 2px, in `@layer base` so a field
+  wrapper can show the ring itself and its input can opt out with `outline-none`. `--focus` is board green on light
+  surfaces and `lamp` inside `.board-dots`, `bg-board`, `bg-board-deep` and `bg-board-deeper` containers (their children
+  inherit it, so a green button on the ground keeps the green ring). Never remove the outline without moving it to a
   visible wrapper.
 - **Contrast** (WCAG ratios, computed from the tokens):
 
@@ -394,22 +433,16 @@ A football whose laces form a pulse line. `src/app/Logo.tsx`:
 | Use `lamp-ink` for amber text on the ground. | Use `lamp` as text on `ground` or `paper` (1.5:1). |
 | Give a button a 1px outline; leave labels and readouts unboxed. | Outline headings, labels or numbers to make them look important. |
 | Use tokens (`bg-board-deep`, `border-rule`). | Use hex values, or the legacy `navy`/`teal`/`marker` names, in new code. |
-| Keep tap targets at 44px on phones. | Shrink phone targets to fit more on a row; use abbreviations instead. |
+| Keep tap targets at 44px below `lg`. | Shrink phone targets to fit more on a row; use abbreviations instead. |
 | Keep the site light-only. | Add a dark mode or `prefers-color-scheme` styles. |
 
 ## Known drift
 
 Places where shipped code doesn't yet follow this guide. Fix them when you touch the file; don't copy them.
 
-- **Lab odds moves use amber, not green.** `PinOdds` and `DockNum` in `src/app/lab/Lab.tsx` color a gain `text-lamp`
-  and a loss with a raw `#f08a7e` instead of `text-root` and `text-drop`.
-- **Inline percent formatting in the Lab.** `Field` and `Races` in `Lab.tsx` round odds with local `pct` helpers
-  (`Math.round(x * 100)`) instead of a core formatter, so long shots read "0%" or "<1%" where the team page shows
-  "0.4%".
-- **Hex values in components**: the lit Reset hover `#f5c056` in `Explorer.tsx`.
-- **Legacy tokens**: the loading pill in `Explorer.tsx` uses `navy`; `.scroll-thin` in `globals.css` uses `navy`.
 - **Toledo on amber.** The Lab draft (`b-lab.html`) notes Toledo's light logo is mostly gold and disappears on an amber
   pick, and shows its dark logo on a small dark disc instead. The shipped `TeamLogo` has no exception yet, so a
   picked Toledo shows the light logo on amber.
-- **Focus ring on light grounds.** The amber ring is 1.5:1 against `ground` and 1.8:1 against `paper`, below the 3:1
-  WCAG asks of focus indicators. It reads well on the board (8:1). A darker ring on light surfaces would fix it.
+- **Share card font.** `src/app/lab/card.tsx` (the Lab's share image: green ground with dot texture, cream mark, seeds
+  as board rows with team logos, amber seeds 1 to 4, an outlined "SEC champ" tag on each projected conference champion and "G6 bid" on the Group of Six bid, the title favorite on an amber plate) uses a bold sans
+  stand-in, because no Saira Condensed `.ttf` is in the repo for `ImageResponse`.

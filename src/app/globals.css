@@ -54,10 +54,22 @@ body {
   background: var(--color-lamp);
   color: var(--color-plate-ink);
 }
+/* The focus ring: board green on the light grounds (amber is 1.5:1 there), amber on the board, where green would vanish.
+   `--focus` is set on what sits inside a board surface and inherited from there, so a board-colored button on the
+   ground keeps the green ring. */
+:root {
+  --focus: var(--color-board);
+}
+.board-dots > *,
+.bg-board > *,
+.bg-board-deep > *,
+.bg-board-deeper > * {
+  --focus: var(--color-lamp);
+}
 /* In the base layer, so a field whose box shows the ring (the team searches) can turn it off with outline-none. */
 @layer base {
   :focus-visible {
-    outline: 2px solid var(--color-lamp);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
 }
@@ -127,7 +139,7 @@ body {
   scrollbar-color: color-mix(in srgb, var(--color-ink) 18%, transparent) transparent;
 }
 .scroll-thin:hover {
-  scrollbar-color: color-mix(in srgb, var(--color-navy) 35%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--color-ink) 35%, transparent) transparent;
 }
 .scroll-thin::-webkit-scrollbar {
   width: 6px;
@@ -137,11 +149,11 @@ body {
   background: transparent;
 }
 .scroll-thin::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--color-navy) 18%, transparent);
+  background: color-mix(in srgb, var(--color-ink) 18%, transparent);
   border-radius: 999px;
 }
 .scroll-thin:hover::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--color-navy) 35%, transparent);
+  background: color-mix(in srgb, var(--color-ink) 35%, transparent);
 }
 
 /* Motion: short and eased, never bouncy. New content rises in a few pixels as it fades in. */

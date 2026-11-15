@@ -34,7 +34,7 @@ describe("proven clinch and elimination", () => {
     expect(p.status).toBe("alive");
     const me = seasonOutlook(s, o).teams.find((t) => t.teamId === 1)!;
     expect(me.status).toBe("alive");
-    expect(formatChance(me.titleGame, me.status)).toBe("<1%");
+    expect(formatChance(me.titleGame, me.status)).toBe("<0.1%");
     expect(pathTree(s, { ...o, teamId: 1 }).root.verdict).toBe("<1%");
     // The combination really does it.
     expect(teamPath(s, { ...o, teamId: 1, locks: { [upset1.id]: 1, [upset2.id]: 4 } }).titleGame).toBeGreaterThan(0);

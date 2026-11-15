@@ -53,8 +53,8 @@ export function ShareButton({ small = false, className = "", link, board = false
   }
 
   const look = board
-    ? "cond h-9 rounded-[3px] bg-plate px-4 text-base tracking-[0.05em] text-plate-ink hover:bg-white md:h-[38px]"
-    : `cond ${small ? "h-9" : "min-h-10"} rounded-[3px] border border-rule bg-white px-3 text-[15px] tracking-[0.05em] text-ink hover:border-ink-muted`;
+    ? "cond h-11 rounded-[3px] bg-plate px-4 text-base tracking-[0.05em] text-plate-ink hover:bg-white lg:h-9"
+    : `cond ${small ? "h-11 lg:h-9" : "min-h-11 lg:min-h-10"} rounded-[3px] border border-rule bg-white px-3 text-[15px] tracking-[0.05em] text-ink hover:border-ink-muted`;
   return (
     <button
       type="button"

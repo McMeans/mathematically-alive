@@ -3,7 +3,7 @@
 // simulation and the national run over the same seasons. All wording the page shows is here.
 import { projectedField } from "./projected";
 import type { NationalResult } from "./national";
-import { conferenceName, formatOdds, formatRecord, formatSideOdds, shownChange } from "./paths";
+import { conferenceName, formatOdds, formatRecord, formatSideOdds, shownChange, winsLabel } from "./paths";
 import { powerConferences } from "./committee";
 import { playoffFormat } from "./playoff";
 import { INDEPENDENTS, teamRecord, type Game, type Season } from "./season";
@@ -47,6 +47,8 @@ export type HelpSide = {
   teamId: number;
   /** "SMU wins". */
   label: string;
+  /** "SMU wins" with the team's abbreviation, for a narrow button; the name when it has none. */
+  shortLabel: string;
   /** "44% chance": this side's chance to win the game. */
   chance: string;
   /** The team's playoff odds (EXPERIMENTAL) in the seasons this side wins, and for display. */
@@ -231,6 +233,11 @@ export type TeamBoard = {
   recordsNote: string;
   /** Best record first; only records it can still finish with. */
   records: RecordOdds[];
+  /**
+   * Set when every record reads the same playoff odds and the same title-game odds (or none), so the tiles say it once: "Any finish: <0.1% playoff", with the
+   * records under it ("8-4 45% likely · 7-5 41% · 6-6 13%"). Null when the records differ, or there is only one.
+   */
+  flat: { label: string; value: string; unit: string; text: string; records: string } | null;
   /** Its ways into the playoff, likeliest first; empty when the page can't say (a Group of Six team, an independent). */
   ways: WayIn[];
   /** Games elsewhere that move its playoff odds, grouped by the team to root against; biggest swing first. */
@@ -288,6 +295,7 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
   if (!national.playoff || sim.iterations !== national.iterations) return null;
   const n = sim.iterations;
   const name = (id: number) => season.teams.find((t) => t.id === id)?.name ?? `Team ${id}`;
+  const abbreviation = (id: number) => season.teams.find((t) => t.id === id)?.abbreviation ?? null;
   const me = name(teamId);
   const titled = conference !== null && national.conferences.includes(conference);
   const unplayed = season.games.map((g, index) => ({ g, index })).filter(({ g }) => !g.completed && !g.titleGame);
@@ -377,6 +385,14 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
     });
   }
 
+  // Records whose tiles all read the same (playoff, and title game where shown) say so once.
+  const flat = records.length > 1 && records.every((r) => r.playoffText === records[0].playoffText && r.titleGameText === records[0].titleGameText)
+    ? {
+      label: "Any finish", value: records[0].playoffText, unit: "playoff", text: `Any finish: ${records[0].playoffText} playoff`,
+      records: records.map((r, k) => `${r.record} ${k === 0 ? r.likely : formatOdds(r.share)}`).join(" · "),
+    }
+    : null;
+
   // The ways in: the conference title (an automatic bid for a power conference from 2026), and an at-large spot.
   const ways: WayIn[] = [];
   const format = playoffFormat(season.year);
@@ -414,7 +430,7 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
     const side = (id: number, home: boolean): HelpSide => {
       const [k2, f, t] = home ? [hn, hIn, hT] : [an, aIn, aT];
       return {
-        teamId: id, label: `${name(id)} wins`, chance: `${formatOdds(home ? pHome : 1 - pHome)} chance`,
+        teamId: id, label: winsLabel(name(id), abbreviation(id)).full, shortLabel: winsLabel(name(id), abbreviation(id)).short, chance: `${formatOdds(home ? pHome : 1 - pHome)} chance`,
         playoff: f / k2, playoffText: show(f / k2),
         titleGame: titled ? t / k2 : null, titleGameText: titled ? show(t / k2) : null, playoffChange: change(f / k2), root: false,
       };
@@ -554,7 +570,7 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
       fill: "Fill in this path", left: "Your picks leave this path.",
     };
   }
-  return { recordsNote: "Playoff odds by final record.", records, ways, help, helpNote, quiet, titleWeek, race, own: ownChances, bestShot };
+  return { recordsNote: "Playoff odds by final record.", records, flat, ways, help, helpNote, quiet, titleWeek, race, own: ownChances, bestShot };
 }
 
 function when(g: Game): string {
@@ -597,7 +613,7 @@ function playoffRace(season: Season, national: NationalResult, teamId: number, l
     const p = odds.get(id) ?? 0;
     return {
       kind: "team", teamId: id, team: name(id), seed, projected: projected.get(id)!, tag: tags.get(id) ?? null,
-      under: seed !== null && tags.has(id) && projected.get(id)! > lastRank, field: p, text: formatOdds(p), me: id === teamId,
+      under: seed !== null && tags.has(id) && projected.get(id)! > lastRank, field: p, text: formatSideOdds(p, "alive"), me: id === teamId,
     };
   };
   // Every team in card order: the field by seed, then the teams out by projected rank. `above`: rows above the cut.

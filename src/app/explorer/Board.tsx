@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { createContext, useContext, type ReactNode } from "react";
 import {
-  formatSideOdds, formatTitleOdds,
+  formatSideOdds, formatTitleOdds, winsLabel,
   type BestShot, type HelpGroup, type IndependentGame, type PlayoffRace, type RaceItem, type SeasonWeek, type TeamBoard, type TeamOutlook,
 } from "@/core";
 import type { Locks } from "./Explorer";
@@ -24,13 +24,23 @@ export function TeamLogo({ id, dark = true, size = "1.2em" }: { id: number; dark
 /** This week's committee ranking by team ("#16"), for every name on the page. */
 export const RanksContext = createContext<Record<number, string>>({});
 
-/** A team as the page names it: logo, then its committee rank when it has one, then its name. */
-export function TeamName({ id, name, dark = true }: { id: number; name: string; dark?: boolean }) {
+/** Every team's abbreviation ("FIU"), for names that give way to it when their column is narrow. */
+export const AbbreviationsContext = createContext<Record<number, string>>({});
+
+/**
+ * A team as the page names it: logo, then its committee rank when it has one, then its name. With `abbreviate`, the name
+ * gives way to the team's abbreviation when the nearest `@container` is under 120px wide; either way a name that still
+ * doesn't fit ends in an ellipsis (the parent must be a flex or grid cell that can shrink).
+ */
+export function TeamName({ id, name, dark = true, abbreviate = false }: { id: number; name: string; dark?: boolean; abbreviate?: boolean }) {
   const rank = useContext(RanksContext)[id];
+  const abbr = useContext(AbbreviationsContext)[id];
+  const short = abbreviate && abbr && abbr !== name;
   return (
     <span className="inline-flex min-w-0 items-center gap-1 align-bottom">
       <TeamLogo id={id} dark={dark} />
-      <span className="min-w-0 truncate">{rank && <span className="mr-1 text-[0.74em] font-bold opacity-80">{rank}</span>}{name}</span>
+      <span className={`min-w-0 truncate ${short ? "@max-[120px]:hidden" : ""}`}>{rank && <span className="mr-1 text-[0.74em] font-bold opacity-80">{rank}</span>}{name}</span>
+      {short && <span className="hidden min-w-0 truncate @max-[120px]:inline">{abbr}</span>}
     </span>
   );
 }
@@ -52,16 +62,21 @@ type Num = { value: string; label: string; change?: string | null };
  * One result you can lock: what happens, its chance, and the team's odds if it does. A lock fills it amber.
  * `small`: a game elsewhere, one size down.
  */
-export function Outcome({ label, chance, nums, picked, small, onClick }: {
-  label: string; chance?: string; nums: Num[]; picked: boolean; small?: boolean; onClick: () => void;
+export function Outcome({ label, shortLabel, chance, nums, picked, small, onClick }: {
+  label: string;
+  /** The label with the team's abbreviation, used once the button is narrower than 280px. */
+  shortLabel?: string;
+  chance?: string; nums: Num[]; picked: boolean; small?: boolean; onClick: () => void;
 }) {
   return (
+    <div className="@container min-w-0">
     <button type="button" aria-pressed={picked} onClick={onClick} title={picked ? "Locked. Tap again to clear." : `Lock: ${label}`}
       className={`press flex min-h-11 w-full min-w-0 items-center justify-between gap-3 rounded-[3px] border px-3 text-left ${small ? "py-1.5" : "py-2"} ${
         picked ? "border-lamp bg-lamp text-plate-ink" : "border-board-line bg-white/[0.04] text-white hover:border-board-muted hover:bg-white/[0.07]"}`}>
-      <span className="flex min-w-0 flex-col gap-px">
+      <span className="flex min-w-0 flex-1 flex-col gap-px">
         <span className={`cond flex items-center gap-1.5 font-bold tracking-[0.03em] ${small ? "text-sm" : "text-base"} ${picked ? "" : small ? "text-board-muted" : "text-board-text"}`}>
-          <span className="min-w-0">{label}</span>
+          <span className={`min-w-0 break-words ${shortLabel ? "@max-[280px]:hidden" : ""}`}>{label}</span>
+          {shortLabel && <span className="hidden min-w-0 @max-[280px]:inline">{shortLabel}</span>}
         </span>
         {chance && <span className={`text-xs ${picked ? "text-plate-ink" : "text-board-muted"}`}>{chance}</span>}
       </span>
@@ -77,6 +92,7 @@ export function Outcome({ label, chance, nums, picked, small, onClick }: {
         ))}
       </span>
     </button>
+    </div>
   );
 }
 
@@ -86,7 +102,13 @@ export function WhatItTakes({ board }: { board: TeamBoard }) {
   return (
     <section aria-labelledby="takes" className="mb-8">
       <Heading id="takes" sub={board.recordsNote}>What it takes</Heading>
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded bg-board-line sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
+      {board.flat ? (
+        <div className="rounded bg-board-deep px-4 pb-3.5 pt-3 shadow-[inset_0_3px_0_var(--color-lamp)]">
+          <span className="cond text-[15px] font-bold tracking-[0.06em] text-lamp">{board.flat.label}</span>
+          <p className="mt-1 flex items-baseline gap-1.5 text-white"><span className="plate text-[34px]">{board.flat.value}</span><span className="cond text-[15px] font-bold tracking-[0.06em]">{board.flat.unit}</span></p>
+          <p className="mt-1.5 text-xs text-board-muted">{board.flat.records}</p>
+        </div>
+      ) : <div className="grid grid-cols-2 gap-px overflow-hidden rounded bg-board-line sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
         {board.records.map((r) => (
           <div key={r.record} className={`flex flex-col gap-1 bg-board-deep px-4 pb-3.5 pt-3 text-board-muted ${r === best ? "shadow-[inset_0_3px_0_var(--color-lamp)]" : ""}`}>
             <span className={`cond text-[15px] font-bold tracking-[0.06em] ${r === best ? "text-lamp" : ""}`}>{r.label}</span>
@@ -95,7 +117,7 @@ export function WhatItTakes({ board }: { board: TeamBoard }) {
             <span className="text-xs">{r.likely}</span>
           </div>
         ))}
-      </div>
+      </div>}
       {board.ways.length > 1 ? (
         <ul className="mt-3 flex flex-col gap-1 text-ink-soft">
           {board.ways.map((w) => (
@@ -140,13 +162,17 @@ const Tag = ({ children }: { children: ReactNode }) => (
  * The team's own games, week by week: each result with the team's playoff and title-game odds if it happens. After
  * them, its conference title game, pickable once it's in the likeliest matchup.
  */
-export function WeekByWeek({ weeks, outlook, board, teamId, team, names, locks, onPick, title, onTitle, labels }: {
+export function WeekByWeek({ weeks, outlook, board, teamId, team, names, locks, onPick, title, onTitle, labels, settled = false }: {
   weeks: SeasonWeek[]; outlook: TeamOutlook; board: TeamBoard | null; teamId: number; team: string; names: Record<number, string>;
   locks: Locks; onPick: PickFn;
+  /** The team's title game is proven out: its results show the playoff odds only. */
+  settled?: boolean;
   /** The picked title-game winner, if any. */
   title: number | null; onTitle: (winner: number | undefined) => void;
   labels: { titleGame: string; playoff: string; projected: string; projectedNote: string };
 }) {
+  const abbrs = useContext(AbbreviationsContext);
+  const wins = (id: number, name: string) => winsLabel(name, abbrs[id] ?? null);
   const odds = new Map(outlook.games.map((g) => [g.gameId, g]));
   const chances = new Map((board?.own ?? []).map((c) => [c.gameId, c]));
   const status = outlook.postseasonBan ? "eliminated" : "alive";
@@ -155,11 +181,12 @@ export function WeekByWeek({ weeks, outlook, board, teamId, team, names, locks, 
   const result = (gameId: number, opponentId: number, opponent: string, titleWin?: string, titleLose?: string) => {
     const o = odds.get(gameId), c = chances.get(gameId);
     const nums = (playoff: number | undefined, titleText: string | undefined, titleP: number | undefined) =>
-      [{ value: show(playoff), label: labels.playoff }, { value: titleText ?? show(titleP), label: labels.titleGame }];
+      settled ? [{ value: show(playoff), label: labels.playoff }] : [{ value: show(playoff), label: labels.playoff }, { value: titleText ?? show(titleP), label: labels.titleGame }];
+    const mine = wins(teamId, team), theirs = wins(opponentId, opponent);
     return (
       <Pair>
-        <Outcome label={`${team} wins`} chance={c?.win} nums={nums(o?.playoffIfWin, titleWin, o?.titleIfWin)} picked={locks[gameId] === teamId} onClick={() => pick(gameId, teamId)} />
-        <Outcome label={`${opponent} wins`} chance={c?.lose} nums={nums(o?.playoffIfLose, titleLose, o?.titleIfLose)} picked={locks[gameId] === opponentId} onClick={() => pick(gameId, opponentId)} />
+        <Outcome label={mine.full} shortLabel={mine.short} chance={c?.win} nums={nums(o?.playoffIfWin, titleWin, o?.titleIfWin)} picked={locks[gameId] === teamId} onClick={() => pick(gameId, teamId)} />
+        <Outcome label={theirs.full} shortLabel={theirs.short} chance={c?.lose} nums={nums(o?.playoffIfLose, titleLose, o?.titleIfLose)} picked={locks[gameId] === opponentId} onClick={() => pick(gameId, opponentId)} />
       </Pair>
     );
   };
@@ -200,9 +227,9 @@ export function WeekByWeek({ weeks, outlook, board, teamId, team, names, locks, 
       <WeekRow key="title" date={`Championship week · ${tw.label}`} game={<>vs <TeamName id={tw.mine.opponentId} name={names[tw.mine.opponentId]} /></>}
         tag={<span className="text-xs text-board-muted">Likeliest matchup with your picks</span>}>
         <Pair>
-          <Outcome label={`${team} wins`} chance={tw.mine.winText} nums={[{ value: tw.mine.ifWin, label: labels.playoff }]} picked={title === teamId}
+          <Outcome label={wins(teamId, team).full} shortLabel={wins(teamId, team).short} chance={tw.mine.winText} nums={[{ value: tw.mine.ifWin, label: labels.playoff }]} picked={title === teamId}
             onClick={() => onTitle(title === teamId ? undefined : teamId)} />
-          <Outcome label={`${names[tw.mine.opponentId]} wins`} chance={tw.mine.loseText} nums={[{ value: tw.mine.ifLose, label: labels.playoff }]}
+          <Outcome label={wins(tw.mine.opponentId, names[tw.mine.opponentId]).full} shortLabel={wins(tw.mine.opponentId, names[tw.mine.opponentId]).short} chance={tw.mine.loseText} nums={[{ value: tw.mine.ifLose, label: labels.playoff }]}
             picked={title === tw.mine.opponentId} onClick={() => onTitle(title === tw.mine!.opponentId ? undefined : tw.mine!.opponentId)} />
         </Pair>
       </WeekRow>
@@ -218,6 +245,7 @@ export function WeekByWeek({ weeks, outlook, board, teamId, team, names, locks, 
 export function IndependentWeeks({ games, board, teamId, team, locks, onPick, labels }: {
   games: IndependentGame[]; board: TeamBoard | null; teamId: number; team: string; locks: Locks; onPick: PickFn; labels: { playoff: string };
 }) {
+  const abbrs = useContext(AbbreviationsContext);
   const chances = new Map((board?.own ?? []).map((c) => [c.gameId, c]));
   const pick = (gameId: number, winner: number) => onPick(gameId, locks[gameId] === winner ? undefined : winner);
   if (games.length === 0) return <p className="text-sm text-ink-muted">No games left.</p>;
@@ -226,8 +254,8 @@ export function IndependentWeeks({ games, board, teamId, team, locks, onPick, la
       {games.map((g) => (
         <WeekRow key={g.gameId} date={g.date} game={<>{g.site === "away" ? "at" : "vs"} <TeamName id={g.opponentId} name={g.opponent} /></>}>
           <Pair>
-            <Outcome label={`${team} wins`} chance={chances.get(g.gameId)?.win} nums={[{ value: g.ifWin, label: labels.playoff }]} picked={locks[g.gameId] === teamId} onClick={() => pick(g.gameId, teamId)} />
-            <Outcome label={`${g.opponent} wins`} chance={chances.get(g.gameId)?.lose} nums={[{ value: g.ifLose, label: labels.playoff }]} picked={locks[g.gameId] === g.opponentId} onClick={() => pick(g.gameId, g.opponentId)} />
+            <Outcome label={winsLabel(team, abbrs[teamId] ?? null).full} shortLabel={winsLabel(team, abbrs[teamId] ?? null).short} chance={chances.get(g.gameId)?.win} nums={[{ value: g.ifWin, label: labels.playoff }]} picked={locks[g.gameId] === teamId} onClick={() => pick(g.gameId, teamId)} />
+            <Outcome label={winsLabel(g.opponent, abbrs[g.opponentId] ?? null).full} shortLabel={winsLabel(g.opponent, abbrs[g.opponentId] ?? null).short} chance={chances.get(g.gameId)?.lose} nums={[{ value: g.ifLose, label: labels.playoff }]} picked={locks[g.gameId] === g.opponentId} onClick={() => pick(g.gameId, g.opponentId)} />
           </Pair>
         </WeekRow>
       ))}
@@ -253,7 +281,7 @@ export function HelpElsewhere({ board, locks, onPick, labels }: { board: TeamBoa
                 <WeekRow key={x.gameId} date={x.date} game={<>{x.site} <TeamName id={x.opponentId} name={x.opponent} /></>}>
                   <Pair>
                     {x.sides.map((s) => (
-                      <Outcome key={s.teamId} small label={s.label} chance={s.chance} picked={locks[x.gameId] === s.teamId} onClick={() => pick(x.gameId, s.teamId)}
+                      <Outcome key={s.teamId} small label={s.label} shortLabel={s.shortLabel} chance={s.chance} picked={locks[x.gameId] === s.teamId} onClick={() => pick(x.gameId, s.teamId)}
                         nums={[{ value: s.playoffText, label: labels.playoff, change: s.playoffChange }, ...(s.titleGameText ? [{ value: s.titleGameText, label: labels.titleGame }] : [])]} />
                     ))}
                   </Pair>
@@ -282,7 +310,7 @@ function RailHeading({ children, sub }: { children: ReactNode; sub?: string }) {
 function BoardRow({ lead, name, record, odds, me }: { lead?: ReactNode; name: ReactNode; record: string; odds: string; me: boolean }) {
   return (
     <div className={`cond grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2.5 px-3 py-1 text-[17px] font-bold ${me ? "text-white shadow-[inset_3px_0_0_var(--color-lamp)]" : "text-board-muted"}`}>
-      <span className="flex min-w-0 items-center gap-1.5 truncate">{lead}{name}</span>
+      <span className="@container flex min-w-0 items-center gap-1.5">{lead}{name}</span>
       <span className="text-[15px]">{record}</span>
       <span className={`plate min-w-[2.2em] text-right text-[19px] ${me ? "text-lamp" : ""}`}>{odds}</span>
     </div>
@@ -302,7 +330,7 @@ export function PlayoffRaceCard({ race, lab }: { race: PlayoffRace; lab: string 
       <div className="flex flex-col gap-2">
         {blocks.map((b, k) => <RaceBlock key={k} title={b.title} items={b.items} columns={race.columns} />)}
       </div>
-      <Link href={lab} className="mt-2 inline-block text-[13px] font-semibold text-ink underline underline-offset-[3px]">The whole field in the Lab →</Link>
+      <Link href={lab} className="mt-1 inline-flex min-h-11 items-center text-[13px] font-semibold text-ink underline underline-offset-[3px] lg:mt-2 lg:min-h-0">The whole field in the Lab →</Link>
     </section>
   );
 }
@@ -335,7 +363,7 @@ function RaceBlock({ title, items, columns }: { title: string | null; items: Rac
               {x.seed}
               {x.tag && <span title="Automatic bid" className="text-[9.5px] tracking-[0.06em] text-board-text">{x.tag}</span>}
             </span>
-            <span className={`min-w-0 truncate text-base ${tone}`}><TeamName id={x.teamId} name={x.team} /></span>
+            <span className={`@container flex min-w-0 text-base ${tone}`}><TeamName id={x.teamId} name={x.team} abbreviate /></span>
             <span className="text-center text-[15px] text-board-muted">{x.projected}</span>
             <span className={`plate text-right text-lg ${tone}`}>{x.text}</span>
           </div>
@@ -357,7 +385,7 @@ export function ConferenceRace({ outlook, names, teamId, label, sub }: { outlook
       <RailHeading sub={sub}>{label}</RailHeading>
       <div className="rounded bg-board-deep py-1.5">
         {rows.map((o) => (
-          <BoardRow key={o.teamId} name={<TeamName id={o.teamId} name={names[o.teamId]} />} record={`${o.record.conferenceWins}-${o.record.conferenceLosses}`}
+          <BoardRow key={o.teamId} name={<TeamName id={o.teamId} name={names[o.teamId]} abbreviate />} record={`${o.record.conferenceWins}-${o.record.conferenceLosses}`}
             odds={formatTitleOdds(o.titleGame, o.status)} me={o.teamId === teamId} />
         ))}
       </div>
@@ -377,7 +405,7 @@ export function YourPicks({ picks, lab, onRemove, onReset }: {
           {picks.map((p) => (
             <li key={p.id} className="flex items-center justify-between gap-3 border-rule py-1.5 not-first:border-t">
               <span className="min-w-0">{p.what} <span className="text-ink-muted">· {p.when}</span></span>
-              <button type="button" aria-label={`Remove ${p.what}`} onClick={() => onRemove(p.id)} className="h-8 w-8 shrink-0 rounded text-ink-muted hover:bg-paper">×</button>
+              <button type="button" aria-label={`Remove ${p.what}`} onClick={() => onRemove(p.id)} className="-my-1.5 h-11 w-11 shrink-0 rounded text-ink-muted hover:bg-paper lg:my-0 lg:h-8 lg:w-8">×</button>
             </li>
           ))}
         </ul>
@@ -385,8 +413,8 @@ export function YourPicks({ picks, lab, onRemove, onReset }: {
       {picks.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           <ShareButton small />
-          <Link href={lab} className="cond flex h-9 items-center rounded-[3px] border border-rule bg-white px-3 text-[15px] font-bold tracking-[0.05em] hover:border-ink-muted">Open in Lab</Link>
-          <button type="button" onClick={onReset} className="cond h-9 rounded-[3px] border border-rule bg-white px-3 text-[15px] font-bold tracking-[0.05em] hover:border-ink-muted">Reset</button>
+          <Link href={lab} className="cond flex h-11 items-center rounded-[3px] border border-rule bg-white px-3 text-[15px] font-bold tracking-[0.05em] hover:border-ink-muted lg:h-9">Open in Lab</Link>
+          <button type="button" onClick={onReset} className="cond h-11 rounded-[3px] border border-rule bg-white px-3 text-[15px] font-bold tracking-[0.05em] hover:border-ink-muted lg:h-9">Reset</button>
         </div>
       )}
     </section>
@@ -442,8 +470,8 @@ export function BestShotCard({ shot, locks, filled, onFill, lab }: { shot: BestS
         </div>
         <p className="border-t border-board-line pt-2.5 text-xs text-board-muted">{off ? shot.left : shot.note}</p>
         <span className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={onFill} className={`cond h-10 rounded-[3px] px-4 text-[17px] font-bold tracking-[0.05em] ${filled ? "border border-lamp text-lamp hover:bg-lamp hover:text-plate-ink" : "bg-lamp text-plate-ink hover:brightness-105"}`}>{filled ? "Undo this path" : shot.fill}</button>
-          <Link href={lab} className="cond flex h-10 items-center gap-1.5 rounded-[3px] border border-board-line px-3.5 text-[17px] font-bold tracking-[0.05em] text-board-text hover:border-board-muted">Try it in the Lab <span aria-hidden className="text-lamp">→</span></Link>
+          <button type="button" onClick={onFill} className={`cond h-11 rounded-[3px] px-4 text-[17px] lg:h-10 font-bold tracking-[0.05em] ${filled ? "border border-lamp text-lamp hover:bg-lamp hover:text-plate-ink" : "bg-lamp text-plate-ink hover:brightness-105"}`}>{filled ? "Undo this path" : shot.fill}</button>
+          <Link href={lab} className="cond flex h-11 items-center gap-1.5 rounded-[3px] border border-board-line px-3.5 lg:h-10 text-[17px] font-bold tracking-[0.05em] text-board-text hover:border-board-muted">Try it in the Lab <span aria-hidden className="text-lamp">→</span></Link>
         </span>
       </div>
     </section>

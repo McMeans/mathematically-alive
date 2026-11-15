@@ -24,6 +24,32 @@ describe("season lab: the share card", () => {
     expect(card.description).toBe(`No picks. ${card.champion}.`);
   });
 
+  it("tags each seed that is its conference's projected champion", () => {
+    const card = labCard(season, base)!;
+    const tagged = card.field.filter((s) => s.tag !== null);
+    expect(tagged.length).toBeGreaterThan(0);
+    for (const s of tagged) expect(s.tag).toMatch(/^([A-Za-z0-9 ]+ champ|G6 bid)$/);
+    for (const s of card.field) {
+      const conf = base.champions[s.teamId];
+      if (conf) expect(s.tag).toMatch(/ champ$/);
+      else expect([null, "G6 bid"]).toContain(s.tag);
+    }
+    // A power conference's champion is in the field, so each of the four simulated conferences has a tagged seed.
+    for (const c of opts.conferences) expect(card.field.some((s) => base.champions[s.teamId] === c)).toBe(true);
+  });
+
+  it("tags the best-seeded Group of Six team as the G6 bid, and only one", () => {
+    const card = labCard(season, base)!;
+    const power = ["ACC", "Big 12", "SEC", "Big Ten"];
+    const g6 = card.field.filter((s) => s.tag === "G6 bid");
+    expect(g6.length).toBeLessThanOrEqual(1);
+    const first = card.field.find((s) => {
+      const c = team(s.teamId).conference;
+      return !base.champions[s.teamId] && c !== null && c !== "FBS Independents" && !power.includes(c);
+    });
+    expect(g6[0]?.teamId).toBe(first?.teamId);
+  });
+
   it("counts picks, and says so once every game is picked", () => {
     const g = season.games.find((x) => !x.completed && !x.titleGame)!;
     const one = seasonLab(season, { ...opts, locks: { games: { [g.id]: g.homeId } }, reuse: base.national });

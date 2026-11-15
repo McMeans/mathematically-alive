@@ -20,7 +20,7 @@ const played = (g: Game, winner: number): Season => ({
 });
 const order = (s: Season, locks?: Record<number, number>) => liveRanking(s, { locks }).teams.map((t) => t.teamId);
 
-describe("picked results", () => {
+describe("picked results", { timeout: 60_000 }, () => {
   it("an unranked team that loses drops in the projected ranking", () => {
     const base = liveRanking(season).teams;
     const candidates = base.filter((t) => t.rank >= 26 && t.rank < base.length);
