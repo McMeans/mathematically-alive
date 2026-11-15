@@ -2,7 +2,8 @@
 // which results elsewhere move one team's playoff odds. All wording lives here so black-box tests can check it.
 import type { NationalResult } from "./national";
 import { PROJECTED_NOTE, formatFine, formatOdds } from "./paths";
-import { bracketGames, playoffField } from "./playoff";
+import { bracketGames, playoffField, playoffFormat } from "./playoff";
+import { isGroupOfSix } from "./projected";
 import type { Season } from "./season";
 import { HOME_FIELD } from "./odds";
 import { mix, mulberry32, neutralOdds, type SimResult } from "./sim";
@@ -18,6 +19,11 @@ export type FieldSpot = {
   atSeed: number;
   bye: number;
   champion: number;
+  /**
+   * The automatic bid it holds, marked as the team page's race card marks it: "SEC", "B1G", "B12", "ACC", "G6" or
+   * "ND". Null for an at-large team, and in views not seeded from a ranking with tags.
+   */
+  tag: string | null;
   /**
    * "In 92% · seed 3 in 31%"; once the field is announced, "National title 23%", "First-round bye · national title
    * 31%" (before its first game), "Beat Ohio State 24-14 in the
@@ -42,6 +48,19 @@ export type BracketGame = {
 
 export type BubbleTeam = { teamId: number; field: number; text: string };
 
+/**
+ * The Group of Six bubble (formats with a Group of Six bid): the best-placed Group of Six teams outside the projected
+ * field, next in line for the bid.
+ */
+export type GroupOfSixRace = {
+  /** "Group of Six bubble". */
+  title: string;
+  /** "Next in line for the Group of Six bid." */
+  note: string;
+  /** Best placed first. */
+  teams: BubbleTeam[];
+};
+
 export type NationalView = {
   teams: 4 | 12;
   /** Whether the field is the one the committee announced (`NationalResult.announced`), not a projection. */
@@ -53,8 +72,20 @@ export type NationalView = {
   /** The projected field (the announced one once it is), seed 1 first. */
   field: FieldSpot[];
   bracket: BracketGame[];
-  /** The likeliest teams outside the projected field, best odds first; empty once the field is announced. */
+  /**
+   * The at-large bubble: the next teams outside the projected field (by the ranking when seeded from one, else by
+   * field odds); empty once the field is announced.
+   */
   bubble: BubbleTeam[];
+  /** "At-large bubble". */
+  bubbleTitle: string;
+  /** "Next in line for an at-large spot." */
+  bubbleNote: string;
+  /**
+   * The Group of Six bubble, under the at-large one: the four best-placed Group of Six teams outside the field. Null
+   * when the format has no Group of Six bid, the field is announced, or the field isn't seeded from a ranking.
+   */
+  g6: GroupOfSixRace | null;
   /** "Projected from 20,000 simulated seasons. …", or what the announced field's odds come from. */
   note: string;
 };
@@ -74,7 +105,7 @@ export function nationalView(national: NationalResult, opts: {
    * under the season's format (`playoffField`; needs `season`). Each spot keeps its simulated odds; the bubble is the
    * next teams in the ranking. Ignored once the field is announced.
    */
-  ranking?: { order: readonly number[]; champions: readonly number[] };
+  ranking?: RankingSeeds;
 } = {}): NationalView | null {
   if (!national.playoff) return null;
   const T = national.teams.find((t) => t.playoff)!.playoff!.seeds.length as 4 | 12;
@@ -97,7 +128,7 @@ export function nationalView(national: NationalResult, opts: {
   const field: FieldSpot[] = inField.map((t, k) => {
     const p = t.playoff!;
     return {
-      seed: k + 1, teamId: t.teamId, field: p.field, atSeed: p.seeds[k], bye: p.bye, champion: p.champion,
+      seed: k + 1, teamId: t.teamId, field: p.field, atSeed: p.seeds[k], bye: p.bye, champion: p.champion, tag: null,
       text: `In ${formatOdds(p.field)} · seed ${k + 1} in ${formatOdds(p.seeds[k])}`,
     };
   });
@@ -109,14 +140,22 @@ export function nationalView(national: NationalResult, opts: {
     index, round: roundOf(index), a: side(a), b: side(b), site: home ? "At the higher seed" : "Neutral site", result: null,
   }));
   return {
-    teams: T, announced: false, heading: "Projected playoff field", bracketHeading: "Projected bracket", field, bracket, bubble,
+    teams: T, announced: false, heading: "Projected playoff field", bracketHeading: "Projected bracket", field, bracket, bubble, bubbleTitle: BUBBLE, bubbleNote: BUBBLE_NOTE, g6: null,
     note: `Projected from ${iterations} simulated seasons. Modelled odds, not a prediction of the committee.`,
   };
 }
 
+/** A ranking to seed the field from, its power champions, and the automatic bid each field team holds (to mark). */
+type RankingSeeds = { order: readonly number[]; champions: readonly number[]; tags?: ReadonlyMap<number, string> };
+
+/** How many Group of Six teams their bubble lists. */
+const G6_SHOWN = 4;
+const BUBBLE = "At-large bubble";
+const BUBBLE_NOTE = "Next in line for an at-large spot.";
+
 /** The field the format picks from a ranking, its bracket, and the next teams in the ranking as the bubble. */
 function rankedView(
-  national: NationalResult, season: Season, ranking: { order: readonly number[]; champions: readonly number[] }, T: 4 | 12,
+  national: NationalResult, season: Season, ranking: RankingSeeds, T: 4 | 12,
   games: ReturnType<typeof bracketGames>, roundOf: (g: number) => BracketGame["round"], iterations: string, bubbleSize: number,
 ): NationalView {
   const seeds = playoffField(season, ranking.order, ranking.champions);
@@ -125,7 +164,7 @@ function rankedView(
     const p = byId.get(id)?.playoff;
     const [inOdds, atSeed] = [p?.field ?? 0, p?.seeds[k] ?? 0];
     return {
-      seed: k + 1, teamId: id, field: inOdds, atSeed, bye: p?.bye ?? 0, champion: p?.champion ?? 0,
+      seed: k + 1, teamId: id, field: inOdds, atSeed, bye: p?.bye ?? 0, champion: p?.champion ?? 0, tag: ranking.tags?.get(id) ?? null,
       text: `In ${formatOdds(inOdds)} · seed ${k + 1} in ${formatOdds(atSeed)}`,
     };
   });
@@ -138,8 +177,19 @@ function rankedView(
   const bracket = games.map(([a, b, home], index) => ({
     index, round: roundOf(index), a: side(a), b: side(b), site: home ? "At the higher seed" : "Neutral site", result: null,
   }));
+  let g6: GroupOfSixRace | null = null;
+  if (playoffFormat(season.year).autoBids === "power4G6") {
+    g6 = {
+      title: "Group of Six bubble",
+      note: "Next in line for the Group of Six bid.",
+      teams: ranking.order.filter((id) => !seeded.has(id) && isGroupOfSix(season, id)).slice(0, G6_SHOWN).map((id) => {
+        const odds = byId.get(id)?.playoff?.field ?? 0;
+        return { teamId: id, field: odds, text: `In ${formatFine(odds)}` };
+      }),
+    };
+  }
   return {
-    teams: T, announced: false, heading: "Projected playoff field", bracketHeading: "Projected bracket", field, bracket, bubble,
+    teams: T, announced: false, heading: "Projected playoff field", bracketHeading: "Projected bracket", field, bracket, bubble, bubbleTitle: BUBBLE, bubbleNote: BUBBLE_NOTE, g6,
     note: `Seeded from the committee's latest ranking, moved by results since and your picks. Each power conference's champion is its picked one, else whichever of its two likeliest title-game teams wins that game more often. Chances in from ${iterations} simulated seasons, every game played out: a seed is where things stand, the chance how often it holds.`,
   };
 }
@@ -160,7 +210,7 @@ function announcedView(
     // Before its first game, a bye team's run says so: "First-round bye · national title 23%".
     const said = tail !== "" ? tail[0].toUpperCase() + tail.slice(1) : run?.state === "in" && bye ? "First-round bye" : "";
     const text = run?.state === "in" ? (said ? `${said} · ${odds}` : odds[0].toUpperCase() + odds.slice(1)) : said;
-    return { seed: k + 1, teamId: id, field: 1, atSeed: 1, bye: bye ? 1 : 0, champion: p?.champion ?? 0, text };
+    return { seed: k + 1, teamId: id, field: 1, atSeed: 1, bye: bye ? 1 : 0, champion: p?.champion ?? 0, tag: null, text };
   });
   // The bracket as played: each game's two teams once the games feeding it are final, its result once it is.
   const name = (id: number) => season?.teams.find((t) => t.id === id)?.name ?? `Team ${id}`;
@@ -180,7 +230,7 @@ function announcedView(
     return { index, round: roundOf(index), a: side(a, x), b: side(b, y), site: home ? "At the higher seed" : "Neutral site", result };
   });
   return {
-    teams: T, announced: true, heading: "Playoff field", bracketHeading: "Bracket", field, bracket, bubble: [],
+    teams: T, announced: true, heading: "Playoff field", bracketHeading: "Bracket", field, bracket, bubble: [], bubbleTitle: BUBBLE, bubbleNote: BUBBLE_NOTE, g6: null,
     note: `The field and seeds the committee announced, with the results so far. National-title odds from ${iterations} simulated playoffs: modelled, not a prediction.`,
   };
 }

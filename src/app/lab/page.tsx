@@ -50,6 +50,6 @@ const games: LabGame[] = season.games
   });
 
 export default function LabPage() {
-  const teams = supportedTeams.map((t) => ({ id: t.id, name: t.name })).sort((a, b) => a.name.localeCompare(b.name));
+  const teams = supportedTeams.map((t) => ({ id: t.id, name: t.name, abbr: t.abbreviation ?? undefined })).sort((a, b) => a.name.localeCompare(b.name));
   return <Lab initial={initial} games={games} names={names} abbrs={abbrs} teams={teams} paged={supportedTeams.map((t) => t.id)} ranks={liveRanks(season)} baseOdds={baseOdds} through={through} asOf={asOf} />;
 }

@@ -11,9 +11,9 @@ const list = (xs: readonly string[]) => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.
 
 // Every team with a page, for the bar's search: a supported conference's teams and the FBS independents. Read from the
 // data alone (no simulation), so this page stays cheap.
-const find = (data.teams as { id: number; name: string; conference: string | null; classification?: string }[])
+const find = (data.teams as { id: number; name: string; abbreviation?: string | null; conference: string | null; classification?: string }[])
   .filter((t) => t.classification === "fbs" && t.conference !== null && (t.conference === INDEPENDENTS || SUPPORTED_CONFERENCES.includes(t.conference)))
-  .map((t) => ({ id: t.id, name: t.name }));
+  .map((t) => ({ id: t.id, name: t.name, abbr: t.abbreviation ?? undefined }));
 
 // Missing pages, including a team the app has no page for (/team/<id> for an FCS team).
 export default function NotFound() {

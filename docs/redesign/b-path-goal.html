@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Path Card Goal</title>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* The team page's path card says "Way into the ACC title game" but ends with winning it. Four ways to fix that, beside
+   today's card. Numbers are from the live site on Nov 15 except where marked "≈" (illustrative). */
+:root {
+  --board: #133f2e; --board-deep: #0c2c20; --board-deeper: #0a241a; --board-line: #2a5a46; --board-text: #d7e4dc; --board-muted: #9fbcae;
+  --plate: #f3f0e6; --plate-ink: #121a16; --lamp: #f2b134; --lamp-ink: #8a5d00; --root: #5fd08f; --drop: #f0806e;
+  --ground: #e4e7e5; --paper: #f6f8f7; --ink: #15201b; --ink-soft: #3d4a43; --ink-muted: #5d6a63; --rule: #d6d4cc;
+  --hurt: #a3281c;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.45 "Public Sans", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.wrap { max-width: 1480px; margin: 0 auto; padding: 28px 16px 60px; }
+h1 { font: 800 34px/1 "Saira Condensed", sans-serif; text-transform: uppercase; margin: 0 0 8px; }
+.lede { color: var(--ink-muted); margin: 0 0 14px; max-width: 78ch; }
+.teams { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.teams button { font: 700 15px/1 "Saira Condensed", sans-serif; letter-spacing: .04em; text-transform: uppercase; height: 36px; padding: 0 14px; border: 1px solid var(--rule); border-radius: 2px; background: #fff; color: var(--ink-soft); }
+.teams button[aria-pressed="true"] { background: var(--board); border-color: var(--board); color: #fff; }
+.teamnote { font-size: 13px; color: var(--ink-muted); margin: 0 0 18px; min-height: 1.4em; }
+
+.cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 26px 22px; align-items: start; }
+.opt .tag { font: 800 20px/1 "Saira Condensed", sans-serif; text-transform: uppercase; margin: 0 0 4px; display: flex; gap: 8px; align-items: baseline; }
+.opt .tag em { font-style: normal; font-size: 12px; letter-spacing: .08em; padding: 3px 6px 2px; border-radius: 2px; background: var(--lamp); color: var(--plate-ink); }
+.opt .tag em.now { background: var(--rule); color: var(--ink-soft); }
+.opt .why { font-size: 13px; color: var(--ink-muted); margin: 0 0 6px; }
+.opt ul { font-size: 13px; color: var(--ink-soft); margin: 0 0 14px; padding-left: 18px; }
+.opt ul li.con { color: var(--hurt); }
+.opt ul li.con::marker { content: "– "; }
+.opt ul li.pro::marker { content: "+ "; color: var(--board); }
+
+.h2 { font: 800 24px/1 "Saira Condensed", sans-serif; text-transform: uppercase; margin: 0 0 4px; }
+.sub { font-size: 14px; color: var(--ink-muted); margin: 0 0 10px; }
+.card { background: var(--board-deep); color: var(--board-text); border-radius: 4px; padding: 14px 16px; }
+.headline { font: 800 24px/1.05 "Saira Condensed", sans-serif; text-transform: uppercase; color: #fff; margin: 0; }
+.lad { display: grid; grid-template-columns: minmax(0, 1fr) 4.25rem 4.25rem; column-gap: 10px; margin-top: 10px; }
+.lad .hd { font: 700 11px/1 "Saira Condensed", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--board-muted); text-align: right; padding-bottom: 6px; }
+.lad .hd:first-child { text-align: left; }
+.r { display: contents; }
+.r > * { padding: 10px 0; border-top: 1px solid var(--board-line); }
+.what { display: flex; gap: 10px; align-items: flex-start; }
+.n { font: 800 15px/1 "Saira Condensed", sans-serif; color: var(--plate-ink); background: var(--board-muted); min-width: 20px; height: 20px; padding: 0 3px; border-radius: 2px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.r.now .n { background: transparent; border: 1px solid var(--board-line); }
+.r.end .n { background: var(--lamp); }
+.n.then { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 0 5px; }
+.what b { display: block; font: 700 17px/1.15 "Saira Condensed", sans-serif; text-transform: uppercase; color: #fff; }
+.r.now .what b { color: var(--board-muted); }
+.what i { display: block; font-style: normal; font-size: 12px; color: var(--board-muted); margin-top: 2px; }
+.v { text-align: right; font: 800 20px/1 "Saira Condensed", sans-serif; color: #fff; }
+.v small { display: block; font: 600 11px/1.2 "Public Sans", sans-serif; color: var(--root); margin-top: 3px; }
+.r.now .v { color: var(--board-muted); }
+.r.end .v { color: var(--lamp); }
+.r.end.apart > * { border-top-color: transparent; }
+
+/* The milestone line (B): the race card's labelled dashed line. */
+.mile { grid-column: 1 / -1; position: relative; margin: 8px 0 6px; border-top: 1px dashed var(--lamp); }
+.mile span { position: absolute; right: 0; top: -9px; background: var(--board-deep); padding-left: 6px; font: 700 11px/1.5 "Saira Condensed", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--lamp); }
+/* The "Then" break (C): space and a quiet label, the ladder above closed off. */
+.then-gap { grid-column: 1 / -1; border-top: 1px solid var(--board-line); padding: 14px 0 2px; font: 700 11px/1 "Saira Condensed", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--board-muted); }
+
+.foot { font-size: 12px; color: var(--board-muted); margin: 0; border-top: 1px solid var(--board-line); padding-top: 10px; }
+.foot b { color: var(--board-text); font-weight: 600; }
+.foot .two { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
+.foot .two span { display: flex; align-items: baseline; gap: 6px; }
+.foot .two .plate { font: 800 20px/1 "Saira Condensed", sans-serif; color: #fff; }
+.foot .two .plate.lit { color: var(--lamp); }
+.foot .two small { font: 700 11px/1 "Saira Condensed", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--board-muted); }
+.btns { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.btn { font: 700 15px/1 "Saira Condensed", sans-serif; letter-spacing: .05em; text-transform: uppercase; height: 38px; padding: 0 14px; border-radius: 3px; display: inline-flex; align-items: center; gap: 6px; }
+.btn.lamp { background: var(--lamp); color: var(--plate-ink); }
+.btn.line { border: 1px solid var(--board-line); color: var(--board-text); }
+.btn.line span { color: var(--lamp); }
+.changed { outline: 2px dashed var(--lamp); outline-offset: 3px; border-radius: 2px; }
+.legend { font-size: 12px; color: var(--ink-muted); margin: 0 0 16px; display: flex; gap: 8px; align-items: center; }
+.legend i { width: 18px; height: 12px; outline: 2px dashed var(--lamp); outline-offset: -2px; border-radius: 2px; }
+@media (max-width: 420px) { .lad { grid-template-columns: minmax(0, 1fr) 3.6rem 3.6rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Path card: which goal?</h1>
+  <p class="lede">Today's card says <b>"Way into the ACC title game"</b> but its last row is <b>winning</b> the title game, and "All of it happens in 58%" counts that win too, while Miami gets <i>into</i> the title game in 82%. Four fixes, beside today's card. Switch teams to see a power favorite, a multi-step power path, and a Group of Six team (where winning the title game isn't "In").</p>
+  <div class="teams" role="group" aria-label="Team">
+    <button type="button" data-team="miami" aria-pressed="true">Miami</button>
+    <button type="button" data-team="wake" aria-pressed="false">Wake Forest</button>
+    <button type="button" data-team="boise" aria-pressed="false">Boise State</button>
+  </div>
+  <p class="teamnote" id="teamnote"></p>
+  <p class="legend"><i></i>Dashed amber outline: what changes from today's card.</p>
+  <div class="cols" id="cols"></div>
+</div>
+
+<script>
+const TEAMS = {
+  miami: {
+    name: "Miami", conf: "ACC", short: "ACC", headline: "Win 2 of 3", power: true,
+    note: "Power favorite: the title-game row is most of what's left.",
+    today: [">99%", "91%"],
+    steps: [{ text: "Miami wins 2 of 3", detail: "82% likely", t: "In", ta: "+1", p: "95%", pa: "+4" }],
+    title: { opp: "Wake Forest", chance: "70%", p: "In", pa: "+5" },
+    into: "82%", intoLong: "in 82% of seasons", all: "58%", allLong: "in 58% of seasons",
+  },
+  wake: {
+    name: "Wake Forest", conf: "ACC", short: "ACC", headline: "Win 2 of 3", power: true,
+    note: "Multi-step power path: the title-game win is a 31% upset, so “all of it” hides how often Wake just gets there.",
+    today: ["59%", "37%"],
+    steps: [
+      { text: "Wake Forest wins 2 of 3", detail: "41% likely", t: "97%", ta: "+38", p: "65%", pa: "+28" },
+      { text: "Favorites win the rest", detail: "3 games", t: "In", ta: "+3", p: "65%", pa: null },
+    ],
+    title: { opp: "Miami", chance: "31%", p: "In", pa: "+35" },
+    into: "≈ 1 in 3", intoLong: "in about 1 in 3 seasons", all: "about 1 in 11", allLong: "in about 1 in 11 seasons",
+  },
+  boise: {
+    name: "Boise State", conf: "Pac 12", short: "Pac 12", headline: "Win 1 of 2", power: false,
+    note: "Group of Six: winning the title game isn't “In” (71%), and today's card doesn't say why.",
+    today: ["99%", "56%"],
+    steps: [{ text: "Boise State wins 1 of 2", detail: "95% likely", t: "In", ta: "+1", p: "58%", pa: "+2" }],
+    title: { opp: "Texas State", chance: "70%", p: "71%", pa: "+13" },
+    into: "95%", intoLong: "in 95% of seasons", all: "67%", allLong: "in 67% of seasons",
+  },
+};
+
+const v = (val, add, cls = "") => `<span class="v ${cls}">${val}${add ? `<small>${add}</small>` : ""}</span>`;
+const today = (T) => `<div class="r now"><div class="what"><span class="n"></span><b>Today</b></div>${v(T.today[0])}${v(T.today[1])}</div>`;
+const steps = (T) => T.steps.map((s, k) =>
+  `<div class="r"><div class="what"><span class="n">${k + 1}</span><span><b>${s.text}</b><i>${s.detail}</i></span></div>${v(s.t, s.ta)}${v(s.p, s.pa)}</div>`).join("");
+const titleRow = (T, { n, apart = false, mark = false } = {}) =>
+  `<div class="r end ${apart ? "apart" : ""}"><div class="what"><span class="n ${n === "Then" ? "then" : ""} ${mark ? "changed" : ""}">${n ?? T.steps.length + 1}</span><span><b>${T.name} wins the title game</b><i>vs ${T.title.opp} · ${T.title.chance} chance</i></span></div>${v("Won")}${v(T.title.p, T.title.pa)}</div>`;
+const lad = (inner) => `<div class="lad"><span class="hd">After</span><span class="hd">Title game</span><span class="hd">Playoff</span>${inner}</div>`;
+const why = (T) => T.power ? "The champion gets a playoff spot." : `The champion still has to be the top Group of Six team.`;
+const btns = `<div class="btns"><span class="btn lamp">Fill in this path</span><span class="btn line">Try it in the Lab <span>→</span></span></div>`;
+const card = (T, title, sub, body, foot, { markTitle = false, markSub = false } = {}) => `
+  <p class="h2 ${markTitle ? "changed" : ""}">${title}</p>
+  <p class="sub ${markSub ? "changed" : ""}">${sub}</p>
+  <div class="card"><p class="headline">${T.headline}</p>${body}${foot}${btns}</div>`;
+
+const OPTIONS = [
+  {
+    tag: "Today", badge: "now", why: "As shipped.",
+    pros: [], cons: ["Heading says “into”; last row is winning it.", "“All of it” mixes getting there with winning.", "G6: no reason the win isn't In."],
+    render: (T) => card(T, `Way into the ${T.conf} title game`, `The likeliest results that put ${T.name} in it. Each row adds to the rows above.`,
+      lad(today(T) + steps(T) + titleRow(T)),
+      `<p class="foot">All of it happens ${T.allLong}.${T.power ? " The champion gets a playoff spot." : ""}</p>`),
+  },
+  {
+    tag: "A · Rename", why: "Say what the card already shows: the way to win the conference.",
+    pros: ["Wording only: smallest change."], cons: ["Still one number: how often Miami just gets there is lost."],
+    render: (T) => card(T, `Way to win the ${T.conf}`, `The likeliest results that put ${T.name} in the title game, then the title game. Each row adds to the rows above.`,
+      lad(today(T) + steps(T) + titleRow(T)),
+      `<p class="foot changed">All of it happens ${T.allLong}. ${why(T)}</p>`, { markTitle: true, markSub: true }),
+  },
+  {
+    tag: "B · Rename + milestone", badge: "pick", why: "Rename, and mark the moment the team is in the title game with the race card's labelled dashed line.",
+    pros: ["Both goals readable at a glance.", "Reuses the race card's cut-line pattern.", "Footer gives both odds as lit numbers."], cons: ["Two more strings and a field in core."],
+    render: (T) => card(T, `Way to win the ${T.conf}`, `The likeliest results that put ${T.name} in the title game, then the title game.`,
+      lad(today(T) + steps(T) + `<div class="mile changed"><span>In the title game · ${T.into}</span></div>` + titleRow(T, { apart: true })),
+      `<div class="foot changed"><div class="two"><span><small>In the title game</small><b class="plate">${T.into}</b></span><span><small>Champion</small><b class="plate lit">${T.all}</b></span></div>${why(T)}</div>`,
+      { markTitle: true, markSub: true }),
+  },
+  {
+    tag: "C · Title game as “Then”", why: "Keep “Way into” for the numbered rows; the title game becomes a separate “Then” step after a break.",
+    pros: ["Heading stays true for the ladder.", "Clear that the last row is a different kind of step."], cons: ["Two ideas under one heading.", "Badge reads oddly next to numbers on phones."],
+    render: (T) => card(T, `Way into the ${T.conf} title game`, `The likeliest results that put ${T.name} in it, then what winning it does.`,
+      lad(today(T) + steps(T) + `<div class="then-gap changed">Then, in the title game</div>` + titleRow(T, { n: "Then", apart: true, mark: true })),
+      `<p class="foot changed">In the title game ${T.intoLong}; champion ${T.allLong}. ${why(T)}</p>`, { markSub: true }),
+  },
+  {
+    tag: "D · Stop at “In”", why: "Drop the title-game row. The card ends when the team is in; the payoff moves to the footer.",
+    pros: ["Heading and ladder agree exactly.", "Shortest card."], cons: ["Loses the big playoff jump on the board (Wake's +35).", "The title week card already covers the game."],
+    render: (T) => card(T, `Way into the ${T.conf} title game`, `The likeliest results that put ${T.name} in it. Each row adds to the rows above.`,
+      lad(today(T) + steps(T)),
+      `<p class="foot changed">All of it happens ${T.intoLong}. <b>Win the title game too</b> (${T.title.chance} vs ${T.title.opp}): playoff ${T.title.p}.${T.power ? "" : " The champion still has to be the top Group of Six team."}</p>`),
+  },
+];
+
+function draw(id) {
+  const T = TEAMS[id];
+  document.getElementById("teamnote").textContent = T.note;
+  document.getElementById("cols").innerHTML = OPTIONS.map((o) => `
+    <section class="opt">
+      <p class="tag">${o.tag}${o.badge === "now" ? '<em class="now">Now</em>' : o.badge === "pick" ? "<em>Recommended</em>" : ""}</p>
+      <p class="why">${o.why}</p>
+      <ul>${o.pros.map((x) => `<li class="pro">${x}</li>`).join("")}${o.cons.map((x) => `<li class="con">${x}</li>`).join("")}</ul>
+      ${o.render(T)}
+    </section>`).join("");
+  for (const b of document.querySelectorAll(".teams button")) b.setAttribute("aria-pressed", String(b.dataset.team === id));
+}
+document.querySelector(".teams").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) draw(b.dataset.team); });
+draw("miami");
+</script>
+</body>
+</html>

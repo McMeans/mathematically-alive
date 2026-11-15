@@ -258,7 +258,7 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     fieldTexts: Object.fromEntries(national.teams.flatMap((t) => (t.playoff ? [[t.teamId, formatSideOdds(t.playoff.field, "alive")]] : []))),
     loaded: `${picks} ${picks === 1 ? "pick" : "picks"} loaded.`,
     summary: `${picks === 0 ? "No picks yet" : picks === 1 ? "1 pick" : `${picks} picks`}${open === 0 && picks > 0 ? " · every game picked" : ""} · ${seasons}`,
-    playoff: nationalView(national, { season, ranking: { order, champions } }),
+    playoff: nationalView(national, { season, ranking: { order, champions, tags: projected.tags } }),
     champions: Object.fromEntries(projected.champions),
     conferences,
     ranking,

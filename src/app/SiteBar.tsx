@@ -7,7 +7,22 @@ import { Logo } from "@/app/Logo";
 import { TeamLogo } from "@/app/explorer/Board";
 
 /** A team a search can open. */
-export type FindTeam = { id: number; name: string };
+export type FindTeam = { id: number; name: string; /** "UVA": found by it too. */ abbr?: string };
+
+/**
+ * How well a team fits a search, best first, or null when it doesn't: its abbreviation exactly ("uva"), its name's
+ * start, then its abbreviation's or any word's start, then anywhere in its name.
+ */
+export function teamMatch(query: string, name: string, abbr?: string): number | null {
+  const q = query.trim().toLowerCase();
+  if (q === "") return null;
+  const n = name.toLowerCase(), a = abbr?.toLowerCase() ?? "";
+  if (a === q) return 0;
+  if (n.startsWith(q)) return 1;
+  if (a.startsWith(q) || n.split(/[\s&.'-]+/).some((w) => w.startsWith(q))) return 2;
+  if (n.includes(q)) return 3;
+  return null;
+}
 
 /**
  * The top bar, the same on every page: the mark, Teams and Season Lab (the current one lit as a cream plate), a team
@@ -59,8 +74,8 @@ function TeamSearch({ teams }: { teams: FindTeam[] }) {
   const listId = useId();
   const query = q.trim().toLowerCase();
   const matches = query === "" ? [] : teams
-    .filter((t) => t.name.toLowerCase().includes(query))
-    .sort((a, b) => Number(!a.name.toLowerCase().startsWith(query)) - Number(!b.name.toLowerCase().startsWith(query)) || a.name.localeCompare(b.name))
+    .flatMap((t) => { const m = teamMatch(query, t.name, t.abbr); return m === null ? [] : [{ ...t, m }]; })
+    .sort((a, b) => a.m - b.m || a.name.localeCompare(b.name))
     .slice(0, MAX_RESULTS);
   const go = (id: number) => { setQ(""); setOpen(false); inputRef.current?.blur(); router.push(`/team/${id}`); };
   const shown = open && matches.length > 0;
@@ -96,6 +111,7 @@ function TeamSearch({ teams }: { teams: FindTeam[] }) {
                 className={`cond flex min-h-11 w-full items-center gap-2.5 px-3 text-left text-base font-bold text-white ${k === active ? "bg-white/[0.07]" : ""}`}>
                 <TeamLogo id={t.id} size="20px" />
                 <span className="truncate">{t.name}</span>
+                {t.abbr && t.abbr.toLowerCase() !== t.name.toLowerCase() && <span className="ml-auto shrink-0 text-xs tracking-[0.06em] text-board-muted">{t.abbr}</span>}
               </button>
             </li>
           ))}

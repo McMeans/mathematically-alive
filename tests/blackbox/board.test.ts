@@ -324,9 +324,14 @@ describe("the best shot", { timeout: 60_000 }, () => {
   const way = r.tree.likeliest!;
   const ladder = shot.steps.filter((s) => s.kind === "step" || s.kind === "rest");
 
-  it("names its goal, the ACC title game, and sums up the way in one line", () => {
-    expect(shot.title).toBe("Way into the ACC title game");
-    expect(shot.sub).toBe("The likeliest results that put Louisville in it. Each row adds to the rows above.");
+  it("names its goal, winning the ACC when it ends with the title game, and sums up the way in one line", () => {
+    if (shot.steps.at(-1)!.kind === "title") {
+      expect(shot.title).toBe("Way to win the ACC");
+      expect(shot.sub).toBe("The likeliest results that put Louisville in the title game, then the title game. Each row adds to the rows above.");
+    } else {
+      expect(shot.title).toBe("Way into the ACC title game");
+      expect(shot.sub).toBe("The likeliest results that put Louisville in it. Each row adds to the rows above.");
+    }
     expect(shot.headline).toBe(way.summary);
     expect(shot.columns).toEqual(["After", "Title game", "Playoff"]);
     expect(shot.fill).toBe("Fill in this path");
@@ -386,6 +391,19 @@ describe("the best shot", { timeout: 60_000 }, () => {
     const lead = way.note ? `${way.note} ` : "";
     expect(shot.note.startsWith(lead)).toBe(true);
     expect(shot.note.slice(lead.length)).toMatch(/^All of it happens (in about 1 in \d+ seasons|in fewer than 1 in 100 seasons|in \d+% of seasons)\. The champion gets a playoff spot\.$/);
+  });
+
+  it("a Group of Six team's way to win its conference says the champion still has to be the top Group of Six team", () => {
+    const mw = { ...base, conference: "Mountain West" };
+    const ids = season.teams.filter((t) => t.conference === "Mountain West").map((t) => t.id);
+    const shots = ids.map((id) => explore(season, { ...mw, teamId: id }).board?.bestShot ?? null)
+      .filter((s): s is NonNullable<typeof s> => s !== null && s.steps.at(-1)!.kind === "title");
+    expect(shots.length).toBeGreaterThan(0);
+    for (const s of shots) {
+      expect(s.title).toBe("Way to win the Mountain West");
+      expect(s.note).toMatch(/All of it happens .+\. The champion still has to be the top Group of Six team\.$/);
+      expect(s.note).not.toMatch(/gets a playoff spot/);
+    }
   });
 
   it("a team with no likeliest way in left has no best shot", () => {
