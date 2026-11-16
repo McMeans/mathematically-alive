@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team header: odds band</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Option B (the odds band), refined: three ways to set the playoff's second-tier numbers (first-round bye, national
+   title) below the three main ones. Each shown at desktop, narrow desktop and phone, for a long shot and a contender. */
+:root {
+  --board: #133f2e; --board-deep: #0c2c20; --board-line: #2a5a46; --board-text: #d7e4dc; --board-muted: #9fbcae;
+  --plate: #f3f0e6; --plate-ink: #121a16; --lamp: #f2b134;
+  --ground: #e4e7e5; --ink: #15201b; --ink-soft: #3d4a43; --ink-muted: #5d6a63; --rule: #d6d4cc;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.45 "Public Sans", system-ui, sans-serif; font-variant-numeric: tabular-nums; padding: 24px; }
+.plate { font-family: "Saira Condensed", sans-serif; font-weight: 800; line-height: 1; color: #fff; }
+h1 { font: 800 34px/1 "Saira Condensed", sans-serif; text-transform: uppercase; margin: 0 0 6px; }
+h2 { font: 800 26px/1 "Saira Condensed", sans-serif; text-transform: uppercase; margin: 52px 0 6px; }
+.lede, .why { max-width: 84ch; color: var(--ink-soft); margin: 4px 0 12px; font-size: 14.5px; }
+.why b, .lede b { color: var(--ink); }
+.size { font: 700 12px "Saira Condensed", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); margin: 16px 0 4px; }
+.frame { container-type: inline-size; border-radius: 4px; overflow: hidden; }
+.w-desk { width: 1180px; } .w-mid { width: 820px; } .w-phone { width: 375px; }
+.pair { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+
+.board { background-color: var(--board); background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1.2px); background-size: 6px 6px; color: var(--board-text); display: flex; flex-direction: column; }
+.bar { height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--board-line); }
+.bar .ball { width: 24px; height: 16px; border-radius: 50%; background: var(--plate); }
+.bar .nav span { font: 700 15px "Saira Condensed"; letter-spacing: .04em; text-transform: uppercase; padding: 4px 10px; border-radius: 2px; color: var(--board-muted); }
+.bar .nav span.on { background: var(--plate); color: var(--plate-ink); }
+.bar .date { margin-left: auto; font-size: 13px; color: var(--board-muted); }
+
+.top { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; padding: 16px 24px 14px; }
+.idrow { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; min-width: 0; }
+.picker { display: inline-flex; align-items: stretch; border: 1px solid var(--board-line); background: rgba(255,255,255,.04); border-radius: 3px; }
+.picker .nm { display: flex; align-items: center; gap: 10px; padding: 8px 12px; font: 800 40px/1.05 "Saira Condensed"; text-transform: uppercase; color: #fff; }
+.picker .nm img { width: 1.1em; height: 1.1em; }
+.picker .chev { width: 44px; display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--board-line); }
+.recline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 14px; color: var(--board-muted); }
+.tag { font: 800 12px "Saira Condensed"; letter-spacing: .1em; text-transform: uppercase; border: 1px solid var(--lamp); color: var(--lamp); border-radius: 2px; padding: 0 6px; white-space: nowrap; }
+.acts { display: flex; gap: 8px; margin-left: auto; }
+.btn { height: 36px; min-width: 96px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; border: 1px solid var(--board-line); border-radius: 3px; font: 700 16px "Saira Condensed"; letter-spacing: .05em; text-transform: uppercase; color: #fff; }
+.btn.share { background: var(--plate); border-color: var(--plate); color: var(--plate-ink); }
+.btn.off { color: var(--board-muted); opacity: .5; }
+.btn .ar { color: var(--lamp); }
+.lbl { font: 700 12px "Saira Condensed"; letter-spacing: .08em; text-transform: uppercase; color: var(--board-muted); white-space: nowrap; }
+
+/* The band: three equal-weight cells for the three main numbers. */
+.band { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); background: var(--board-deep); border-top: 1px solid var(--board-line); }
+.cell { padding: 10px 24px 12px; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.cell + .cell { border-left: 1px solid var(--board-line); }
+.cell > .plate { font-size: 44px; }
+.cell.lead > .lbl { color: #fff; }
+
+/* Second-tier numbers, three ways. */
+/* B1: sub-scores. Small label + small lit number pairs, inline under the playoff number, inside its cell. */
+.subs { display: flex; gap: 16px; flex-wrap: wrap; }
+.sub { display: inline-flex; align-items: baseline; gap: 5px; }
+.sub .lbl { font-size: 10.5px; }
+.sub .plate { font-size: 17px; color: var(--board-text); }
+/* B2: a narrow fourth column at the band's end, set off by a dashed rule, two small rows. */
+.B2 .band { grid-template-columns: repeat(3, minmax(0,1fr)) auto; }
+.side { padding: 10px 24px 12px 20px; border-left: 1px dashed var(--board-line); display: grid; grid-template-columns: auto auto; gap: 4px 14px; align-content: center; }
+.side .lbl { font-size: 11px; align-self: baseline; }
+.side .plate { font-size: 20px; color: var(--board-text); text-align: right; }
+.side .head { grid-column: 1 / -1; font-size: 10px; opacity: .8; letter-spacing: .1em; }
+/* B3: a thin foot line under the whole band: the playoff's road, in small lit numbers. */
+.foot { display: flex; align-items: baseline; gap: 18px; padding: 6px 24px 7px; background: var(--board-deep); border-top: 1px solid var(--board-line); }
+.foot .head { font: 700 10.5px "Saira Condensed"; letter-spacing: .1em; text-transform: uppercase; color: var(--board-muted); opacity: .85; }
+.foot .sub .plate { font-size: 15px; }
+
+@container (max-width: 1000px) {
+  .top { padding: 14px 20px 12px; }
+  .picker .nm { font-size: 32px; }
+  .acts { margin-left: 0; }
+  .cell { padding: 8px 20px 10px; }
+  .cell > .plate { font-size: 36px; }
+  .side { padding: 8px 18px 10px 16px; }
+  .foot { padding: 6px 20px 7px; }
+}
+@container (max-width: 600px) {
+  .bar { padding: 0 14px; height: 44px; } .bar .date { display: none; }
+  .namebar { display: flex !important; }
+  .top { padding: 10px 14px 12px; order: 3; }
+  .idrow .picker { display: none; }
+  .acts { width: 100%; } .acts .btn { flex: 1; height: 44px; } .acts .btn.off { display: none; }
+  .band { order: 2; grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
+  .cell { padding: 6px 12px 8px; gap: 3px; }
+  .cell > .plate { font-size: 28px; }
+  .cell > .lbl { font-size: 10.5px; }
+  .subs { gap: 2px 10px; } .sub .lbl { font-size: 9.5px; } .sub .plate { font-size: 14px; }
+  .B2 .side { grid-column: 1 / -1; grid-template-columns: auto auto auto auto auto; justify-content: start; align-items: baseline; border-left: 0; border-top: 1px dashed var(--board-line); padding: 5px 12px 6px; gap: 4px 10px; }
+  .B2 .side .head { grid-column: auto; }
+  .side .plate { font-size: 15px; } .side .lbl { font-size: 10px; }
+  .foot { order: 2; padding: 5px 12px 6px; gap: 12px; flex-wrap: wrap; }
+}
+.namebar { display: none; height: 52px; align-items: center; gap: 8px; padding: 0 2px 0 14px; border-bottom: 1px solid var(--board-line); order: 1; }
+.namebar .nm { flex: 1; display: flex; align-items: center; gap: 8px; font: 800 20px/1 "Saira Condensed"; text-transform: uppercase; color: #fff; }
+.namebar img { width: 1.2em; height: 1.2em; }
+.namebar .reset { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--board-muted); opacity: .5; }
+.below { padding: 12px 14px; background: var(--ground); color: var(--ink-muted); font-size: 13px; order: 9; }
+.note { font-size: 13px; color: var(--ink-muted); margin: 8px 0 0; max-width: 84ch; }
+</style>
+</head>
+<body>
+<h1>Team header: odds band, refined</h1>
+<p class="lede">Option B, with one question worked three ways: <b>where the playoff's second-tier numbers go.</b> Playoff, title game and conference title answer "is my team alive"; first-round bye and national title matter, but less. Today they read as a sentence of prose under 17%. In all three below they become small lit numbers (the board's own language, not body text), a clear step down in size and color from the band's three. Each is shown for a long shot (Liberty, today's data) and a contender (made-up numbers, to show the tier when the values are big), at desktop 1180, narrow or short desktop 820, and phone 375.</p>
+<p class="lede">Same in all three: the identity row (picker, record, tags, actions at the right; under 1000px the actions take their own row, never wrapping into the numbers), and the band of three equal cells, label over lit number. On phones the band is the sticky row under the name line.</p>
+
+<script>
+const T = {
+  lib: { id: 2335, name: 'Liberty', rec: '9-1 (6-0 CUSA)', tags: ['Playoff · In the hunt', 'CUSA title game · Clinched'], p: '17%', tg: 'In', tgl: 'CUSA title game', w: '72%', wl: 'Win CUSA', bye: '<0.1%', nat: '<0.1%' },
+  ind: { id: 84, name: 'Indiana', rec: '10-0 (7-0 Big Ten)', tags: ['Playoff · In the hunt', 'Big Ten title game · Alive'], p: '94%', tg: '61%', tgl: 'Big Ten title game', w: '38%', wl: 'Win Big Ten', bye: '52%', nat: '14%' },
+};
+const esc = (s) => s.replace(/</g, '&lt;');
+const chev = (n) => `<svg width="${n}" height="${n}" viewBox="0 0 12 12"><path d="M2.5 4.5 6 8 9.5 4.5" stroke="currentColor" stroke-width="2.2" fill="none"/></svg>`;
+const resetI = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 10a6 6 0 1 0 1.8-4.3"/><path d="M4 3.5V7h3.5"/></svg>';
+const shareI = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M6 7l4-4 4 4"/><path d="M5 11v4.5A1.5 1.5 0 0 0 6.5 17h7a1.5 1.5 0 0 0 1.5-1.5V11"/></svg>';
+const logo = (t) => `<img alt="" src="https://cdn.collegefootballdata.com/logos-dark/64/${t.id}.png">`;
+const sub = (l, v) => `<span class="sub"><span class="lbl">${l}</span><span class="plate">${esc(v)}</span></span>`;
+
+function header(kind, t) {
+  const bar = '<div class="bar"><span class="ball"></span><div class="nav"><span class="on">Teams</span><span>Season Lab</span></div><span class="date">Through Nov 14</span></div>';
+  const namebar = `<div class="namebar"><span class="nm">${logo(t)}${t.name} <span style="color:var(--board-muted)">${chev(14)}</span></span><span class="reset">${resetI}</span></div>`;
+  const tags = t.tags.map((l) => `<span class="tag">${l}</span>`).join('');
+  const top = `<div class="top"><div class="idrow"><span class="picker"><span class="nm">${logo(t)}${t.name}</span><span class="chev">${chev(20)}</span></span><div class="recline"><span>${t.rec}</span>${tags}</div></div>`
+    + `<div class="acts"><span class="btn">Open picks in Lab <span class="ar">→</span></span><span class="btn share">${shareI}Share</span><span class="btn off">${resetI}Reset</span></div></div>`;
+  const lead = kind === 'B1'
+    ? `<div class="cell lead"><span class="lbl">Playoff*</span><span class="plate">${t.p}</span><div class="subs">${sub('Bye', t.bye)}${sub('Natl title', t.nat)}</div></div>`
+    : `<div class="cell lead"><span class="lbl">Playoff*</span><span class="plate">${t.p}</span></div>`;
+  const rest = `<div class="cell"><span class="lbl">${t.tgl}</span><span class="plate">${t.tg}</span></div><div class="cell"><span class="lbl">${t.wl}</span><span class="plate">${t.w}</span></div>`;
+  const side = kind === 'B2' ? `<div class="side"><span class="lbl head">If in the field</span><span class="lbl">First-round bye</span><span class="plate">${esc(t.bye)}</span><span class="lbl">National title</span><span class="plate">${esc(t.nat)}</span></div>` : '';
+  const foot = kind === 'B3' ? `<div class="foot"><span class="head">Playoff road</span>${sub('First-round bye', t.bye)}${sub('National title', t.nat)}</div>` : '';
+  return `<div class="board ${kind}">${bar}${namebar}${top}<div class="band">${lead}${rest}${side}</div>${foot}<div class="below">What it takes · Week by week …</div></div>`;
+}
+const show = (kind) => document.write(
+  `<p class="size">Desktop 1180 · long shot</p><div class="frame w-desk">${header(kind, T.lib)}</div>`
+  + `<p class="size">Desktop 1180 · contender (illustrative numbers)</p><div class="frame w-desk">${header(kind, T.ind)}</div>`
+  + `<div class="pair"><div><p class="size">Narrow / short desktop 820 · long shot</p><div class="frame w-mid">${header(kind, T.lib)}</div></div>`
+  + `<div><p class="size">Phone 375 · long shot</p><div class="frame w-phone">${header(kind, T.lib)}</div></div>`
+  + `<div><p class="size">Phone 375 · contender</p><div class="frame w-phone">${header(kind, T.ind)}</div></div></div>`);
+</script>
+
+<h2>B1 · Sub-scores in the playoff cell</h2>
+<p class="why"><b>Closest to what the numbers mean.</b> Bye and national title are parts of the playoff answer, so they sit inside its cell, under the big number, as two small label-and-number pairs (17px against 44px, <code>board-text</code> against white). Short labels ("Bye", "Natl title") keep them on one line down to phone width. The playoff cell runs a little taller than its neighbours, which quietly marks it as the lead.</p>
+<script>show('B1');</script>
+
+<h2>B2 · A side column at the band's end</h2>
+<p class="why"><b>Out of the main row entirely.</b> A narrow fourth column after a dashed rule, headed "If in the field", lists both as a two-line mini table. The three cells stay perfectly even; the pair reads as an appendix. On phones it folds into one dashed row under the band.</p>
+<script>show('B2');</script>
+
+<h2>B3 · A foot line under the band</h2>
+<p class="why"><b>Quietest.</b> One thin row under the band, "Playoff road", both numbers small with full labels; nothing shares a cell with the big three. Reads like a scoreboard's fine print. Costs one more thin row (about 28px) and is the easiest to overlook.</p>
+<script>show('B3');</script>
+
+<p class="note">Edge cases, the same in each: a four-team field has no byes (only National title shows); once the field is announced the pair becomes Seed and National title ("Won", "Out" or odds); an independent's band has one main cell (Playoff) and the pair keeps its tier. Short labels ("Bye", "Natl title") would come from the core beside today's <code>playoffDetail</code>.</p>
+</body>
+</html>

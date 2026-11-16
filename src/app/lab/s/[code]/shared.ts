@@ -1,7 +1,7 @@
 // A shared Lab link's picks, run once per link on the server: a small run (the card needs only the field's order and
 // the favourite), and only so many a minute. Loads the season itself rather than `@/app/season`, which runs the full
 // no-picks simulations on import.
-import { decodeLabLocks, encodeLabLocks, labCard, seasonLab, type LabCard, type Season } from "@/core";
+import { decodeLabBracket, decodeLabLocks, encodeLabBracket, encodeLabLocks, labCard, readLabShareCode, seasonLab, type LabCard, type Season } from "@/core";
 import { SEED, SUPPORTED_CONFERENCES } from "@/app/config";
 import data from "@/app/data/season.json";
 
@@ -17,7 +17,7 @@ let runs = 0;
 const cards = new Map<string, LabCard | null>();
 
 /**
- * The share card for a link's picks (`?picks=` code).
+ * The share card for a link's code: its picks (`?picks=` code), then `~` and a filled-in bracket (`?bracket=`) when it has one.
  *
  * - Undefined: the code is too long to be a Lab link (404).
  * - Null: the plain preview, with no run. For a malformed code or picks that no longer fit the season (the Lab explains
@@ -27,9 +27,13 @@ const cards = new Map<string, LabCard | null>();
  */
 export function sharedCard(code: string): LabCard | null | undefined {
   if (code.length > MAX_CODE) return undefined;
-  const { locks, dropped } = decodeLabLocks(season, code);
+  const parts = readLabShareCode(code);
+  const { locks, dropped } = decodeLabLocks(season, parts.picks);
   if (dropped > 0) return null;
-  const key = encodeLabLocks(season, locks);
+  // A filled-in bracket (`<picks>~<bracket>`) is shown, never run: it only changes what the card draws.
+  const bracket = decodeLabBracket(season, parts.bracket);
+  if (parts.bracket !== null && bracket === null) return null;
+  const key = `${encodeLabLocks(season, locks)}~${bracket ? encodeLabBracket(bracket) : ""}`;
   if (cards.has(key)) {
     const card = cards.get(key)!;
     cards.delete(key); // most recent last
@@ -39,7 +43,7 @@ export function sharedCard(code: string): LabCard | null | undefined {
   const now = Date.now();
   if (now - windowStart >= 60_000) { windowStart = now; runs = 0; }
   if (++runs > PER_MINUTE) return null;
-  const card = labCard(season, seasonLab(season, { iterations: ITERATIONS, seed: SEED, conferences: SUPPORTED_CONFERENCES, locks }));
+  const card = labCard(season, seasonLab(season, { iterations: ITERATIONS, seed: SEED, conferences: SUPPORTED_CONFERENCES, locks }), bracket);
   if (cards.size >= KEEP) cards.delete(cards.keys().next().value!);
   cards.set(key, card);
   return card;

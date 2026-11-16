@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team header: keep B3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Today's B3 header (identity row, odds band, playoff road) with the record moved into the picker, the tags gone,
+   and the Undo, Reset, Share suite plus the Lab link. */
+:root {
+  --board: #133f2e; --board-deep: #0c2c20; --board-line: #2a5a46; --board-text: #d7e4dc; --board-muted: #9fbcae;
+  --plate: #f3f0e6; --plate-ink: #121a16; --lamp: #f2b134;
+  --ground: #e4e7e5; --paper: #f6f8f7; --ink: #15201b; --ink-soft: #3d4a43; --ink-muted: #5d6a63; --rule: #d6d4cc;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.45 "Public Sans", system-ui, sans-serif; font-variant-numeric: tabular-nums; padding: 24px; }
+.plate { font-family: "Saira Condensed", sans-serif; font-weight: 800; line-height: 1; color: #fff; }
+h1 { font: 800 34px/1 "Saira Condensed", sans-serif; text-transform: uppercase; margin: 0 0 8px; }
+h2 { font: 800 26px/1 "Saira Condensed", sans-serif; text-transform: uppercase; margin: 56px 0 6px; }
+p.t { max-width: 90ch; color: var(--ink-soft); margin: 4px 0 12px; font-size: 14.5px; }
+p.t b { color: var(--ink); }
+.size { font: 700 12px "Saira Condensed", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); margin: 14px 0 4px; }
+.size em { font-style: normal; color: var(--ink); }
+.frame { container-type: inline-size; border-radius: 4px; overflow: hidden; }
+.w-desk { width: 1180px; } .w-mid { width: 820px; } .w-phone { width: 375px; }
+.pair { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+
+.board { background-color: var(--board); background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1.2px); background-size: 6px 6px; color: var(--board-text); }
+.bar { height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--board-line); }
+.ball { width: 24px; height: 16px; border-radius: 50%; background: var(--plate); flex-shrink: 0; }
+.nav { display: flex; gap: 2px; }
+.nav span { font: 700 15px "Saira Condensed"; letter-spacing: .04em; text-transform: uppercase; padding: 4px 10px; border-radius: 2px; color: var(--board-muted); white-space: nowrap; }
+.nav span.on { background: var(--plate); color: var(--plate-ink); }
+.date { margin-left: auto; font-size: 13px; color: var(--board-muted); white-space: nowrap; }
+.page { display: grid; grid-template-columns: minmax(0,1fr) 300px; min-height: 70px; }
+.page .main { background: var(--ground); padding: 12px 14px; color: var(--ink-muted); font-size: 13px; }
+.page .rail { background: var(--paper); border-left: 1px solid var(--rule); padding: 12px 14px; color: var(--ink-muted); font-size: 13px; }
+@container (max-width: 600px) { .page { grid-template-columns: 1fr; } .page .rail { display: none; } }
+
+/* Identity row, as built: picker, then the actions at the row's end. */
+.id { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 16px 24px 14px; }
+.picker { display: inline-flex; align-items: stretch; border: 1px solid var(--board-line); background: rgba(255,255,255,.04); border-radius: 3px; flex-shrink: 0; }
+.picker .in { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
+.picker img { width: 44px; height: 44px; flex-shrink: 0; }
+.picker .nm { display: flex; flex-direction: column; gap: 3px; }
+.picker .nm b { font: 800 40px/0.95 "Saira Condensed"; text-transform: uppercase; color: #fff; white-space: nowrap; }
+.picker .nm span { font-size: 13px; color: var(--board-muted); white-space: nowrap; }
+.picker .cv { width: 44px; display: flex; align-items: center; justify-content: center; border-left: 1px solid var(--board-line); color: var(--board-text); }
+.end { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+.end.col { flex-direction: column; align-items: flex-end; gap: 8px; }
+.suite { display: flex; gap: 8px; flex-shrink: 0; }
+.btn { height: 36px; min-width: 96px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; border: 1px solid var(--board-line); border-radius: 3px; font: 700 16px "Saira Condensed"; letter-spacing: .05em; text-transform: uppercase; color: #fff; }
+.btn.share { background: var(--plate); border-color: var(--plate); color: var(--plate-ink); }
+.btn.dim { color: var(--board-muted); opacity: .5; }
+.btn.lit { border-color: var(--lamp); color: var(--lamp); }
+.btn.ico { width: 44px; min-width: 0; height: 44px; padding: 0; }
+.ph .btn { height: 44px; }
+.lablink { display: inline-flex; align-items: center; gap: 6px; font: 700 15px "Saira Condensed"; letter-spacing: .05em; text-transform: uppercase; color: var(--board-text); white-space: nowrap; }
+.lablink .ar { color: var(--lamp); }
+.lablink small { font: 600 12px "Public Sans"; text-transform: none; letter-spacing: 0; color: var(--board-muted); }
+
+/* Odds band and playoff road, as built. */
+.band { display: grid; border-top: 1px solid var(--board-line); background: var(--board-deep); }
+.cell { display: flex; flex-direction: column; gap: 4px; padding: 10px 24px 12px; min-width: 0; }
+.cell + .cell { border-left: 1px solid var(--board-line); }
+.cell .lbl { font: 700 12px "Saira Condensed"; letter-spacing: .08em; text-transform: uppercase; color: var(--board-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell.lead .lbl { color: #fff; }
+.cell .plate { font-size: 44px; }
+.road { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 16px; padding: 6px 24px; border-top: 1px solid var(--board-line); background: var(--board-deep); }
+.road .k { font: 700 11px "Saira Condensed"; letter-spacing: .1em; text-transform: uppercase; color: var(--board-muted); }
+.road .i { display: inline-flex; align-items: baseline; gap: 6px; }
+.road .i .plate { font-size: 15px; color: var(--board-text); }
+
+/* Phone, as built, with the record under the name in the sticky line and one row for the actions. */
+.ph { display: none; }
+.strip { display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 14px; }
+.strip img { width: 24px; height: 24px; }
+.strip .nm { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.strip .nm b { font: 800 20px/1 "Saira Condensed"; text-transform: uppercase; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strip .nm span { font-size: 11.5px; line-height: 1; color: var(--board-muted); white-space: nowrap; }
+.ph .cell { padding: 6px 14px 8px; gap: 2px; }
+.ph .cell .lbl { font-size: 11px; }
+.ph .cell .plate { font-size: 26px; }
+.ph .road { padding: 6px 14px; border-top: 0; border-bottom: 1px solid var(--board-line); }
+.phrow { display: flex; align-items: center; gap: 6px; padding: 10px 14px 12px; }
+.phrow .lablink { margin-left: auto; }
+.sticky { border-bottom: 0; }
+.tagnote { font: 700 10px "Saira Condensed"; letter-spacing: .08em; text-transform: uppercase; color: var(--lamp); }
+@container (max-width: 600px) { .ph { display: block; } .dk { display: none !important; } .date { display: none; } .bar { padding: 0 14px; height: 44px; } }
+.note { font-size: 13px; color: var(--ink-muted); margin: 8px 0 0; max-width: 90ch; }
+</style>
+</head>
+<body>
+<h1>Team header: keep B3</h1>
+<p class="t">What's built on this branch (identity row, odds band, playoff road), changed three ways: <b>the record moves into the team picker</b> in today's format, under the name; <b>the tags are gone</b>; <b>the actions are Undo, Reset, Share</b>, with the Lab as a link. Two placements for the Lab link: G1 under the suite, G2 on the suite's line before it.</p>
+
+<script>
+const T = {
+  lib: { id: 2335, name: 'Liberty', rec: '9-1 (6-0 CUSA)', goals: [['Playoff*', '17%', 'Playoff*'], ['CUSA title game', 'In', 'Title game'], ['Win CUSA', '72%', 'Win CUSA']], road: ['<0.1%', '<0.1%'] },
+  nd: { id: 87, name: 'Notre Dame', rec: '9-1', goals: [['Playoff*', '99%', 'Playoff*']], road: ['51%', '19%'] },
+  uc: { id: 41, name: 'UConn', rec: '5-5', goals: [['Playoff*', '<0.1%', 'Playoff*']], road: null },
+};
+T.libPicks = { ...T.lib, picks: 2, goals: [['Playoff*', '23%', 'Playoff*'], ['CUSA title game', 'In', 'Title game'], ['Win CUSA', '81%', 'Win CUSA']], road: ['<0.1%', '0.2%'] };
+const esc = (s) => s.replace(/</g, '&lt;');
+const chev = (n = 18) => `<svg width="${n}" height="${n}" viewBox="0 0 12 12"><path d="M2.5 4.5 6 8 9.5 4.5" stroke="currentColor" stroke-width="2.2" fill="none"/></svg>`;
+const undoI = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5 4 8.5 7.5 12"/><path d="M4 8.5h8a4 4 0 0 1 0 8h-2"/></svg>';
+const resetI = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 10a6 6 0 1 0 1.8-4.3"/><path d="M4 3.5V7h3.5"/></svg>';
+const shareI = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M6 7l4-4 4 4"/><path d="M5 11v4.5A1.5 1.5 0 0 0 6.5 17h7a1.5 1.5 0 0 0 1.5-1.5V11"/></svg>';
+const logo = (t) => `<img alt="" src="https://cdn.collegefootballdata.com/logos-dark/64/${t.id}.png">`;
+const bar = '<div class="bar"><span class="ball"></span><div class="nav"><span class="on">Teams</span><span>Season Lab</span></div><span class="date">Through Nov 14</span></div>';
+const suite = (p, icons = false) => `<div class="suite"><span class="btn ${p ? '' : 'dim'} ${icons ? 'ico' : ''}">${undoI}${icons ? '' : 'Undo'}</span><span class="btn ${p ? 'lit' : 'dim'} ${icons ? 'ico' : ''}">${resetI}${icons ? '' : 'Reset'}</span><span class="btn share">${shareI}Share</span></div>`;
+const picker = (t) => `<span class="picker"><span class="in">${logo(t)}<span class="nm"><b>${t.name}</b><span>${t.rec}</span></span></span><span class="cv">${chev()}</span></span>`;
+const lab = (t, short = false) => `<span class="lablink">${short ? 'Lab' : 'Open picks in Lab'}${t.picks ? ` <small>· ${t.picks} picks</small>` : ''} <span class="ar">→</span></span>`;
+const band = (t, phone = false) => `<div class="band" style="grid-template-columns:repeat(${t.goals.length},minmax(0,1fr))">${t.goals.map(([l, v, s], k) => `<div class="cell ${k === 0 ? 'lead' : ''}"><span class="lbl">${phone ? s : l}</span><span class="plate">${esc(v)}</span></div>`).join('')}</div>`;
+const road = (t) => t.road ? `<div class="road"><span class="k">Playoff road</span><span class="i"><span class="k">First-round bye</span><span class="plate">${esc(t.road[0])}</span></span><span class="i"><span class="k">National title</span><span class="plate">${esc(t.road[1])}</span></span></div>` : '';
+const phone = (t) => `<div class="ph"><div class="strip">${logo(t)}<span class="nm"><b>${t.name}</b><span>${t.rec}</span></span><span style="color:var(--board-muted)">${chev(14)}</span></div>${band(t, true)}${road(t)}<div class="phrow">${suite(t.picks, true)}${lab(t, true)}</div></div>`;
+const page = '<div class="page"><div class="main">What it takes · Week by week …</div><div class="rail">Playoff race …</div></div>';
+
+const G1 = (t) => `<div class="board">${bar}<div class="dk"><div class="id">${picker(t)}<div class="end col">${suite(t.picks)}${lab(t)}</div></div>${band(t)}${road(t)}</div>${phone(t)}</div>${page}`;
+const G2 = (t) => `<div class="board">${bar}<div class="dk"><div class="id">${picker(t)}<div class="end">${lab(t)}${suite(t.picks)}</div></div>${band(t)}${road(t)}</div>${phone(t)}</div>${page}`;
+
+const show = (f) => document.write(
+  `<p class="size">Desktop 1180 · Liberty</p><div class="frame w-desk">${f(T.lib)}</div>`
+  + `<p class="size">Desktop 1180 · Liberty with 2 picks</p><div class="frame w-desk">${f(T.libPicks)}</div>`
+  + `<p class="size">Desktop 1180 · Notre Dame</p><div class="frame w-desk">${f(T.nd)}</div>`
+  + `<p class="size">Desktop 1180 · UConn</p><div class="frame w-desk">${f(T.uc)}</div>`
+  + `<div class="pair"><div><p class="size">Narrow 820 · Liberty with 2 picks</p><div class="frame w-mid">${f(T.libPicks)}</div></div>`
+  + `<div><p class="size">Phone · Liberty with 2 picks</p><div class="frame w-phone">${f(T.libPicks)}</div></div>`
+  + `<div><p class="size">Phone · Notre Dame</p><div class="frame w-phone">${f(T.nd)}</div></div></div>`);
+</script>
+
+<h2>G1 · Lab link under the suite</h2>
+<p class="t"><b>The actions stack at the row's end:</b> Undo, Reset, Share on top, "Open picks in Lab →" under them, right-aligned. The picker's two lines (name, record) and the stack are about the same height, so the row stays balanced. Then the band and road, unchanged.</p>
+<script>show(G1);</script>
+
+<h2>G2 · Lab link on the suite's line</h2>
+<p class="t"><b>One line of actions:</b> "Open picks in Lab →" sits just before Undo, Reset, Share. Shorter row than G1's stack, but wider, so it wraps sooner on narrow screens.</p>
+<script>show(G2);</script>
+
+<p class="note">Phones are the same in both: the sticky line gets the record under the name (and loses its Reset icon, since the suite is now one row below the band); then the band, the playoff road, and one row with Undo and Reset as 44px icons, Share, and "Lab →" at the end.</p>
+</body>
+</html>

@@ -402,6 +402,22 @@ export type LabCardSeed = {
   tag: string | null;
 };
 
+/** One team in a bracket on the share card. */
+export type LabCardSlot = { seed: number; teamId: number; name: string; abbr: string };
+
+/** One game of the visitor's bracket on the share card: its two teams as far as the picks say, and the pick. */
+export type LabCardGame = {
+  index: number;
+  round: "First round" | "Quarterfinal" | "Semifinal" | "Final";
+  /** Null while the game feeding that side isn't picked. */
+  a: LabCardSlot | null;
+  b: LabCardSlot | null;
+  /** The picked winner's team id, or null. */
+  winner: number | null;
+  /** The games whose winners fill its sides, in side order (none for a first-round game). */
+  feeders: number[];
+};
+
 /** What a Lab link's share image shows: the projected field and who is favoured to win it all. */
 export type LabCard = {
   /** "Projected playoff field", or "Playoff field" once announced. */
@@ -415,13 +431,19 @@ export type LabCard = {
   title: string;
   /** The link preview's text: "3 picks. Title favorite: Indiana, 24%." */
   description: string;
+  /**
+   * The visitor's own filled-in bracket, when the link carries one with at least one pick: every game with its picked
+   * winner, the champion once the final is picked, and how much is picked ("7 of 11 playoff games picked", "Every
+   * playoff game picked"). Null otherwise.
+   */
+  bracket: { games: LabCardGame[]; champion: LabCardSlot | null; picked: string } | null;
 };
 
 /**
  * The share card for a Lab run: its field by seed and the likeliest champion. Null when the season's playoff isn't
  * simulated (or has no field).
  */
-export function labCard(season: Season, lab: SeasonLab): LabCard | null {
+export function labCard(season: Season, lab: SeasonLab, bracket?: LabBracketPicks | null): LabCard | null {
   const p = lab.playoff;
   if (!p || p.field.length === 0) return null;
   const team = new Map(season.teams.map((t) => [t.id, t]));
@@ -441,7 +463,130 @@ export function labCard(season: Season, lab: SeasonLab): LabCard | null {
   const best = [...p.field].sort((a, b) => b.champion - a.champion || a.seed - b.seed)[0];
   const champion = best.champion >= 1 ? `National champion: ${name(best.teamId)}` : `Title favorite: ${name(best.teamId)}, ${formatOdds(best.champion)}`;
   const title = lab.picks === 0 ? "Projected playoff field · Season Lab" : "Playoff picks · Season Lab";
-  return { heading: p.heading, picks, field, champion, title, description: `${picks}. ${champion}.` };
+  const mine = bracket && Object.keys(bracket.picks).length > 0 ? bracketCard(season, bracket) : null;
+  if (mine) {
+    const said = mine.champion ? `My champion: ${mine.champion.name}` : champion;
+    return { heading: "My playoff bracket", picks, field, champion: said, title: "My playoff bracket · Season Lab", description: `${mine.picked}. ${said}.`, bracket: mine };
+  }
+  return { heading: p.heading, picks, field, champion, title, description: `${picks}. ${champion}.`, bracket: null };
+}
+
+/** A filled-in bracket as the share card draws it. `b` is already checked (`decodeLabBracket`) or from the Lab itself. */
+function bracketCard(season: Season, b: LabBracketPicks): NonNullable<LabCard["bracket"]> {
+  const team = new Map(season.teams.map((t) => [t.id, t]));
+  const games = bracketGames(b.seeds.length as 4 | 12);
+  const slot = (id: number): LabCardSlot => {
+    const t = team.get(id);
+    return { seed: b.seeds.indexOf(id) + 1, teamId: id, name: t?.name ?? `Team ${id}`, abbr: t?.abbreviation ?? t?.name ?? `Team ${id}` };
+  };
+  const side = (x: number) => (x >= 0 ? slot(b.seeds[x]) : b.picks[~x] !== undefined ? slot(b.picks[~x]) : null);
+  const last = games.length - 1;
+  const out: LabCardGame[] = games.map(([x, y], index) => ({
+    index, round: index === last ? "Final" : b.seeds.length === 4 ? "Semifinal" : index < 4 ? "First round" : index < 8 ? "Quarterfinal" : "Semifinal",
+    a: side(x), b: side(y), winner: b.picks[index] ?? null, feeders: [x, y].filter((v) => v < 0).map((v) => ~v),
+  }));
+  const n = Object.keys(b.picks).length;
+  const champion = b.picks[last] !== undefined ? slot(b.picks[last]) : null;
+  return { games: out, champion, picked: n === games.length ? "Every playoff game picked" : `${n} of ${games.length} playoff games picked` };
+}
+
+// --- Bracket codec: the visitor's own fill-in of the projected bracket. ------------------------------------------
+// Shown only, never run: the bracket picks don't change any odds. They travel beside the picks code (`?bracket=` in
+// the Lab, `<picks>~<bracket>` in a shared link). Bytes, as unsigned LEB128 varints: a version (1); the seeds' team
+// ids, seed 1 first, with their count; the picks, with their count, each (game index, winner's seed index). Then
+// base64url without padding.
+
+/** The visitor's own fill-in of a bracket: shown, never run, so no odds move. */
+export type LabBracketPicks = {
+  /** The bracket it was picked on: team ids, seed 1 first. */
+  seeds: number[];
+  /** Bracket game index (`bracketGames` order) -> the team picked to win it. */
+  picks: Record<number, number>;
+};
+
+const BRACKET_VERSION = 1;
+
+/** A filled-in bracket as a short URL-safe string. Throws for a pick whose winner isn't one of the seeds. */
+export function encodeLabBracket(b: LabBracketPicks): string {
+  const out: number[] = [];
+  const put = (v: number) => {
+    let x = v;
+    while (x >= 0x80) { out.push((x % 128) | 0x80); x = Math.floor(x / 128); }
+    out.push(x);
+  };
+  put(BRACKET_VERSION);
+  put(b.seeds.length);
+  for (const id of b.seeds) put(id);
+  const ks = Object.keys(b.picks).map(Number).sort((x, y) => x - y);
+  put(ks.length);
+  for (const k of ks) {
+    const at = b.seeds.indexOf(b.picks[k]);
+    if (at < 0) throw new Error(`team ${b.picks[k]} isn't in the bracket`);
+    put(k);
+    put(at);
+  }
+  return toBase64Url(out);
+}
+
+/**
+ * Read a bracket back from `encodeLabBracket`. A link can be old or hand-edited, so the whole bracket is dropped (null)
+ * unless it fits the season: as many distinct seeds as its playoff format takes, all teams in the season, and each pick
+ * a team that can be in that game (a seed placed there, or the pick of the game feeding that side). Never throws.
+ */
+export function decodeLabBracket(season: Season, text: string | null | undefined): LabBracketPicks | null {
+  if (!text) return null;
+  const bytes = fromBase64Url(text);
+  const format = findFormat(season.year);
+  if (bytes === null || !format) return null;
+  let p = 0;
+  const get = (): number => {
+    let v = 0;
+    let scale = 1;
+    for (;;) {
+      if (p >= bytes.length) throw new RangeError("truncated");
+      const b = bytes[p++];
+      v += (b & 0x7f) * scale;
+      if (b < 0x80) return v;
+      scale *= 128;
+      if (scale > 2 ** 49) throw new RangeError("too long");
+    }
+  };
+  try {
+    if (get() !== BRACKET_VERSION) return null;
+    const n = get();
+    if (n !== format.teams) return null;
+    const ids = new Set(season.teams.map((t) => t.id));
+    const seeds: number[] = [];
+    for (let k = 0; k < n; k++) seeds.push(get());
+    if (new Set(seeds).size !== n || seeds.some((id) => !ids.has(id))) return null;
+    const games = bracketGames(format.teams);
+    const picks: Record<number, number> = {};
+    for (let m = get(), prev = -1; m > 0; m--) {
+      const k = get();
+      const at = get();
+      if (k <= prev || k >= games.length || at >= n) return null;
+      prev = k;
+      const [x, y] = games[k];
+      const side = (s: number) => (s >= 0 ? seeds[s] : picks[~s]);
+      if (seeds[at] !== side(x) && seeds[at] !== side(y)) return null;
+      picks[k] = seeds[at];
+    }
+    if (p !== bytes.length) return null;
+    return { seeds, picks };
+  } catch {
+    return null;
+  }
+}
+
+/** A shared Lab link's code: the picks code, then `~` and the bracket code when there is one. Either may be empty. */
+export function labShareCode(picks: string | null | undefined, bracket: string | null | undefined): string {
+  return `${picks ?? ""}${bracket ? `~${bracket}` : ""}`;
+}
+
+/** Split a shared Lab link's code (`labShareCode`) into its picks code and bracket code (null when it has none). */
+export function readLabShareCode(code: string): { picks: string; bracket: string | null } {
+  const at = code.indexOf("~");
+  return at < 0 ? { picks: code, bracket: null } : { picks: code.slice(0, at), bracket: code.slice(at + 1) || null };
 }
 
 /** Steps whose answer picks can't settle: the ranking stand-in, a coin toss, and scoring margin (picks have no score). */

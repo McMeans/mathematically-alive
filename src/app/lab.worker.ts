@@ -1,7 +1,7 @@
 // The Season Lab's simulations and link codec, off the main thread (the codec needs the whole season, which only
 // this worker loads). Each pick runs twice: a quick pass for numbers right away, then the full run. A newer pick
 // skips the full run of an older one.
-import { decodeLabLocks, decodeLocks, decodeTitlePick, encodeLabLocks, fillLabLocks, labChanges, labTeamOdds, seasonLab, simulateBracket, type BracketGame, type LabChanges, type LabFill, type LabLocks, type LabTeamOdds, type NationalResult, type Season, type SeasonLab } from "@/core";
+import { decodeLabBracket, decodeLabLocks, decodeLocks, decodeTitlePick, encodeLabLocks, fillLabLocks, labChanges, labTeamOdds, seasonLab, simulateBracket, type BracketGame, type LabBracketPicks, type LabChanges, type LabFill, type LabLocks, type LabTeamOdds, type NationalResult, type Season, type SeasonLab } from "@/core";
 import { ITERATIONS, QUICK_ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
 import data from "./data/season.json";
 
@@ -13,8 +13,11 @@ import data from "./data/season.json";
 export type LabView = Omit<SeasonLab, "national" | "locks" | "bigGames"> & { changes: LabChanges | null; focus: LabTeamOdds | null };
 export type LabRequest =
   | { kind: "run"; id: number; locks: LabLocks; focus: number | null }
-  /** A link's picks: the Lab's own (`picks`), or a team page's game picks (`games`) and title-game pick (`title`, `<conference>~<team>`). */
-  | { kind: "open"; id: number; picks: string | null; games: string | null; title: string | null }
+  /**
+   * A link's picks: the Lab's own (`picks`, and `bracket`, a filled-in bracket shown but never run), or a team page's
+   * game picks (`games`) and title-game pick (`title`, `<conference>~<team>`).
+   */
+  | { kind: "open"; id: number; picks: string | null; games: string | null; title: string | null; bracket: string | null }
   /** Pick every open game: favourites, or one season drawn from a seed. */
   | { kind: "fill"; id: number; locks: LabLocks; how: LabFill }
   /** Play out the bracket's open games once; `picked` winners kept. Answered with `bracketed`. */
@@ -23,7 +26,8 @@ export type LabRequest =
   | { kind: "reset"; id: number };
 export type LabResponse =
   | { kind: "result"; id: number; final: boolean; view: LabView; code: string }
-  | { kind: "opened"; id: number; locks: LabLocks; note: string }
+  /** `bracket`: the link's filled-in bracket, checked against the season (null when it has none, or it doesn't fit). */
+  | { kind: "opened"; id: number; locks: LabLocks; note: string; bracket: LabBracketPicks | null }
   | { kind: "filled"; id: number; locks: LabLocks }
   | { kind: "bracketed"; id: number; key: string; picks: Record<number, number> }
   | { kind: "error"; id: number };
@@ -56,7 +60,7 @@ self.onmessage = async (e: MessageEvent<LabRequest>) => {
       const games = decodeLocks(req.games, season.games.filter((g) => !g.completed));
       const locks = { ...lab.locks, games: { ...lab.locks.games, ...games }, titles: { ...lab.locks.titles, ...decodeTitlePick(season, req.title) } };
       opened = true;
-      self.postMessage({ kind: "opened", id: req.id, locks, note: lab.note } satisfies LabResponse);
+      self.postMessage({ kind: "opened", id: req.id, locks, note: lab.note, bracket: decodeLabBracket(season, req.bracket) } satisfies LabResponse);
       return;
     }
     if (req.kind === "reset") {

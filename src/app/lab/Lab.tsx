@@ -3,17 +3,25 @@
 // left and the conference races side by side (tabs on phones); a pinned team followed as you pick.
 import Link from "next/link";
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { conferenceShort, encodeLocks, labOddsChange, teamMatch, type BracketGame, type BracketSide, type LabBigGame, type LabConference, type LabFill, type LabLocks, type LabTeamOdds } from "@/core";
+import { conferenceShort, encodeLabBracket, labOddsChange, labShareCode, teamMatch, type BracketGame, type BracketSide, type LabBigGame, type LabBracketPicks, type LabConference, type LabFill, type LabLocks, type LabTeamOdds } from "@/core";
 import type { LabRequest, LabResponse, LabView } from "@/app/lab.worker";
 import { ShareButton } from "@/app/explorer/Share";
 import { TeamLogo } from "@/app/explorer/Board";
 import { SiteBar, type FindTeam } from "@/app/SiteBar";
+import { BoardButton } from "@/app/BoardButton";
+import { Lit } from "@/app/Lit";
 
-/** The address to share: a link with its own preview image (`/lab/s/<code>`) once there are picks. */
+/** The address to share: a link with its own preview image (`/lab/s/<code>`) once there are picks or a filled-in bracket. */
 function labLink(): string {
-  const code = new URLSearchParams(window.location.search).get("picks");
-  return code ? `${window.location.origin}/lab/s/${encodeURIComponent(code)}` : window.location.href;
+  const q = new URLSearchParams(window.location.search);
+  const picks = q.get("picks"), bracket = q.get("bracket");
+  return picks || bracket ? `${window.location.origin}/lab/s/${encodeURIComponent(labShareCode(picks, bracket))}` : window.location.href;
 }
+
+/** Which bracket a set of bracket picks belongs to: its matchups. */
+const bracketKeyOf = (v: LabView) => JSON.stringify(v.playoff?.bracket.map((g) => [g.a, g.b]) ?? []);
+/** The bracket's teams, seed 1 first. */
+const seedsOf = (v: LabView) => [...(v.playoff?.field ?? [])].sort((a, b) => a.seed - b.seed).map((s) => s.teamId);
 
 /** A game still to play, with the model's odds for each side. */
 export type LabGame = {
@@ -74,6 +82,27 @@ function useLab(initial: LabView) {
   /** Title picks from a link: their matchup is the one under the link's picks, known once those picks' run finishes. */
   const linkTitles = useRef<Set<string>>(new Set());
   const finals = useRef<LabConference[]>(initial.conferences);
+  /**
+   * A link's filled-in bracket: its code until the worker has read it, then the picks, waiting for the run that shows
+   * the bracket they were made on. They apply only if that bracket has the same seeds.
+   */
+  const linkBracket = useRef<string | LabBracketPicks | null>(null);
+  function applyLinkBracket(v: LabView) {
+    const b = linkBracket.current;
+    if (b === null || typeof b === "string") return;
+    linkBracket.current = null;
+    if (seedsOf(v).join() === b.seeds.join()) setBracketState({ key: bracketKeyOf(v), picks: b.picks });
+    else {
+      setNote("Bracket picks cleared: the field changed.");
+      dropBracketParam();
+    }
+  }
+  /** Take a link's bracket out of the address once it won't apply, so Share doesn't pass it on. */
+  function dropBracketParam() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("bracket");
+    window.history.replaceState(window.history.state, "", url);
+  }
 
   function setAddress(code: string | null) {
     const url = new URL(window.location.href);
@@ -117,7 +146,11 @@ function useLab(initial: LabView) {
         for (const c of Object.keys(next.titles)) if (titleKeys.current[c] === undefined) linkTitles.current.add(c);
         current.current = next;
         setLocks(next);
+        linkBracket.current = r.bracket && Object.keys(r.bracket.picks).length > 0 ? r.bracket : null;
+        if (linkBracket.current === null) dropBracketParam();
         run(next);
+        // No picks to run: the bracket is the no-picks one.
+        if (count(next) === 0) applyLinkBracket(initial);
         return;
       }
       if (r.kind === "bracketed") {
@@ -139,6 +172,7 @@ function useLab(initial: LabView) {
         setAddress(r.code);
         if (r.final) {
           setRefining(false);
+          applyLinkBracket(r.view);
           for (const c of linkTitles.current) {
             const f = r.view.conferences.find((x) => x.conference === c)?.final;
             if (f) titleKeys.current[c] = f.key;
@@ -172,14 +206,16 @@ function useLab(initial: LabView) {
     const picks = params.get("picks");
     const games = params.get("games");
     const title = params.get("title"); // checked in the worker: a stale or hand-edited pick is dropped
+    const bracket = params.get("bracket");
+    linkBracket.current = bracket;
     const team = Number(params.get("team"));
     if (Number.isInteger(team) && team > 0) {
       focusRef.current = team;
       queueMicrotask(() => setFocusState(team));
     }
-    if (picks !== null || games !== null || title !== null) {
+    if (picks !== null || games !== null || title !== null || bracket !== null) {
       opening.current = ++latest.current;
-      w.postMessage({ kind: "open", id: opening.current, picks, games, title } satisfies LabRequest);
+      w.postMessage({ kind: "open", id: opening.current, picks, games, title, bracket } satisfies LabRequest);
     }
     return () => { clearTimeout(timer.current); w.terminate(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load: the worker and a shared link's picks
@@ -235,9 +271,19 @@ function useLab(initial: LabView) {
    */
   // Bracket picks are the visitor's own fill-in of the projected bracket: shown only, never run, so the field and
   // seeds stay put. They belong to the bracket they were made on, and drop when other picks reseed it.
-  const bracketKey = JSON.stringify(view.playoff?.bracket.map((g) => [g.a, g.b]) ?? []);
+  const bracketKey = bracketKeyOf(view);
   const [bracketState, setBracketState] = useState<{ key: string; picks: Record<number, number> }>({ key: "", picks: {} });
   const bracketPicks = bracketState.key === bracketKey ? bracketState.picks : {};
+  // The address carries the filled-in bracket (`?bracket=`), so Share and a reload keep it. A link's bracket stays in
+  // the address while it waits for its run.
+  const bracketCode = view.playoff && Object.keys(bracketPicks).length > 0 ? encodeLabBracket({ seeds: seedsOf(view), picks: bracketPicks }) : null;
+  useEffect(() => {
+    if (bracketCode === null && linkBracket.current !== null) return;
+    const url = new URL(window.location.href);
+    if (bracketCode) url.searchParams.set("bracket", bracketCode);
+    else url.searchParams.delete("bracket");
+    window.history.replaceState(window.history.state, "", url);
+  }, [bracketCode]);
   function pickBracket(bracket: BracketGame[], index: number, winner: number) {
     const picks = { ...bracketPicks };
     const old = picks[index];
@@ -294,7 +340,8 @@ export function Lab({ initial, bigGames, games, names, abbrs, teams, paged, rank
   const headline = note || view.changes?.headline || "";
   const lines = view.changes?.lines ?? [];
   const idle = fromLink && picks > 0 && view.picks > 0 ? view.loaded : "Pick a game, or fill the rest.";
-  const teamPage = focus === null ? "/" : `/team/${focus}${Object.keys(locks.games).length ? `?picks=${encodeLocks(locks.games)}` : ""}`;
+  // Picks carry one way, from a team page into the Lab (`?games=`, `?title=`), never back: the team page opens clean.
+  const teamPage = focus === null ? "/" : `/team/${focus}`;
   const unpin = () => pin(null);
   const focusConference = focus === null ? null : view.conferences.find((c) => c.standings.some((s) => s.teamId === focus))?.conference ?? null;
 
@@ -342,16 +389,16 @@ export function Lab({ initial, bigGames, games, names, abbrs, teams, paged, rank
             ) : <span className="text-[15px] text-board-muted">{idle}</span>}
           </div>
           <div className="flex min-w-0 flex-1 items-center gap-2.5 md:flex-none">
-            <span key={picks} className="plate plate-hang text-[30px] text-white md:text-[40px]">{picks}</span>
+            <Lit value={String(picks)} className="text-[30px] text-white md:text-[40px]" />
             <span className="cond text-sm font-bold leading-tight tracking-[0.06em] text-board-muted">
               Picks
               <span className={`block font-sans text-xs font-medium normal-case tracking-normal ${refining ? "text-lamp" : "hidden md:block"}`}>{status || view.summary.split(" · ").at(-1)}</span>
             </span>
           </div>
           <div className="flex gap-1.5">
-            <BoardButton onClick={undo} disabled={!canUndo}>Undo</BoardButton>
-            <BoardButton lit={picks > 0 || Object.keys(bracketPicks).length > 0} onClick={reset} disabled={picks === 0 && Object.keys(bracketPicks).length === 0}>Reset</BoardButton>
-            <ShareButton board label="Share" link={labLink} className={picks === 0 ? "opacity-55" : ""} />
+            <BoardButton kind="undo" onClick={undo} disabled={!canUndo} />
+            <BoardButton kind="reset" onClick={reset} disabled={picks === 0 && Object.keys(bracketPicks).length === 0} />
+            <ShareButton board label="Share" link={labLink} className={picks === 0 && Object.keys(bracketPicks).length === 0 ? "opacity-55" : ""} />
           </div>
         </div>
         {focus !== null && now && before && (
@@ -369,7 +416,7 @@ export function Lab({ initial, bigGames, games, names, abbrs, teams, paged, rank
         <div role="tablist" aria-label="Season Lab" className="flex border-t border-board-line px-3.5 md:px-6 lg:tall:hidden">
           {(["field", "games", "races"] as const).map((t) => (
             <button key={t} role="tab" type="button" aria-selected={tab === t} onClick={() => { setTab(t); window.scrollTo(0, 0); }}
-              className={`cond h-11 flex-1 border-b-[3px] text-base font-bold tracking-[0.04em] ${tab === t ? "border-lamp text-white" : "border-transparent text-board-muted hover:text-white"}`}>
+              className={`cond h-11 flex-1 border-b-[3px] text-base transition-colors duration-200 font-bold tracking-[0.04em] ${tab === t ? "border-lamp text-white" : "border-transparent text-board-muted hover:text-white"}`}>
               {t === "field" ? "Field" : t === "games" ? "Games" : "Races"}
             </button>
           ))}
@@ -398,16 +445,6 @@ export function Lab({ initial, bigGames, games, names, abbrs, teams, paged, rank
         <Dock team={focus} name={name(focus)} abbr={abbrs[focus] ?? name(focus)} before={before} now={now} teamPage={teamPage} onUnpin={unpin} />
       )}
     </div>
-  );
-}
-
-function BoardButton({ children, onClick, disabled, lit }: { children: ReactNode; onClick: () => void; disabled?: boolean; lit?: boolean }) {
-  return (
-    <button type="button" onClick={onClick} disabled={disabled}
-      className={`cond h-11 rounded-[3px] border px-3 text-base font-bold tracking-[0.05em] lg:h-[38px] md:px-3.5 ${lit === undefined ? "border-board-line text-white hover:border-board-muted disabled:opacity-40"
-        : lit ? "border-lamp bg-lamp text-plate-ink" : "border-board-line text-board-muted opacity-50"}`}>
-      {children}
-    </button>
   );
 }
 
@@ -444,7 +481,7 @@ function Dock({ team, name, abbr, before, now, teamPage, onUnpin }: { team: numb
         <svg viewBox="0 0 16 16" aria-hidden className={`ml-auto h-[18px] w-[18px] text-board-muted transition-transform ${open ? "" : "rotate-180"}`}><path d="M4 10l4-4 4 4" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
       {open && (
-        <div className="border-t border-board-line px-3 pb-3">
+        <div className="border-t border-board-line px-3 pb-3 motion-safe:animate-rise">
           <p className="my-2.5 text-[13px] text-board-text">{name} before your picks: playoff {before.playoffText}{before.titleGame !== null && `, title game ${before.titleGameText}`}.</p>
           <div className="flex gap-2">
             <Link href={teamPage} className="cond flex h-11 flex-1 items-center justify-center rounded-[3px] border border-board-line text-base font-bold tracking-[0.04em]">{name}’s page <span className="ml-1.5 text-lamp">→</span></Link>
@@ -485,12 +522,18 @@ function useFlip<T extends HTMLElement>() {
     const next = new Map<string, number>();
     for (const el of box.querySelectorAll<HTMLElement>("[data-flip]")) {
       const key = el.dataset.flip!;
-      const y = el.getBoundingClientRect().top - top.top;
+      // Where the row sits in layout, without a glide still running on it (that glide's offset is `moving`).
+      const moving = new DOMMatrixReadOnly(getComputedStyle(el).transform === "none" ? undefined : getComputedStyle(el).transform).m42;
+      const y = el.getBoundingClientRect().top - top.top - moving;
       next.set(key, y);
       if (reduce || before.size === 0) continue;
       const was = before.get(key);
       if (was === undefined) el.animate([{ opacity: 0, transform: "translateY(4px)" }, { opacity: 1, transform: "none" }], { duration: 220, easing: "cubic-bezier(0.2, 0, 0, 1)" });
-      else if (Math.abs(was - y) > 1) el.animate([{ transform: `translateY(${was - y}px)` }, { transform: "none" }], { duration: 360, easing: "cubic-bezier(0.2, 0, 0, 1)" });
+      else if (Math.abs(was - y) > 1) {
+        // A row moved again mid-glide starts from where it is on screen, not from its last resting place.
+        for (const a of el.getAnimations()) a.cancel();
+        el.animate([{ transform: `translateY(${was - y + moving}px)` }, { transform: "none" }], { duration: 360, easing: "cubic-bezier(0.2, 0, 0, 1)" });
+      }
     }
     last.current = next;
   });
@@ -512,7 +555,7 @@ function Seg<T extends string>({ options, value, onChange, label }: { options: {
     <div role="group" aria-label={label} className="flex gap-1">
       {options.map((o) => (
         <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)}
-          className={`cond h-11 flex-1 whitespace-nowrap rounded-[2px] border px-3 text-[15px] font-bold tracking-[0.04em] lg:h-[34px] ${value === o.id ? "border-board bg-board text-white" : "border-rule bg-white text-ink-soft"}`}>
+          className={`cond press h-11 flex-1 whitespace-nowrap rounded-[2px] border px-3 text-[15px] font-bold tracking-[0.04em] lg:h-[34px] ${value === o.id ? "border-board bg-board text-white" : "border-rule bg-white text-ink-soft"}`}>
           {o.label}
         </button>
       ))}
@@ -636,14 +679,14 @@ function FieldRow({ flip, seed, lit, id, rank, name, record, odds, me, tag, tone
   return (
     <div data-flip={flip} className={`grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-2.5 px-3.5 py-1.5 transition-colors duration-300 ${me ? "bg-lamp/10" : ""}`}>
       <span className="flex flex-col items-center gap-0.5">
-        <span key={seed} className={`plate text-center text-[22px] ${seed !== undefined ? "plate-hang" : ""} ${lit ? "text-lamp" : "text-board-muted"}`}>{seed ?? ""}</span>
+        <Lit value={seed === undefined ? "" : String(seed)} className={`text-center text-[22px] ${lit ? "text-lamp" : "text-board-muted"}`} />
         {bid && <span title="Automatic bid" className="cond text-[9.5px] font-bold leading-none tracking-[0.06em] text-board-text">{bid}</span>}
       </span>
       <span className="cond flex min-w-0 items-center gap-1.5 truncate text-[19px] font-bold text-white">
         <TeamLogo id={id} /> <span className="truncate">{rank && <span className="mr-1 text-[0.74em] font-bold text-board-muted">{rank}</span>}{name}{record && <span className="ml-1.5 font-sans text-[12px] font-semibold text-board-muted">{record}</span>}</span>
         {tag && <i className="ml-1 font-sans text-[11px] font-semibold not-italic tracking-[0.06em] text-lamp">{tag}</i>}
       </span>
-      <span key={odds} className={`plate plate-hang text-[22px] ${tone ?? (me ? "text-lamp" : "text-white")}`}>{odds}</span>
+      <Lit value={odds} className={`text-[22px] ${tone ?? (me ? "text-lamp" : "text-white")}`} />
     </div>
   );
 }
@@ -721,13 +764,13 @@ function Bracket({ games, picked, abbr, name, onPick, onReset, onSimulate }: {
       </div>
       <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-board-line pt-2.5">
         {champion !== undefined ? (
-          <p className="cond flex w-full min-w-0 items-center gap-1.5 text-base font-bold text-white">
+          <p key={champion} className="cond flex w-full min-w-0 items-center gap-1.5 text-base font-bold text-white motion-safe:animate-rise">
             <span className="text-xs tracking-[0.08em] text-board-muted">Your champion</span>
             <TeamLogo id={champion} size="18px" />
             <span className="truncate">{seedOf.get(champion) !== undefined && <span className="mr-1 text-board-muted">{seedOf.get(champion)}</span>}{name(champion)}</span>
           </p>
         ) : (
-          <p className="w-full text-[13px] text-board-muted">{Object.keys(picked).length > 0 ? "Pick the final to crown a champion." : "Tap a team to move it on. Shown only: the odds don’t change."}</p>
+          <p className="w-full text-[13px] text-board-muted">{Object.keys(picked).length > 0 ? "Pick the final to crown a champion." : "Tap a team to move it on."}</p>
         )}
         <button type="button" onClick={onSimulate} disabled={Object.keys(picked).length >= games.length}
           className="cond ml-auto h-11 shrink-0 lg:h-7 rounded-[3px] border border-board-line px-2.5 text-[13px] font-bold tracking-[0.05em] text-board-text hover:border-board-muted disabled:opacity-40">
@@ -890,7 +933,7 @@ const conferenceShortOf = (c: LabConference) => conferenceShort(c.conference);
 function Chip({ on, lamp, onClick, children }: { on: boolean; lamp?: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button type="button" aria-pressed={on} onClick={onClick}
-      className={`cond flex h-11 shrink-0 items-center gap-1.5 rounded-[2px] border px-2.5 text-[15px] font-bold tracking-[0.03em] lg:h-7 ${
+      className={`cond press flex h-11 shrink-0 items-center gap-1.5 rounded-[2px] border px-2.5 text-[15px] font-bold tracking-[0.03em] lg:h-7 ${
         on ? (lamp ? "border-lamp bg-lamp text-plate-ink" : "border-board bg-board text-white") : lamp ? "border-lamp bg-white text-ink" : "border-rule bg-white text-ink-soft"}`}>
       {children}
     </button>
@@ -950,7 +993,7 @@ function Races({ conferences, name, paged, focus }: { conferences: LabConference
                   <span key={t.teamId} className="contents">
                     <span className={`cond flex min-w-0 items-center gap-1.5 truncate text-[17px] font-bold ${t.teamId === focus ? "text-lamp" : k === 0 ? "text-white" : "text-board-text"}`}><TeamLogo id={t.teamId} /> <span className="truncate"><Rank id={t.teamId} />{name(t.teamId)}</span>
                       {t.teamId === c.picked && <span className="shrink-0 text-[15px] text-lamp"><PickMark /></span>}</span>
-                    <span key={t.titleGameText} className={`plate plate-hang text-right text-[17px] ${t.teamId === focus ? "text-lamp" : k === 0 ? "text-white" : "text-board-text"}`}>{t.titleGameText}</span>
+                    <Lit value={t.titleGameText} className={`text-right text-[17px] ${t.teamId === focus ? "text-lamp" : k === 0 ? "text-white" : "text-board-text"}`} />
                   </span>
                 ))}
               </button>

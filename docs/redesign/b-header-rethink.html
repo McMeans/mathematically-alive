@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team header rethink</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* The whole team header, rethought from its content: team, record, status, actions and odds. */
+:root {
+  --board: #133f2e; --board-deep: #0c2c20; --board-line: #2a5a46; --board-text: #d7e4dc; --board-muted: #9fbcae;
+  --plate: #f3f0e6; --plate-ink: #121a16; --lamp: #f2b134;
+  --ground: #e4e7e5; --ink: #15201b; --ink-soft: #3d4a43; --ink-muted: #5d6a63; --rule: #d6d4cc;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.45 "Public Sans", system-ui, sans-serif; font-variant-numeric: tabular-nums; padding: 24px; }
+.plate { font-family: "Saira Condensed", sans-serif; font-weight: 800; line-height: 1; color: #fff; }
+.cond { font-family: "Saira Condensed", sans-serif; text-transform: uppercase; }
+h1 { font: 800 34px/1 "Saira Condensed", sans-serif; text-transform: uppercase; margin: 0 0 8px; }
+h2 { font: 800 26px/1 "Saira Condensed", sans-serif; text-transform: uppercase; margin: 56px 0 6px; }
+p.t { max-width: 88ch; color: var(--ink-soft); margin: 4px 0 12px; font-size: 14.5px; }
+p.t b { color: var(--ink); }
+table.inv { border-collapse: collapse; font-size: 14px; max-width: 1180px; margin: 10px 0 0; }
+table.inv th, table.inv td { text-align: left; vertical-align: top; padding: 7px 14px 7px 0; border-top: 1px solid var(--rule); }
+table.inv th { font: 700 12px "Saira Condensed"; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); }
+.size { font: 700 12px "Saira Condensed", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); margin: 14px 0 4px; }
+.frame { container-type: inline-size; border-radius: 4px; overflow: hidden; }
+.w-desk { width: 1180px; } .w-mid { width: 820px; } .w-phone { width: 375px; }
+.pair { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+
+/* Shared board pieces */
+.board { background-color: var(--board); background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1.2px); background-size: 6px 6px; color: var(--board-text); }
+.bar { height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--board-line); }
+.bar .ball { width: 24px; height: 16px; border-radius: 50%; background: var(--plate); }
+.bar .nav span { font: 700 15px "Saira Condensed"; letter-spacing: .04em; text-transform: uppercase; padding: 4px 10px; border-radius: 2px; color: var(--board-muted); }
+.bar .nav span.on { background: var(--plate); color: var(--plate-ink); }
+.bar .date { margin-left: auto; font-size: 13px; color: var(--board-muted); }
+.below { padding: 12px 14px; background: var(--ground); color: var(--ink-muted); font-size: 13px; }
+.lbl { font: 700 12px "Saira Condensed"; letter-spacing: .08em; text-transform: uppercase; color: var(--board-muted); white-space: nowrap; }
+.lbl.w { color: #fff; }
+
+/* Identity: the picker carries logo and name; the record sits under the name, small, with the rank when there is one. */
+.picker { display: inline-flex; align-items: center; gap: 12px; border: 1px solid var(--board-line); background: rgba(255,255,255,.04); border-radius: 3px; padding: 8px 10px 8px 12px; max-width: 100%; }
+.picker img { width: 48px; height: 48px; flex-shrink: 0; }
+.picker .nm { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.picker .nm b { font: 800 38px/0.95 "Saira Condensed"; text-transform: uppercase; color: #fff; white-space: nowrap; }
+.picker .nm span { font-size: 13.5px; color: var(--board-muted); white-space: nowrap; }
+.picker .chev { color: var(--board-text); margin-left: 6px; }
+/* Actions: Lab outlined, Share the cream plate, Reset only with picks, as part of the picks note. */
+.acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.btn { height: 36px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; border: 1px solid var(--board-line); border-radius: 3px; font: 700 16px "Saira Condensed"; letter-spacing: .05em; text-transform: uppercase; color: #fff; }
+.btn.share { background: var(--plate); border-color: var(--plate); color: var(--plate-ink); }
+.btn .ar { color: var(--lamp); }
+.picks { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 4px 0 12px; border-radius: 3px; background: color-mix(in srgb, var(--lamp) 14%, transparent); color: var(--lamp); font: 700 15px "Saira Condensed"; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+.picks .rs { height: 28px; padding: 0 10px; display: inline-flex; align-items: center; gap: 5px; border-radius: 2px; background: var(--lamp); color: var(--plate-ink); }
+.status { font: 700 13px "Saira Condensed"; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.status.live { color: var(--lamp); } .status.set { color: var(--board-muted); }
+.status.pip::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 6px; transform: translateY(-1px); }
+.road { font-size: 12.5px; color: var(--board-muted); white-space: nowrap; }
+.road b { font: 800 15px "Saira Condensed"; color: var(--board-text); margin-left: 3px; }
+.namebar { display: none; }
+.road i { font-style: normal; } .road .short { display: none; }
+@container (max-width: 600px) { .road .full { display: none; } .road .short { display: inline; } }
+
+@container (max-width: 1000px) { .picker .nm b { font-size: 32px; } .picker img { width: 40px; height: 40px; } }
+@container (max-width: 600px) {
+  .bar { padding: 0 14px; height: 44px; } .bar .date { display: none; }
+  .picker { border: 0; background: none; padding: 0; gap: 10px; }
+  .picker img { width: 32px; height: 32px; } .picker .nm b { font-size: 24px; } .picker .nm span { font-size: 12.5px; }
+  .acts { width: 100%; } .acts .btn { flex: 1; height: 44px; } .picks { height: 44px; flex-basis: 100%; justify-content: space-between; } .picks .rs { height: 34px; }
+}
+
+/* ===== D1 · Goal ledger ===== */
+.D1 .hd { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 14px 40px; padding: 18px 24px 18px; align-items: start; }
+.D1 .id { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; min-width: 0; }
+.D1 .ledger { display: grid; grid-template-columns: auto auto auto; column-gap: 0; align-items: baseline; min-width: 380px; }
+.D1 .row { display: contents; }
+.D1 .row > * { padding: 7px 0; border-top: 1px solid var(--board-line); }
+.D1 .row:first-child > * { border-top: 0; padding-top: 0; }
+.D1 .row > * + * { padding-left: 22px; }
+.D1 .row .lbl { font-size: 14px; }
+.D1 .row .plate { font-size: 34px; text-align: right; }
+.D1 .row.lead .plate { font-size: 44px; color: #fff; }
+.D1 .row .status { text-align: right; }
+.D1 .road { grid-column: 1 / -1; border-top: 0 !important; padding-top: 0 !important; margin-top: -3px; }
+@container (max-width: 1000px) { .D1 .hd { gap: 14px 24px; padding: 16px 20px; } .D1 .ledger { min-width: 300px; } .D1 .row .plate { font-size: 28px; } .D1 .row.lead .plate { font-size: 36px; } }
+@container (max-width: 600px) {
+  .D1 .hd { grid-template-columns: 1fr; padding: 12px 14px 14px; gap: 12px; }
+  .D1 .ledger { min-width: 0; order: 2; } .D1 .id { display: contents; } .D1 .acts { order: 3; }
+  .D1 .row .lbl { font-size: 12.5px; } .D1 .row .plate { font-size: 24px; } .D1 .row.lead .plate { font-size: 30px; } .D1 .row > * { padding: 5px 0; }
+}
+
+/* ===== D2 · Goals across, status under each number ===== */
+.D2 .hd { display: flex; flex-wrap: wrap; gap: 16px 44px; padding: 18px 24px 18px; align-items: flex-start; }
+.D2 .id { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; min-width: 0; }
+.D2 .goals { display: flex; gap: 0; margin-left: auto; }
+.D2 .g { display: flex; flex-direction: column; gap: 5px; padding: 0 26px; border-left: 1px solid var(--board-line); }
+.D2 .g:first-child { border-left: 0; padding-left: 0; }
+.D2 .g:last-child { padding-right: 0; }
+.D2 .g .plate { font-size: 44px; }
+.D2 .g.lead .plate { font-size: 56px; }
+@container (max-width: 1000px) { .D2 .hd { padding: 16px 20px; gap: 14px 24px; } .D2 .goals { margin-left: 0; width: 100%; } .D2 .g { padding: 0 20px; } .D2 .g .plate { font-size: 36px; } .D2 .g.lead .plate { font-size: 44px; } }
+@container (max-width: 600px) {
+  .D2 .hd { padding: 12px 14px 14px; gap: 12px; } .D2 .id { display: contents; } .D2 .goals { order: 2; } .D2 .acts { order: 3; }
+  .D2 .g { padding: 0 12px; flex: 1; min-width: 0; } .D2 .g .lbl { font-size: 10.5px; } .D2 .g .status { font-size: 11px; }
+  .D2 .g .plate { font-size: 26px; } .D2 .g.lead .plate { font-size: 30px; } .D2 .g .road { white-space: normal; font-size: 11px; line-height: 1.6; }
+}
+
+/* ===== D3 · Verdict ===== */
+.D3 .hd { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 14px 32px; padding: 18px 24px 18px; align-items: center; }
+.D3 .verdict { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-left: 32px; border-left: 1px solid var(--board-line); }
+.D3 .say { font: 800 30px/1.1 "Saira Condensed"; text-transform: uppercase; color: #fff; letter-spacing: .01em; }
+.D3 .say .n { color: var(--lamp); }
+.D3 .fine { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.D3 .fine span { font-size: 13px; color: var(--board-muted); white-space: nowrap; }
+.D3 .fine b { font: 800 17px "Saira Condensed"; color: var(--board-text); margin-left: 4px; }
+.D3 .acts { flex-direction: column; align-items: stretch; }
+@container (max-width: 1000px) { .D3 .hd { grid-template-columns: auto minmax(0,1fr); padding: 16px 20px; } .D3 .acts { grid-column: 1 / -1; flex-direction: row; } .D3 .say { font-size: 24px; } }
+@container (max-width: 600px) { .D3 .hd { grid-template-columns: 1fr; padding: 12px 14px 14px; gap: 12px; } .D3 .verdict { padding-left: 0; border-left: 0; } .D3 .say { font-size: 22px; } }
+
+.note { font-size: 13px; color: var(--ink-muted); margin: 8px 0 0; max-width: 88ch; }
+</style>
+</head>
+<body>
+<h1>Team header, from its content up</h1>
+<p class="t">Not a layout pass this time: what each piece of the header is for, what it duplicates, and three directions built from that. Real data from today for Liberty, Notre Dame and UConn; a fourth frame shows Liberty with two picks made.</p>
+
+<table class="inv">
+  <tr><th>Piece</th><th>Today</th><th>What's wrong</th><th>In these directions</th></tr>
+  <tr><td><b>Team</b></td><td>Picker: logo, name, chevron cell</td><td>Fine, but heavy; the record floats away from it on its own line</td><td>Picker holds logo, name and record together: one identity block</td></tr>
+  <tr><td><b>Record</b></td><td>"9-1 (6-0 CUSA)" beside the tags</td><td>Reads as part of the tag row; parentheses</td><td>"9-1 · 6-0 CUSA" under the name, inside the picker (with the rank, "#16", when ranked)</td></tr>
+  <tr><td><b>Tags</b></td><td>Amber outlined pills: "Playoff · In the hunt", "CUSA title game · Clinched"</td><td>They restate the numbers in words ("Clinched" next to "In"), repeat each goal's name, and the outlines break the "only buttons get an outline" rule</td><td><b>Gone as tags.</b> The status word moves beside its own number ("17% · In the hunt"), no outline, no repeated goal name. A proven goal says so once</td></tr>
+  <tr><td><b>Actions</b></td><td>Open picks in Lab, Share, Reset (always shown, dimmed with no picks)</td><td>Three buttons at equal weight; a disabled Reset is noise most of the time</td><td>Lab and Share always; <b>Reset only appears with picks</b>, inside an amber "2 picks · Reset" note that also says picks are on</td></tr>
+  <tr><td><b>Odds</b></td><td>Band of 1 to 3 numbers, road under it</td><td>Width is fixed, content isn't (one number for independents)</td><td>Each goal is one unit: name, number, status; the road belongs to Playoff</td></tr>
+</table>
+
+<script>
+const T = {
+  lib: { id: 2335, name: 'Liberty', rec: '9-1 · 6-0 CUSA', goals: [
+    { l: 'Playoff*', v: '17%', s: 'In the hunt', live: true, lead: true, road: ['<0.1%', '<0.1%'] },
+    { l: 'CUSA title game', v: 'In', s: 'Clinched', live: false },
+    { l: 'Win CUSA', v: '72%' }],
+    say: ['In the <span class="n">CUSA title game</span>.', 'Playoff: <span class="n">17%</span>, in the hunt.'], fine: [['Win CUSA', '72%'], ['First-round bye', '<0.1%'], ['National title', '<0.1%']] },
+  nd: { id: 87, name: 'Notre Dame', rec: '9-1', goals: [{ l: 'Playoff*', v: '99%', s: 'In control', live: true, lead: true, road: ['51%', '19%'] }],
+    say: ['Playoff: <span class="n">99%</span>, in control.'], fine: [['First-round bye', '51%'], ['National title', '19%']] },
+  uc: { id: 41, name: 'UConn', rec: '5-5', goals: [{ l: 'Playoff*', v: '<0.1%', s: 'Needs a miracle', live: true, lead: true }],
+    say: ['Playoff: <span class="n">&lt;0.1%</span>. Needs a miracle.'], fine: [] },
+};
+T.libPicks = { ...T.lib, picks: 2 };
+const esc = (s) => s.replace(/</g, '&lt;');
+const chev = '<svg class="chev" width="18" height="18" viewBox="0 0 12 12"><path d="M2.5 4.5 6 8 9.5 4.5" stroke="currentColor" stroke-width="2.2" fill="none"/></svg>';
+const resetI = '<svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 10a6 6 0 1 0 1.8-4.3"/><path d="M4 3.5V7h3.5"/></svg>';
+const shareI = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M6 7l4-4 4 4"/><path d="M5 11v4.5A1.5 1.5 0 0 0 6.5 17h7a1.5 1.5 0 0 0 1.5-1.5V11"/></svg>';
+const bar = '<div class="bar"><span class="ball"></span><div class="nav"><span class="on">Teams</span><span>Season Lab</span></div><span class="date">Through Nov 14</span></div>';
+const picker = (t) => `<span class="picker"><img alt="" src="https://cdn.collegefootballdata.com/logos-dark/64/${t.id}.png"><span class="nm"><b>${t.name}</b><span>${t.rec}</span></span>${chev}</span>`;
+const acts = (t) => `<div class="acts"><span class="btn">Open in Lab <span class="ar">→</span></span><span class="btn share">${shareI}Share</span>${t.picks ? `<span class="picks">${t.picks} picks <span class="rs">${resetI}Reset</span></span>` : ''}</div>`;
+const road = (r) => r ? `<span class="road"><i class="full">First-round bye</i><i class="short">Bye</i><b>${esc(r[0])}</b> · <i class="full">National title</i><i class="short">Natl title</i><b>${esc(r[1])}</b></span>` : '';
+const status = (g) => g.s ? `<span class="status pip ${g.live ? 'live' : 'set'}">${g.s}</span>` : '<span></span>';
+const below = '<div class="below">What it takes · Week by week …</div>';
+
+const D1 = (t) => `<div class="board D1">${bar}<div class="hd"><div class="id">${picker(t)}${acts(t)}</div><div class="ledger">${t.goals.map((g) =>
+  `<div class="row ${g.lead ? 'lead' : ''}"><span class="lbl ${g.lead ? 'w' : ''}">${g.l}</span>${status(g)}<span class="plate">${esc(g.v)}</span></div>${g.road ? road(g.road) : ''}`).join('')}</div></div>${below}</div>`;
+const D2 = (t) => `<div class="board D2">${bar}<div class="hd"><div class="id">${picker(t)}${acts(t)}</div><div class="goals">${t.goals.map((g) =>
+  `<div class="g ${g.lead ? 'lead' : ''}"><span class="lbl ${g.lead ? 'w' : ''}">${g.l}</span><span class="plate">${esc(g.v)}</span>${g.s ? status(g) : ''}${g.road ? road(g.road) : ''}</div>`).join('')}</div></div>${below}</div>`;
+const D3 = (t) => `<div class="board D3">${bar}<div class="hd">${picker(t)}<div class="verdict"><div class="say">${t.say.join(' ')}</div>${t.fine.length ? `<div class="fine">${t.fine.map(([l, v]) => `<span>${l}<b>${esc(v)}</b></span>`).join('')}</div>` : ''}</div>${acts(t)}</div>${below}</div>`;
+
+const show = (f) => document.write(
+  `<p class="size">Desktop 1180 · Liberty</p><div class="frame w-desk">${f(T.lib)}</div>`
+  + `<p class="size">Desktop 1180 · Notre Dame</p><div class="frame w-desk">${f(T.nd)}</div>`
+  + `<p class="size">Desktop 1180 · UConn</p><div class="frame w-desk">${f(T.uc)}</div>`
+  + `<div class="pair"><div><p class="size">Narrow 820 · Liberty, 2 picks</p><div class="frame w-mid">${f(T.libPicks)}</div></div>`
+  + `<div><p class="size">Phone · Liberty</p><div class="frame w-phone">${f(T.lib)}</div></div>`
+  + `<div><p class="size">Phone · Notre Dame</p><div class="frame w-phone">${f(T.nd)}</div></div></div>`);
+</script>
+
+<h2>D1 · Goal ledger</h2>
+<p class="t"><b>Each goal is one row: name, status, number.</b> The status word (amber with a lamp dot while live, muted once settled) replaces the tags, beside the number it describes. Numbers line up in one right-aligned column, so they compare at a glance, and the playoff road sits under its own row. The ledger is as tall as the identity block beside it, so nothing floats; an independent is one row. Reads like a standings table: dense and calm.</p>
+<script>show(D1);</script>
+
+<h2>D2 · Goals across</h2>
+<p class="t"><b>The scoreboard version.</b> Goals side by side with big lit numbers, each with its status word under it and the playoff road under Playoff. No fill, no band: it's as wide as the goals it has, so an independent is one unit beside its identity block. The loudest of the three; closest to what the header is today, minus the tags and the strip.</p>
+<script>show(D2);</script>
+
+<h2>D3 · Verdict</h2>
+<p class="t"><b>Say it.</b> One short sentence answers the page's question ("In the CUSA title game. Playoff: 17%, in the hunt."), with the key facts lit amber; the rest of the numbers sit under it as fine print. Most direct for a fan who just wants the answer, and naturally sized to any team. The sentence would come from the core (like the path text), so it's tested; the cost is fewer numbers at full size.</p>
+<script>show(D3);</script>
+
+<p class="note">Common to all three: the record moves into the picker; tags become one status word per goal; Reset shows only with picks ("2 picks · Reset" in amber, which also tells the visitor the numbers include their picks); "Open picks in Lab" shortens to "Open in Lab". On phones the sticky name line would carry the Playoff number (and its status in D1/D2); the rest scrolls away as now.</p>
+</body>
+</html>

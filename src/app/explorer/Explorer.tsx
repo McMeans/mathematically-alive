@@ -2,11 +2,13 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  conferenceName, conferenceShort, decodeLocks, encodeLocks, formatChampion, formatPlayoff, formatRecord, formatTitleOdds, oddsLabels, playoffDetail, statusTags, titleGameOutLine, type StatusTag,
+  conferenceName, conferenceShort, decodeLocks, encodeLocks, formatChampion, formatPlayoff, formatRecord, formatTitleOdds, oddsLabels, playoffDetail, titleGameOutLine,
   type BoardHelpGame, type HelpGroup, type IndependentGame, type IndependentOutlook, type Locks, type PathTree, type PlayoffSignal, type SeasonWeek, type TeamBoard, type TeamOutlook, type TeamPath,
 } from "@/core";
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
 import { SiteBar } from "@/app/SiteBar";
+import { BoardButton } from "@/app/BoardButton";
+import { Lit } from "@/app/Lit";
 import { ShareButton } from "./Share";
 import { ITERATIONS } from "@/app/config";
 import { TeamList } from "./Panels";
@@ -78,6 +80,8 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
   check?: (r: R, titles: Titles) => Titles | null) {
   const [locks, setLocks] = useState<Locks>({});
   const [titles, setTitles] = useState<Titles>({});
+  // The picks before each change (the last 50), for Undo.
+  const [history, setHistory] = useState<{ locks: Locks; titles: Titles }[]>([]);
   const [result, setResult] = useState<R>(initial);
   // Ranks by name: the current ranking (the committee's latest, moved by real results only). Picks never change it.
   const [ranks, setRanks] = useState(initialRanks);
@@ -99,7 +103,7 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
         setRanks(e.data.ranks);
         const keep = checker.current?.(r, latestPicks.current.titles);
         if (keep) {
-          update(latestPicks.current.locks, keep);
+          update(latestPicks.current.locks, keep, false);
           return;
         }
       }
@@ -113,7 +117,7 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
     // A shared link's picks ("?picks=401-12.402-30") load as the starting what-if.
     const text = new URLSearchParams(window.location.search).get("picks");
     const shared = decodeLocks(text, openGames);
-    if (Object.keys(shared).length > 0) update(shared);
+    if (Object.keys(shared).length > 0) update(shared, {}, false);
     else if (text !== null) {
       // Nothing in the link survived: drop the param so the address bar doesn't claim picks the page isn't showing.
       const url = new URL(window.location.href);
@@ -124,7 +128,12 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load: the worker and a shared link's picks
   }, []);
 
-  function update(next: Locks, nextTitles: Titles = latestPicks.current.titles) {
+  /** `record` false: not a change of the visitor's own (a link's picks, a title pick the new result undid), so no Undo step. */
+  function update(next: Locks, nextTitles: Titles = latestPicks.current.titles, record = true) {
+    if (record) {
+      const prev = latestPicks.current;
+      setHistory((h) => [...h.slice(-49), prev]);
+    }
     latestPicks.current = { locks: next, titles: nextTitles };
     setLocks(next);
     setTitles(nextTitles);
@@ -162,7 +171,14 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
     else next[conf] = winner;
     update(locks, next);
   }
-  return { locks, titles, result, ranks, busy, failed, status, update, pick, pickTitle };
+  /** Back to the picks before the last change. */
+  function undo() {
+    const prev = history.at(-1);
+    if (!prev) return;
+    setHistory((h) => h.slice(0, -1));
+    update(prev.locks, prev.titles, false);
+  }
+  return { locks, titles, result, ranks, busy, failed, status, update, pick, pickTitle, undo, canUndo: history.length > 0 };
 }
 
 /** Every pick on the page, worded for the rail. Ids: "g<game id>" for a game, "t<conference>" for a title game. */
@@ -202,13 +218,13 @@ function keepPicked(board: TeamBoard | null, kept: Kept, locks: Locks): TeamBoar
   return { ...board, help };
 }
 
-/** Remember a help game when it's picked, forget it when it's cleared. */
+/**
+ * Remember a help game when it's picked. Clearing it doesn't forget it (only a picked one shows), so Undo can bring the
+ * pick back where it was.
+ */
 function track(board: TeamBoard | null, kept: Kept, gameId: number, winner: number | undefined): Kept {
+  if (winner === undefined) return kept;
   const next = { ...kept };
-  if (winner === undefined) {
-    delete next[gameId];
-    return next;
-  }
   for (const g of board?.help ?? []) {
     const at = g.games.findIndex((x) => x.gameId === gameId);
     if (at >= 0) next[gameId] = { group: { teamId: g.teamId, team: g.team, record: g.record, title: g.title }, game: g.games[at], at };
@@ -222,7 +238,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
   // A title-game pick stands while its matchup is the same two teams (in either order); then it clears, with a note.
   const titleKey = useRef<string | null>(null);
   const [note, setNote] = useState("");
-  const { locks, titles, result, ranks, busy, failed, status, update, pick, pickTitle } = useWhatIf<Result>(initial, common.ranks, conference, teamId, common.openGames, (r) =>
+  const { locks, titles, result, ranks, busy, failed, status, update, pick, pickTitle, undo, canUndo } = useWhatIf<Result>(initial, common.ranks, conference, teamId, common.openGames, (r) =>
     r.independent ? null : { outlook: r.outlook, path: r.path, tree: r.tree, playoffGames: r.playoffGames, board: r.board },
   (r, t) => {
     if (t[conference] === undefined) return null;
@@ -245,7 +261,9 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
   const titlePick = titles[conference] ?? null;
   const week = board?.titleWeek ?? null;
   const [kept, setKept] = useState<Kept>({});
-  const reset = () => { setWayPicks(null); setKept({}); titleKey.current = null; setNote(""); update({}, {}); };
+  const reset = () => { setWayPicks(null); titleKey.current = null; setNote(""); update({}, {}); };
+  // A title pick Undo brings back stands while its team is in the title game (its matchup key is gone with the step).
+  const back = () => { titleKey.current = null; setNote(""); undo(); };
   function onPick(gameId: number, winner: number | undefined) { setNote(""); pick(gameId, winner); }
   function onHelpPick(gameId: number, winner: number | undefined) { setKept((k) => track(board, k, gameId, winner)); onPick(gameId, winner); }
   const helpBoard = keepPicked(board, kept, locks);
@@ -283,10 +301,11 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
       {...common}
       ranks={ranks}
       record={formatRecord(me.record, conference)}
-      tags={statusTags(me, `${conferenceShort(conference)} title game`)}
       picks={picks.length}
       lab={lab}
       onReset={reset}
+      onUndo={back}
+      canUndo={canUndo}
       busy={busy}
       status={status}
       failed={failed}
@@ -325,7 +344,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
 /** An FBS independent's page: no conference, so no title game; its own games and the playoff. */
 export function IndependentExplorer({ initial, ...common }: Common & { initial: IndependentResult }) {
   const { teamId, teams, names, through } = common;
-  const { locks, result, ranks, busy, failed, status, update, pick } = useWhatIf<IndependentResult>(initial, common.ranks, null, teamId, common.openGames, (r) =>
+  const { locks, result, ranks, busy, failed, status, update, pick, undo, canUndo } = useWhatIf<IndependentResult>(initial, common.ranks, null, teamId, common.openGames, (r) =>
     r.independent ? { outlook: r.outlook, games: r.games, playoffGames: r.playoffGames, board: r.board } : null);
   const me = result.outlook.find((o) => o.teamId === teamId)!;
   const team = teams.find((t) => t.id === teamId)!;
@@ -341,10 +360,11 @@ export function IndependentExplorer({ initial, ...common }: Common & { initial: 
       {...common}
       ranks={ranks}
       record={formatRecord(me.record, common.conference)}
-      tags={statusTags(me, null)}
       picks={picks.length}
       lab={lab}
-      onReset={() => { setKept({}); update({}); }}
+      onReset={() => update({})}
+      onUndo={undo}
+      canUndo={canUndo}
       busy={busy}
       status={status}
       failed={failed}
@@ -372,23 +392,25 @@ export function IndependentExplorer({ initial, ...common }: Common & { initial: 
 
 type Score = {
   value: string; label: string; lead?: boolean; detail?: { label: string; value: string }[];
-  /** A shorter label for the compact strip ("Title game" for "Big Ten title game"). */
+  /** A shorter label for the odds band on phones ("Title game" for "Big Ten title game"). */
   short?: string;
 };
 
 /** The names on a team's header from here on wrap instead of truncating: past this many letters it steps down a size. */
 const LONG_NAME = 18;
+/** In the name line, which shares its row with Undo, Reset and Share, names past this many letters step down to 15px. */
+const STRIP_NAME = 12;
 
-function Frame({ teamId, conference, teams, conferences, names, abbreviations, ranks, through, asOf, record, tags, picks, lab, onReset, busy, failed, status, scores, main, rail }: Common & {
-  /** The team's record: "6-3 (5-2 ACC)". */
+function Frame({ teamId, conference, teams, conferences, names, abbreviations, ranks, through, asOf, record, picks, lab, onReset, onUndo, canUndo, busy, failed, status, scores, main, rail }: Common & {
+  /** The team's record, shown in the team picker under the name: "6-3 (5-2 ACC)". */
   record: string;
-  /** One per goal: "Playoff · Needs a miracle", "ACC title game · Out". */
-  tags: StatusTag[];
   /** How many picks are on the page. */
   picks: number;
   /** The Season Lab link, carrying the picks and the team. */
   lab: string;
   onReset: () => void;
+  onUndo: () => void;
+  canUndo: boolean;
   busy: boolean;
   failed: boolean;
   status: string;
@@ -398,7 +420,7 @@ function Frame({ teamId, conference, teams, conferences, names, abbreviations, r
   rail: ReactNode;
 }) {
   const [sheet, setSheet] = useState(false);
-  // Two pickers share one state: the strip's (phones, and screens too short for the one-screen layout) and the header's.
+  // Two pickers share one state: the name line's (phones, and screens too short for the one-screen layout) and the header's.
   const stripPicker = useRef<HTMLButtonElement>(null);
   const deskPicker = useRef<HTMLButtonElement>(null);
   const focusPicker = () => [deskPicker.current, stripPicker.current].find((b) => b && b.offsetParent !== null)?.focus();
@@ -427,11 +449,19 @@ function Frame({ teamId, conference, teams, conferences, names, abbreviations, r
   const team = teams.find((t) => t.id === teamId)!;
   const long = team.name.length > LONG_NAME;
   const openLab = (
-    <><span className="sm:hidden">Lab</span><span className="hidden sm:inline">Open picks in Lab</span>{picks > 0 && <span className="font-sans text-xs font-semibold normal-case tracking-normal text-board-muted"> · {picks} pick{picks === 1 ? "" : "s"}</span>} <span aria-hidden className="text-lamp">→</span></>
+    <>Open picks in Lab{picks > 0 && <span className="font-sans text-xs font-semibold normal-case tracking-normal text-board-muted"> · {picks} pick{picks === 1 ? "" : "s"}</span>} <span aria-hidden className="text-lamp">→</span></>
   );
-  const resetIcon = <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10a6 6 0 1 0 1.8-4.3" /><path d="M4 3.5V7h3.5" /></svg>;
-  // Reset, lit amber once there are picks to clear: an icon in the strip, a labelled button in the header.
-  const resetState = picks > 0 ? "border-lamp bg-lamp text-plate-ink hover:brightness-105" : "border-board-line text-board-muted opacity-50";
+  // Undo, Reset, Share: the same suite, in the same order, as the Lab's header. Below `sm` all three are icon squares,
+  // to sit in the name line beside the team.
+  const actions = (
+    <div className="flex shrink-0 gap-1.5">
+      <BoardButton kind="undo" onClick={onUndo} disabled={!canUndo} />
+      <BoardButton kind="reset" onClick={onReset} disabled={picks === 0} />
+      {/* Dimmed with no picks, as in the Lab, but still pressable: the link still shares the team. */}
+      <ShareButton board label="Share" className={picks === 0 ? "opacity-55" : ""} />
+    </div>
+  );
+  const labLink = "cond inline-flex items-center gap-1 whitespace-nowrap text-[15px] font-bold tracking-[0.05em] text-board-text transition-colors hover:text-white";
   const chevron = (cls: string) => <svg aria-hidden viewBox="0 0 12 12" className={`transition-transform ${cls} ${sheet ? "rotate-180" : ""}`}><path d="M2.5 4.5 6 8 9.5 4.5" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="square" /></svg>;
   const pickerLabel = `${team.name}: change team`;
   const list = (
@@ -445,84 +475,73 @@ function Frame({ teamId, conference, teams, conferences, names, abbreviations, r
       <RanksContext.Provider value={ranks}>
       <AbbreviationsContext.Provider value={abbreviations}>
       {/* The one-screen layout (static header, columns that scroll on their own) needs a screen at least 640px tall as well
-          as 768 wide; shorter ones scroll as one page, with the compact strip as the only sticky part. */}
+          as 768 wide; shorter ones scroll as one page, with the name line and odds band as the only sticky part. */}
       <div className="flex min-h-dvh flex-col tall:md:h-dvh tall:md:overflow-hidden">
         <header className="contents">
           <div className="board-dots text-board-text">
             <SiteBar current="teams" teams={`/team/${teamId}`} lab={lab} through={through} asOf={asOf} find={conferences.flatMap((c) => c.teams).map((t) => ({ ...t, abbr: abbreviations[t.id] }))} />
           </div>
 
-          {/* The compact strip: picker, the numbers on one line and Reset. It is what sticks while the page scrolls. */}
-          <div className="board-dots sticky top-0 z-30 flex h-[52px] items-center gap-2 border-b border-board-line pl-3.5 pr-0.5 text-board-text tall:md:hidden">
-            <button type="button" ref={stripPicker} aria-expanded={sheet} aria-controls="team-sheet-strip" aria-label={pickerLabel} onClick={() => setSheet(!sheet)}
-              className="relative z-30 flex h-11 min-w-0 flex-1 items-center gap-2 text-left">
-              <TeamLogo id={teamId} size="1.2em" />
-              <span className={`cond min-w-0 font-extrabold tracking-[0.03em] text-white ${long ? "line-clamp-2 text-[15px] leading-[1.05]" : "truncate text-xl leading-none"}`}>{team.name}</span>
-              <span className="shrink-0 text-board-muted">{chevron("h-3.5 w-3.5")}</span>
-            </button>
-            <div className="flex shrink-0 gap-2.5 text-center">
-              {scores.map((s) => (
-                <div key={s.label}>
-                  <div key={s.value} className={`plate plate-hang text-white ${s.lead ? "text-[22px]" : "text-[17px]"}`}>{s.value}</div>
-                  <span className={`cond mt-0.5 block whitespace-nowrap text-[9px] font-bold tracking-[0.06em] ${s.lead ? "text-white" : "text-board-muted"}`}>{s.short ?? s.label}</span>
-                </div>
-              ))}
-            </div>
-            <button type="button" onClick={onReset} disabled={picks === 0} aria-label="Reset picks"
-              className={`flex h-11 w-11 shrink-0 items-center justify-center ${picks > 0 ? "text-lamp" : "text-board-muted opacity-50"}`}>{resetIcon}</button>
-            {sheet && (
-              <>
-                <button type="button" aria-label="Close team list" tabIndex={-1} onClick={closeSheet} className="fixed inset-0 z-20 cursor-default" />
-                <div id="team-sheet-strip" className={`${panel} left-3.5 top-full tall:md:hidden`}>{list}</div>
-              </>
-            )}
-          </div>
-
-          <div className="board-dots text-board-text tall:md:grid tall:md:grid-cols-[minmax(0,1fr)_auto] tall:md:items-end tall:md:gap-5 tall:md:px-6 tall:md:pb-5 tall:md:pt-4 tall:lg:gap-8">
-            <div className="min-w-0 tall:md:relative tall:md:flex tall:md:flex-col tall:md:items-start tall:md:gap-2.5">
-              {/* The team picker, as a field with the chevron in its own cell. The name is never cut: it steps down a size, then wraps. */}
-              <button type="button" ref={deskPicker} aria-expanded={sheet} aria-controls="team-sheet" aria-label={pickerLabel} onClick={() => setSheet(!sheet)}
-                className={`hidden max-w-full items-stretch rounded-[3px] border bg-white/[0.04] text-left transition-colors hover:border-board-muted hover:bg-white/[0.07] tall:md:flex ${sheet ? "border-board-muted" : "border-board-line"}`}>
-                <span className={`cond flex min-w-0 items-center gap-2.5 px-3 py-2 font-extrabold leading-[1.05] text-white tall:md:text-[32px] ${long ? "" : "tall:lg:text-[40px]"}`}>
-                  <TeamLogo id={teamId} size="1.1em" />
-                  <span className="min-w-0 break-words">{team.name}</span>
+          {/* Phones and short screens: the name line (picker with the record under the name, then Undo, Reset, Share) and
+              the odds band stick together while the page scrolls. */}
+          <div className="board-dots sticky top-0 z-30 text-board-text tall:md:hidden">
+            <div className="relative flex h-[52px] items-center gap-2 pl-3.5 pr-2 md:px-6">
+              <button type="button" ref={stripPicker} aria-expanded={sheet} aria-controls="team-sheet-strip" aria-label={pickerLabel} onClick={() => setSheet(!sheet)}
+                className="relative z-30 flex h-11 min-w-0 flex-1 items-center gap-2 text-left">
+                <TeamLogo id={teamId} size="1.5rem" />
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className={`cond min-w-0 font-extrabold tracking-[0.03em] text-white ${team.name.length > STRIP_NAME ? "line-clamp-2 text-[15px] leading-[1.05]" : "truncate text-xl leading-none"}`}>{team.name}</span>
+                  <span className="truncate text-[11.5px] leading-none text-board-muted">{record}</span>
                 </span>
-                <span className="flex w-11 items-center justify-center border-l border-board-line text-board-text">{chevron("h-5 w-5")}</span>
+                <span className="shrink-0 text-board-muted">{chevron("h-3.5 w-3.5")}</span>
               </button>
-              {/* The record and the status tags on one line, which scrolls sideways when it must. */}
-              <div className="flex min-h-11 items-center gap-x-2 gap-y-1 overflow-x-auto whitespace-nowrap px-4 text-xs text-board-muted [scrollbar-width:none] tall:md:min-h-0 tall:md:flex-wrap tall:md:overflow-visible tall:md:whitespace-normal tall:md:px-0 tall:md:text-sm">
-                <span className="shrink-0">{record}</span>
-                {tags.map((t) => (
-                  <span key={t.label} className={`cond shrink-0 whitespace-nowrap rounded-[2px] border px-1.5 text-xs font-extrabold tracking-[0.1em] ${t.live ? "border-lamp text-lamp" : "border-board-line text-board-muted"}`}>{t.label}</span>
-                ))}
-              </div>
-              <div className="flex items-center gap-2 px-4 pb-3.5 pt-0.5 tall:md:flex-wrap tall:md:p-0">
-                <Link href={lab} className="cond flex h-11 items-center gap-1.5 rounded-[3px] border border-board-line px-3.5 text-base font-bold tracking-[0.05em] text-white hover:border-lamp lg:h-9">{openLab}</Link>
-                <ShareButton board label="Share" />
-                <button type="button" onClick={onReset} disabled={picks === 0} aria-label="Reset picks"
-                  className={`cond hidden h-11 items-center gap-1.5 rounded-[3px] border px-3 text-base font-bold tracking-[0.05em] transition-colors tall:md:flex lg:h-9 ${resetState}`}>
-                  {resetIcon}
-                  <span>Reset</span>
-                </button>
-              </div>
               {sheet && (
                 <>
-                  <button type="button" aria-label="Close team list" tabIndex={-1} onClick={closeSheet} className="fixed inset-0 z-20 hidden cursor-default tall:md:block" />
-                  <div id="team-sheet" className={`${panel} left-0 top-full hidden tall:md:block`}>{list}</div>
+                  <button type="button" aria-label="Close team list" tabIndex={-1} onClick={closeSheet} className="fixed inset-0 z-20 cursor-default" />
+                  <div id="team-sheet-strip" className={`${panel} left-3.5 top-full md:left-6`}>{list}</div>
                 </>
               )}
+              {actions}
             </div>
-            <div className="hidden items-start gap-5 tall:md:flex">
-              {scores.map((s) => (
-                <div key={s.label} className="text-center">
-                  <div key={s.value} className={`plate plate-hang text-white ${s.lead ? "tall:md:text-[44px] tall:lg:text-[56px]" : "tall:md:text-4xl"}`}>{s.value}</div>
-                  <span className={`cond mt-1 block text-sm font-semibold tracking-[0.08em] ${s.lead ? "text-white" : "text-board-muted"}`}>{s.label}</span>
-                  {s.detail && s.detail.length > 0 && (
-                    <span className="mt-0.5 block text-xs text-board-muted">{s.detail.map((d) => <span key={d.label}>{d.label} <b className="font-semibold text-white">{d.value}</b></span>).reduce<ReactNode[]>((acc, x, k) => (k ? [...acc, " · ", x] : [x]), [])}</span>
-                  )}
-                </div>
-              ))}
+            <OddsBand scores={scores} />
+          </div>
+
+          {/* The rest of the header. One screen: the identity row (picker with the record, then the actions with the Lab
+              link under them), the odds band and the playoff road. Phones: the playoff road, then one row of actions. */}
+          <div className="board-dots flex flex-col text-board-text">
+            <div className="hidden flex-wrap items-center gap-x-5 gap-y-3 px-6 pb-3.5 pt-4 tall:md:flex">
+              <div className="relative min-w-0 max-w-full">
+                {/* The team picker, as a field with the chevron in its own cell: the name, the record under it. The name is
+                    never cut: it steps down a size, then wraps. */}
+                <button type="button" ref={deskPicker} aria-expanded={sheet} aria-controls="team-sheet" aria-label={pickerLabel} onClick={() => setSheet(!sheet)}
+                  className={`flex max-w-full items-stretch rounded-[3px] border bg-white/[0.04] text-left transition-colors hover:border-board-muted hover:bg-white/[0.07] ${sheet ? "border-board-muted" : "border-board-line"}`}>
+                  <span className={`cond flex min-w-0 items-center gap-2.5 px-3 py-2 text-[32px] text-white ${long ? "" : "tall:lg:text-[40px]"}`}>
+                    <TeamLogo id={teamId} size="1.1em" />
+                    <span className="flex min-w-0 flex-col gap-1">
+                      <span className="min-w-0 break-words font-extrabold leading-[0.95]">{team.name}</span>
+                      <span className="font-sans text-[13px] font-medium normal-case leading-none tracking-normal text-board-muted">{record}</span>
+                    </span>
+                  </span>
+                  <span className="flex w-11 items-center justify-center border-l border-board-line text-board-text">{chevron("h-5 w-5")}</span>
+                </button>
+                {sheet && (
+                  <>
+                    <button type="button" aria-label="Close team list" tabIndex={-1} onClick={closeSheet} className="fixed inset-0 z-20 cursor-default" />
+                    <div id="team-sheet" className={`${panel} left-0 top-full`}>{list}</div>
+                  </>
+                )}
+              </div>
+              <div className="ml-auto flex flex-col items-end gap-2">
+                {actions}
+                <Link href={lab} className={labLink}>{openLab}</Link>
+              </div>
             </div>
+            {/* Phones and short screens: the Lab link on its own line, under the playoff road. */}
+            <div className="flex px-3.5 md:px-6 tall:md:hidden">
+              <Link href={lab} className={`${labLink} min-h-11`}>{openLab}</Link>
+            </div>
+            <div className="hidden tall:md:block"><OddsBand scores={scores} /></div>
+            <PlayoffRoad detail={scores.find((s) => s.lead)?.detail ?? []} />
           </div>
         </header>
 
@@ -541,6 +560,44 @@ function Frame({ teamId, conference, teams, conferences, names, abbreviations, r
       </AbbreviationsContext.Provider>
       </RanksContext.Provider>
     </ConferenceProvider>
+  );
+}
+
+/**
+ * The header's main numbers in one board-deep band of equal cells, label over lit number, the lead one's label in white.
+ * Phones use each label's short form ("Title game").
+ */
+function OddsBand({ scores }: { scores: Score[] }) {
+  return (
+    <div className="grid border-t border-board-line bg-board-deep" style={{ gridTemplateColumns: `repeat(${scores.length}, minmax(0, 1fr))` }}>
+      {scores.map((s) => (
+        <div key={s.label} className="flex min-w-0 flex-col gap-0.5 px-3.5 pb-2 pt-1.5 not-first:border-l not-first:border-board-line md:px-6 tall:md:gap-1 tall:md:pb-3 tall:md:pt-2.5">
+          <span className={`cond truncate text-[11px] font-bold tracking-[0.08em] tall:md:text-xs ${s.lead ? "text-white" : "text-board-muted"}`}>
+            {s.short ? <><span className="sm:hidden">{s.short}</span><span className="hidden sm:inline">{s.label}</span></> : s.label}
+          </span>
+          <Lit value={s.value} className="text-[26px] text-white tall:md:text-4xl tall:lg:text-[44px]" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The playoff's second tier under the band ("First-round bye <0.1%", "National title 14%"): small lit numbers, a step
+ * down from the band's. Nothing when the playoff has none (no field simulated).
+ */
+function PlayoffRoad({ detail }: { detail: { label: string; value: string }[] }) {
+  if (detail.length === 0) return null;
+  return (
+    <div className="order-first flex flex-wrap items-baseline gap-x-4 gap-y-0.5 border-b border-board-line bg-board-deep px-3.5 py-1.5 md:px-6 tall:md:order-none tall:md:border-b-0 tall:md:border-t">
+      <span className="cond text-[11px] font-bold tracking-[0.1em] text-board-muted">Playoff road</span>
+      {detail.map((d) => (
+        <span key={d.label} className="inline-flex items-baseline gap-1.5">
+          <span className="cond text-[11px] font-bold tracking-[0.08em] text-board-muted">{d.label}</span>
+          <Lit value={d.value} className="text-[15px] text-board-text" />
+        </span>
+      ))}
+    </div>
   );
 }
 

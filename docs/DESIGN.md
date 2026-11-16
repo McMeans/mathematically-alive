@@ -37,7 +37,7 @@ The site is **light-only**. There is no dark mode, and none is planned.
 - **Numbers are lit digits on the board, never boxes.** A number is Saira Condensed set straight on the board, not in a
   pill, chip or tile with its own border.
 - **Only buttons get an outline.** A 1px border means "you can press this". Labels, tags and readouts don't get one,
-  with two narrow exceptions noted below (status tags and the dashed "Projected" tag).
+  with one narrow exception noted below (the dashed "Projected" tag).
 - **A pick fills amber.** A pressed result fills the whole button with `lamp`, with dark `plate-ink` text.
 - **The core writes the words.** Every odds string and path sentence a user sees comes from `@/core`. The app lays it
   out.
@@ -63,7 +63,7 @@ All colors are Tailwind v4 tokens in the `@theme` block of `src/app/globals.css`
 
 | Token | Hex | Use |
 | --- | --- | --- |
-| `lamp` | `#F2B134` | Amber. A pick (button fill), the page's own team in a race (left edge and its numbers), the cut line, a big game's 2px outline, the focus ring on the board, "live" status tags, a reset button that has something to reset, text selection. |
+| `lamp` | `#F2B134` | Amber. A pick (button fill), the page's own team in a race (left edge and its numbers), the cut line, a big game's 2px outline, the focus ring on the board, a reset button that has something to reset, text selection. |
 | `lamp-ink` | `#8A5D00` | Amber as text on the ground, where `lamp` is too light (1.5:1). Used for notes like "title pick cleared". |
 | `plate` | `#F3F0E6` | The cream plate: the current nav item, Share on the board, the selected conference tab in the team sheet, the mark's ball. |
 | `plate-ink` | `#121A16` | Text on `plate` and on `lamp`. |
@@ -119,10 +119,10 @@ with `font-sans normal-case tracking-normal`.
 
 | Role | Classes |
 | --- | --- |
-| Team name in the header (picker), 768px up | `cond text-[32px] lg:text-[40px] font-extrabold`; names over 18 letters stay 32px. It wraps and is never truncated. |
-| Lead number in the header (Playoff), 768px up | `plate text-[44px] lg:text-[56px]` |
-| Other header numbers, 768px up | `plate text-4xl` |
-| Sticky strip (team page below that) | name `cond text-xl` (15px over 18 letters, two lines), lead number `plate text-[22px]`, others `text-[17px]` |
+| Team name in the header (picker), 768px up | `cond text-[32px] lg:text-[40px] font-extrabold`; names over 18 letters stay 32px. It wraps and is never truncated. The record sits under it, `font-sans text-[13px]` in `board-muted`. |
+| Odds band numbers (team page header) | `plate text-[26px]`; one screen: `text-4xl`, `lg` `text-[44px]`. Labels `cond text-[11px]` (`text-xs` one screen), the lead one white |
+| Playoff road (under the band) | labels `cond text-[11px]` in `board-muted`, numbers `plate text-[15px]` in `board-text` |
+| Name line (team page, phones and short screens) | name `cond text-xl` (15px over 12 letters, up to two lines: the line also holds Undo, Reset and Share), the record under it at 11.5px in `board-muted` |
 | Section heading on the ground (`Heading`) | `cond text-2xl font-extrabold tracking-[0.02em]` |
 | Lab pane heading (`PaneHeading`) | `cond text-[26px] font-extrabold` |
 | Rail heading (`RailHeading`) | `cond text-lg font-extrabold tracking-[0.03em]` |
@@ -145,7 +145,7 @@ Formatters to reach for:
 | `formatTitleOdds(p, status)` | Title-game odds: `"In"` once clinched, `"Out"` once eliminated (both proven), else `formatSideOdds`. |
 | `formatFine(p)` | The same one-decimal precision, without a status. |
 | `formatOdds(p)` | Whole percents only (`"<1%"`, `">99%"`), for the team list and older views. |
-| `formatPlayoff`, `formatChampion`, `formatRecord`, `statusTags`, `playoffDetail`, `oddsLabels` | The header's numbers, record line, status tags and labels. |
+| `formatPlayoff`, `formatChampion`, `formatRecord`, `playoffDetail`, `oddsLabels` | The header's numbers, the record in the picker, and labels. |
 | `shownChange(before, after)` | How far odds moved, **in points of the odds as shown** (`">99%"` counts as 99, `"<0.1%"` as 0.1), so the move matches the two numbers on screen: `"+4"`, `"−0.3"`, or `null` when they read the same. Uses a real minus sign (`−`). |
 | `labOddsChange(before, after)` | The same move with its unit, for where the move stands alone (the Lab's pin strip and dock): `"+4 pts"`, `"+1 pt"`. |
 | `winsLabel(name, abbreviation)` | A result button's label as `{ full, short }`: `"Florida International wins"` and `"FIU wins"`. The button picks one by width. |
@@ -264,9 +264,10 @@ button is solid `lamp`; once filled it turns to an amber outline, "Undo this pat
 
 | Kind | Look |
 | --- | --- |
-| Board action (Undo, Reset, Lab link in the header) | `cond h-9 rounded-[3px] border border-board-line text-white`, hover `border-board-muted` (Lab link hovers to `border-lamp`). Disabled: `opacity-40`. |
-| Share on the board | The cream plate: `bg-plate text-plate-ink`, no border, hover `bg-white`. |
-| Reset with picks to clear | Lit: `border-lamp bg-lamp text-plate-ink`. Without: `border-board-line text-board-muted opacity-50`, disabled. The team page and the Lab match. |
+| Board action (Undo, Reset, Share) | One suite, in that order, on the team page and in the Lab. One size everywhere, `BOARD_ACTION` in `src/app/BoardButton.tsx`: `cond` 16px bold, `h-11` (`lg:h-9`), `px-3.5`, `min-w-24`, 1px border, never wrapping. Outlined `border-board-line text-white`, hover `border-board-muted`. Undo and Reset carry an icon (`BoardButton`); below `sm` they are 44px icon squares with the label kept for screen readers (Share on the board too, team page and Lab alike). Undo steps back through the last 50 changes (a Reset included). |
+| Lab link on the team header | Text, not a button: "Open picks in Lab" ("Lab" below `sm`), `cond` 15px bold `board-text`, hover white, an amber →, and "· 2 picks" in small `board-muted` sans when there are picks. Under the suite, right-aligned, on one screen; otherwise on its own line under the playoff road. |
+| Share on the board | The cream plate: `bg-plate text-plate-ink`, its border the same cream, hover `bg-white`. Same box as the other board actions. With no picks it dims to `opacity-55` but stays pressable, on the team page and in the Lab alike. |
+| Reset with picks to clear | Lit: `border-lamp bg-lamp text-plate-ink` (`resetLook`). Without: `border-board-line text-board-muted opacity-50`, disabled. The team page and the Lab match. |
 | Primary on the ground | `bg-board text-white`, hover `bg-board-deep` ("Fill the rest", "Pick a team"). |
 | Secondary on the ground | `border border-rule bg-white`, hover `border-ink-muted` (Share picks, Open in Lab, Reset in the rail). |
 | Segmented control / chips | `rounded-[2px] border`. Off: `border-rule bg-white text-ink-soft`. On: `border-board bg-board text-white`. An amber chip (the pinned team's games) is `border-lamp` and fills `lamp` when on. On the board (team sheet tabs) the on state is the cream plate. |
@@ -274,11 +275,17 @@ button is solid `lamp`; once filled it turns to an amber outline, "Undo this pat
 
 Arrows that lead elsewhere ("Try it in the Lab →") put the arrow in `text-lamp`, `aria-hidden`.
 
-### Status tags
+### Odds band and playoff road (team page header)
 
-In the header, beside the record: `cond text-xs font-extrabold tracking-[0.1em] rounded-[2px] border px-1.5`.
-A live goal is `border-lamp text-lamp`; a settled one `border-board-line text-board-muted`. The labels come from
-`statusTags` in the core.
+The header's main numbers sit in one `board-deep` band of equal cells (`OddsBand` in `Explorer.tsx`), divided by
+`board-line` hairlines: label over lit number, left-aligned, the lead label (Playoff) in white and the others in
+`board-muted`. A conference team has three (Playoff, title game, win the conference), an independent one. Phones use the
+labels' short forms ("Title game"). Nothing floats or bottom-aligns: every width is the same rows.
+
+The playoff's second tier, first-round bye and national title (`playoffDetail`, or seed and national title once the field
+is announced), is a thin **playoff road** row under the band (`PlayoffRoad`): a `board-muted` "Playoff road" label,
+then each pair as a small `cond` label and a small lit number in `board-text`, a clear step down from the band. It is
+never prose, and never in the band's cells. No row when there's no detail.
 
 ### Site bar and search
 
@@ -326,9 +333,9 @@ Phone first: most use is on a phone around Saturdays. Three shapes matter.
 
 ### Phone (about 375px)
 
-- Team page: one column. The full header scrolls away; a sticky 52px strip stays (picker, the three numbers on one
-  line, a Reset icon). Under the full header, the record and tags sit on one line that scrolls sideways, then the
-  actions (Lab, Share). The rail follows the main column under a `rule` border.
+- Team page: one column. A sticky block stays: the 52px name line (the picker: name with the record under it; then
+  Undo, Reset and Share, all three 44px icon squares below `sm`) over the odds band. Under it, scrolling away: the
+  playoff road, then the "Open picks in Lab →" link. The rail follows the main column under a `rule` border.
 - Lab: a Field / Games / Races tab strip (`role="tablist"`) under the header; one pane at a time. A pinned
   team docks at the bottom as a ticket in thumb reach (`fixed`, above `env(safe-area-inset-bottom)`), opening upward,
   and flashes amber (`.bump`) when its odds change. Game rows show team abbreviations instead of full names.
@@ -345,15 +352,16 @@ page needs 768px wide, the Lab 1024px.
 
 - The page is exactly one screen tall (`h-dvh overflow-hidden`); the header is static and **each column scrolls on its
   own** (`overflow-y-auto` with `.scroll-thin`).
-- Team page: main column plus a 300px `paper` rail (`md:grid-cols-[minmax(0,1fr)_300px]`). The picker sits beside the
-  numbers in the header; the actions (Lab, Share, Reset) share one row.
+- Team page: main column plus a 300px `paper` rail (`md:grid-cols-[minmax(0,1fr)_300px]`). The header is three rows:
+  the identity row (the picker with the record under the name; at the row's end Undo, Reset, Share with the Lab link
+  under them, right-aligned), the odds band, and the playoff road. No status tags: the band says it.
 - Lab: three panes, field (320 to 380px, `paper`), games (flexible, on the ground), races (300px, `paper`). The "Season
   Lab" title shows from `xl`. A pinned team gets a strip under the header with before → after odds.
 
 ### Short desktop and tablets
 
 Below those sizes, or on a screen under 640px tall (a laptop window around 1280×600), the page scrolls as one. The team
-page's compact strip is the only sticky part; the Lab's header is sticky. The Lab's pane tabs are the header's last
+page's name line (with Undo, Reset, Share, labelled from `sm`) and odds band are the only sticky part; the Lab's header is sticky. The Lab's pane tabs are the header's last
 row on the board: text tabs, `cond` 16px bold, 44px tall, `board-muted`, the selected one white with a 3px `lamp`
 underline. They show whenever the three panes aren't side by side.
 
@@ -364,15 +372,21 @@ they scroll inside.
 
 Short, eased, never bouncy. Defined in `globals.css`:
 
-- `.plate-hang`: a lit number flips once (180ms, two steps) when it changes. Re-key the element on its value so it
-  runs.
+- `.plate-hang`: a lit number flips once (180ms, two steps) when it changes. Use `Lit` (`src/app/Lit.tsx`), which flips
+  on a change only, never when the number first appears (page load, a tab or view switch, a new team), so new content
+  rises in without every digit also flipping. Every changing number uses it: the team header's band and playoff road,
+  result buttons, record tiles, the Lab's picks count, field, top 25 and races.
 - `.bump`: a 900ms amber glow that fades into the board, for the phone dock when odds move.
 - `animate-pop` (160ms) for floating panels (the team sheet) and the pick mark. `animate-rise` (220ms, content rising
   4px as it fades in) for new content: the Lab's panes as a phone tab shows them, a Field view switch, the games list
   when its filter changes, the field-change headline and opened standings. Use `motion-safe:`.
 - The Lab's field, at-large and Group of Six bubbles and top 25 rows glide to their new place (360ms) when a pick reorders them,
-  and new rows rise in (`useFlip` in `Lab.tsx`, keyed by `data-flip`). Their numbers flip (`.plate-hang`) as they change.
-- `.press`: 180ms color transitions and a 0.97 press scale on buttons.
+  and new rows rise in (`useFlip` in `Lab.tsx`, keyed by `data-flip`). A row moved again mid-glide starts from where it
+  is on screen, not its last resting place. Their numbers flip as they change.
+- `.press`: 180ms transitions of background, border, text color and opacity (so a pick's amber border and the beaten
+  side's fade ease with the fill), and a 0.97 press scale. Result buttons, board actions, segments and chips use it.
+  The Lab's pane tabs ease their underline color.
+- The phone dock's panel and the bracket's "Your champion" line rise in (`animate-rise`) when they appear.
 - `prefers-reduced-motion: reduce` cuts every animation and transition to 1ms and drops the press scale.
 
 ## Accessibility
@@ -447,5 +461,5 @@ Places where shipped code doesn't yet follow this guide. Fix them when you touch
   pick, and shows its dark logo on a small dark disc instead. The shipped `TeamLogo` has no exception yet, so a
   picked Toledo shows the light logo on amber.
 - **Share card font.** `src/app/lab/card.tsx` (the Lab's share image: green ground with dot texture, cream mark, seeds
-  as board rows with team logos, amber seeds 1 to 4, an outlined "SEC champ" tag on each projected conference champion and "G6 bid" on the Group of Six bid, the title favorite on an amber plate) uses a bold sans
+  as board rows with team logos, amber seeds 1 to 4, an outlined "SEC champ" tag on each projected conference champion and "G6 bid" on the Group of Six bid, the title favorite on an amber plate; or, for a link with a filled-in bracket, "My playoff bracket": a column per round, each game level with the games feeding it, the pick filled amber with the light logo and the beaten side faded, then "My champion" with its logo, name in amber and seed) uses a bold sans
   stand-in, because no Saira Condensed `.ttf` is in the repo for `ImageResponse`.
