@@ -8,7 +8,7 @@ import {
   formatSideOdds, formatTitleOdds, winsLabel,
   type BestShot, type HelpGroup, type IndependentGame, type PlayoffRace, type RaceItem, type SeasonWeek, type TeamBoard, type TeamOutlook,
 } from "@/core";
-import type { Locks, Pick } from "./Explorer";
+import type { Locks, RailPick } from "./Explorer";
 
 export type PickFn = (gameId: number, winner: number | undefined) => void;
 
@@ -409,8 +409,8 @@ function PickTeam({ id, name }: { id: number; name: string }) {
  * The picks so far under their date, one full-width row each ("[logo] ALA over [logo] CHAT"), each removable. Share,
  * Reset and the Lab live in the header. Dates keep the order their first pick has.
  */
-export function YourPicks({ picks, names, onRemove }: { picks: Pick[]; names: Record<number, string>; onRemove: (id: string) => void }) {
-  const byDate = new Map<string, Pick[]>();
+export function YourPicks({ picks, names, onRemove }: { picks: RailPick[]; names: Record<number, string>; onRemove: (id: string) => void }) {
+  const byDate = new Map<string, RailPick[]>();
   for (const p of picks) byDate.set(p.when, [...(byDate.get(p.when) ?? []), p]);
   return (
     <section className="mb-7 text-sm">
@@ -424,10 +424,10 @@ export function YourPicks({ picks, names, onRemove }: { picks: Pick[]; names: Re
                 {ps.map((p) => (
                   <li key={p.id} className="flex items-center gap-1.5 rounded-[2px] border border-rule bg-white pl-2 text-[13px]">
                     <PickTeam id={p.winner} name={names[p.winner]} />
-                    {p.wins ? <span className="text-ink-muted">wins {p.wins}</span> : (
+                    {p.wins ? <span className="text-ink-muted">wins {p.wins}</span> : p.loser !== null && (
                       <>
                         <span className="text-ink-muted">over</span>
-                        {p.loser !== null && <PickTeam id={p.loser} name={names[p.loser]} />}
+                        <PickTeam id={p.loser} name={names[p.loser]} />
                       </>
                     )}
                     <button type="button" aria-label={`Remove ${p.what}`} onClick={() => onRemove(p.id)}

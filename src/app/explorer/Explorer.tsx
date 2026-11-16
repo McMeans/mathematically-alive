@@ -184,7 +184,7 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
 const PICK_DAY = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
 
 /** Every pick on the page, worded for the rail. */
-export type Pick = {
+export type RailPick = {
   id: string; what: string; when: string; winner: number; loser: number | null;
   /** A title-game pick: the conference it wins ("SEC"). */
   wins?: string;
@@ -192,13 +192,13 @@ export type Pick = {
 /** Every pick on the page, worded for the rail. Ids: "g<game id>" for a game, "t<conference>" for a title game. */
 function pickList(locks: Locks, titles: Titles, games: OpenGame[], names: Record<number, string>, teamId: number) {
   const byId = new Map(games.map((g) => [g.id, g]));
-  const out = Object.entries(locks).map(([id, winner]) => {
+  const out = Object.entries(locks).map(([id, winner]): RailPick => {
     const g = byId.get(Number(id));
     const loser = g ? (g.homeId === winner ? g.awayId : g.homeId) : null;
     const what = winner === teamId ? `Beat ${loser !== null ? names[loser] : "opponent"}` : loser === teamId ? `Lose to ${names[winner]}` : `${names[winner]} over ${loser !== null ? names[loser] : "opponent"}`;
     // Each pick dated by its own kickoff, Eastern, as the boards date games: a week's label is only its first game's day.
     const start = g ? new Date(g.start) : null;
-    return { id: `g${id}`, what, when: start && !Number.isNaN(start.getTime()) ? PICK_DAY.format(start) : "", winner, loser } as Pick;
+    return { id: `g${id}`, what, when: start && !Number.isNaN(start.getTime()) ? PICK_DAY.format(start) : "", winner, loser };
   });
   for (const [c, w] of Object.entries(titles)) out.push({ id: `t${c}`, what: `${names[w]} wins the ${conferenceName(c)}`, when: "Title game", winner: w, loser: null, wins: conferenceShort(c) });
   return out;
