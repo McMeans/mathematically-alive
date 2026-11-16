@@ -2,6 +2,7 @@
 // The team page's board, design B: what it takes, the team's own games week by week (and its title game once it's in
 // the likeliest matchup), help from elsewhere, and the rail's races. Every number and line comes from `@/core`.
 import Link from "next/link";
+import { Lit } from "@/app/Lit";
 import { createContext, useContext, type ReactNode } from "react";
 import {
   formatSideOdds, formatTitleOdds, winsLabel,
@@ -84,7 +85,7 @@ export function Outcome({ label, shortLabel, chance, nums, picked, small, onClic
         {nums.map((n, k) => (
           <span key={n.label} className="flex flex-col items-end gap-0.5">
             <span className="flex items-baseline gap-1">
-              <span className={`plate ${k === 0 ? (small ? "text-xl" : "text-[26px]") : small ? "text-[15px]" : "text-lg"} ${picked ? "" : k === 0 ? "text-white" : "text-board-text"}`}>{n.value}</span>
+              <Lit value={n.value} className={`${k === 0 ? (small ? "text-xl" : "text-[26px]") : small ? "text-[15px]" : "text-lg"} ${picked ? "" : k === 0 ? "text-white" : "text-board-text"}`} />
               {n.change && <span className={`plate text-[13px] ${picked ? "" : n.change.startsWith("+") ? "text-root" : "text-drop"}`}>{n.change}</span>}
             </span>
             <small className={`cond whitespace-nowrap text-[11px] font-bold tracking-[0.06em] ${picked ? "text-plate-ink" : "text-board-muted"}`}>{n.label}</small>
@@ -112,7 +113,7 @@ export function WhatItTakes({ board }: { board: TeamBoard }) {
         {board.records.map((r) => (
           <div key={r.record} className={`flex flex-col gap-1 bg-board-deep px-4 pb-3.5 pt-3 text-board-muted ${r === best ? "shadow-[inset_0_3px_0_var(--color-lamp)]" : ""}`}>
             <span className={`cond text-[15px] font-bold tracking-[0.06em] ${r === best ? "text-lamp" : ""}`}>{r.label}</span>
-            <span className="plate text-[34px] text-white">{r.playoffText}</span>
+            <Lit value={r.playoffText} className="text-[34px] text-white" />
             {r.titleGameText && <span className="text-xs text-board-text">Title game <b className="font-bold text-white">{r.titleGameText}</b></span>}
             <span className="text-xs">{r.likely}</span>
           </div>

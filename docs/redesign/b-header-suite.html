@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team header: one button suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Team header without status tags, with the Lab's button suite (Undo, Reset, Share) on both pages. */
+:root {
+  --board: #133f2e; --board-deep: #0c2c20; --board-line: #2a5a46; --board-text: #d7e4dc; --board-muted: #9fbcae;
+  --plate: #f3f0e6; --plate-ink: #121a16; --lamp: #f2b134;
+  --ground: #e4e7e5; --ink: #15201b; --ink-soft: #3d4a43; --ink-muted: #5d6a63; --rule: #d6d4cc;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.45 "Public Sans", system-ui, sans-serif; font-variant-numeric: tabular-nums; padding: 24px; }
+.plate { font-family: "Saira Condensed", sans-serif; font-weight: 800; line-height: 1; color: #fff; }
+h1 { font: 800 34px/1 "Saira Condensed", sans-serif; text-transform: uppercase; margin: 0 0 8px; }
+h2 { font: 800 26px/1 "Saira Condensed", sans-serif; text-transform: uppercase; margin: 56px 0 6px; }
+p.t { max-width: 90ch; color: var(--ink-soft); margin: 4px 0 12px; font-size: 14.5px; }
+p.t b { color: var(--ink); }
+ul.t { max-width: 90ch; color: var(--ink-soft); font-size: 14.5px; margin: 4px 0 12px; padding-left: 20px; }
+ul.t b { color: var(--ink); }
+.size { font: 700 12px "Saira Condensed", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); margin: 14px 0 4px; }
+.frame { container-type: inline-size; border-radius: 4px; overflow: hidden; }
+.w-desk { width: 1180px; } .w-mid { width: 820px; } .w-phone { width: 375px; }
+.pair { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+
+.board { background-color: var(--board); background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1.2px); background-size: 6px 6px; color: var(--board-text); }
+.bar { height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--board-line); }
+.bar .ball { width: 24px; height: 16px; border-radius: 50%; background: var(--plate); }
+.bar .nav span { font: 700 15px "Saira Condensed"; letter-spacing: .04em; text-transform: uppercase; padding: 4px 10px; border-radius: 2px; color: var(--board-muted); }
+.bar .nav span.on { background: var(--plate); color: var(--plate-ink); }
+.bar .date { margin-left: auto; font-size: 13px; color: var(--board-muted); }
+.below { padding: 12px 14px; background: var(--ground); color: var(--ink-muted); font-size: 13px; }
+.lbl { font: 700 12px "Saira Condensed"; letter-spacing: .08em; text-transform: uppercase; color: var(--board-muted); white-space: nowrap; }
+.lbl.w { color: #fff; }
+
+/* Identity: logo, name and record in the picker. */
+.picker { display: inline-flex; align-items: center; gap: 12px; border: 1px solid var(--board-line); background: rgba(255,255,255,.04); border-radius: 3px; padding: 8px 10px 8px 12px; max-width: 100%; flex-shrink: 0; }
+.picker img { width: 46px; height: 46px; flex-shrink: 0; }
+.picker .nm { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.picker .nm b { font: 800 38px/0.95 "Saira Condensed"; text-transform: uppercase; color: #fff; white-space: nowrap; }
+.picker .nm span { font-size: 13.5px; color: var(--board-muted); white-space: nowrap; }
+.picker .chev { color: var(--board-text); margin-left: 4px; }
+
+/* The suite: Undo, Reset, Share. Same three, same order, same size on the team page and in the Lab. */
+.suite { display: flex; gap: 8px; }
+.btn { height: 36px; min-width: 96px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; border: 1px solid var(--board-line); border-radius: 3px; font: 700 16px "Saira Condensed"; letter-spacing: .05em; text-transform: uppercase; color: #fff; }
+.btn.share { background: var(--plate); border-color: var(--plate); color: var(--plate-ink); }
+.btn.dim { color: var(--board-muted); opacity: .5; }
+.btn.lit { background: var(--lamp); border-color: var(--lamp); color: var(--plate-ink); }
+.btn.sep { margin-left: 8px; }
+.lablink { display: inline-flex; align-items: center; gap: 6px; height: 36px; font: 700 15px "Saira Condensed"; letter-spacing: .05em; text-transform: uppercase; color: var(--board-text); white-space: nowrap; }
+.lablink .ar { color: var(--lamp); }
+.lablink small { font: 600 12px "Public Sans"; text-transform: none; letter-spacing: 0; color: var(--board-muted); }
+
+/* Goals: label over number; Playoff's bye and national title small under it. */
+.goals { display: flex; align-items: flex-start; }
+.g { display: flex; flex-direction: column; gap: 5px; padding: 0 24px; border-left: 1px solid var(--board-line); }
+.g:first-child { border-left: 0; padding-left: 0; }
+.g:last-child { padding-right: 0; }
+.g .plate { font-size: 40px; }
+.g.lead .plate { font-size: 48px; }
+.road { display: flex; gap: 12px; font-size: 12.5px; color: var(--board-muted); white-space: nowrap; }
+.road b { font: 800 15px "Saira Condensed"; color: var(--board-text); margin-left: 3px; }
+.road i { font-style: normal; } .road .short { display: none; }
+
+/* Phone pieces */
+.namebar { display: none; height: 52px; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--board-line); }
+.namebar img { width: 26px; height: 26px; }
+.namebar b { font: 800 20px/1 "Saira Condensed"; text-transform: uppercase; color: #fff; }
+.namebar .p { margin-left: auto; text-align: right; }
+.namebar .p .plate { font-size: 22px; display: block; }
+.namebar .p small { font: 700 9px "Saira Condensed"; letter-spacing: .06em; text-transform: uppercase; color: #fff; }
+
+@container (max-width: 1000px) {
+  .picker .nm b { font-size: 32px; } .picker img { width: 40px; height: 40px; }
+  .g { padding: 0 18px; } .g .plate { font-size: 32px; } .g.lead .plate { font-size: 38px; }
+}
+@container (max-width: 600px) {
+  .bar { padding: 0 14px; height: 44px; } .bar .date { display: none; }
+  .namebar { display: flex; }
+  .desk { display: none !important; }
+  .picker { border: 0; background: none; padding: 0; gap: 10px; }
+  .g { padding: 0 12px; flex: 1; min-width: 0; } .g .lbl { font-size: 10.5px; }
+  .g .plate { font-size: 26px; } .g.lead .plate { font-size: 30px; }
+  .road { flex-direction: column; gap: 1px; font-size: 11px; } .road b { font-size: 13px; }
+  .road .full { display: none; } .road .short { display: inline; }
+  .suite { width: 100%; } .suite .btn { height: 44px; flex: 1; min-width: 0; }
+  .suite .btn:not(.share) span { display: none; } .suite .btn:not(.share) { flex: 0 0 44px; }
+  .lablink { height: 44px; }
+}
+
+/* ===== E1 · Two rows: who and how likely, then what you can do ===== */
+.E1 .r1 { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px 32px; flex-wrap: wrap; padding: 18px 24px 16px; }
+.E1 .r2 { display: flex; align-items: center; justify-content: space-between; gap: 10px 20px; flex-wrap: wrap; padding: 10px 24px; border-top: 1px solid var(--board-line); }
+@container (max-width: 1000px) { .E1 .r1 { padding: 16px 20px 14px; } .E1 .r2 { padding: 10px 20px; } }
+@container (max-width: 600px) {
+  .E1 .r1 { padding: 12px 14px; } .E1 .r1 .picker { display: none; } .E1 .goals { width: 100%; }
+  .E1 .r2 { padding: 10px 14px 12px; flex-direction: column-reverse; align-items: stretch; }
+}
+
+/* ===== E2 · Actions up top: name and suite share the first row; the numbers get a clean row of their own. ===== */
+.E2 .r1 { display: flex; align-items: center; justify-content: space-between; gap: 14px 24px; flex-wrap: wrap; padding: 16px 24px 14px; }
+.E2 .r2 { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px 24px; flex-wrap: wrap; padding: 12px 24px 18px; border-top: 1px solid var(--board-line); }
+@container (max-width: 1000px) { .E2 .r1, .E2 .r2 { padding-left: 20px; padding-right: 20px; } }
+@container (max-width: 600px) {
+  .E2 .r1 { padding: 0; border: 0; } .E2 .r1 .picker { display: none; } .E2 .r1 .suite { display: none; }
+  .E2 .r2 { padding: 12px 14px; border-top: 0; flex-direction: column; align-items: stretch; } .E2 .goals { width: 100%; }
+  .E2 .phone-suite { display: flex !important; padding: 0 14px 12px; }
+}
+.E2 .phone-suite { display: none; }
+
+/* ===== E3 · One row: picker, numbers, then the suite, on a single line from 1000px. ===== */
+.E3 .r1 { display: flex; align-items: center; gap: 16px 36px; flex-wrap: wrap; padding: 18px 24px; }
+.E3 .end { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+@container (max-width: 1000px) { .E3 .r1 { padding: 16px 20px; } .E3 .end { margin-left: 0; width: 100%; flex-direction: row-reverse; justify-content: space-between; align-items: center; } }
+@container (max-width: 600px) {
+  .E3 .r1 { padding: 12px 14px; } .E3 .r1 .picker { display: none; } .E3 .goals { width: 100%; }
+  .E3 .end { flex-direction: column; align-items: stretch; }
+}
+
+/* The Lab header, for comparison: the same suite in the same place. */
+.lab .r { display: flex; align-items: center; gap: 24px; padding: 14px 24px; }
+.lab .title b { font: 800 34px/1 "Saira Condensed"; text-transform: uppercase; color: #fff; display: block; }
+.lab .title span { font-size: 13px; color: var(--board-muted); }
+.lab .chg { flex: 1; font-size: 15px; color: var(--board-muted); }
+.lab .count { display: flex; align-items: center; gap: 10px; } .lab .count .plate { font-size: 40px; }
+.note { font-size: 13px; color: var(--ink-muted); margin: 8px 0 0; max-width: 90ch; }
+</style>
+</head>
+<body>
+<h1>Team header: no tags, one button suite</h1>
+<p class="t">The status tags are gone. Both pages get the same three buttons, <b>Undo, Reset, Share</b>, in that order: the two that change your picks together, from least to most drastic, then Share apart at the end, the cream plate, as the one that leaves the page. Undo and Reset rest dimmed until there's something to undo; Reset lights amber with picks, as in the Lab today. "Open picks in Lab" leaves the suite and becomes a link beside it, with the pick count.</p>
+<ul class="t">
+  <li><b>Team block:</b> the picker holds the logo, name and record ("9-1 · 6-0 CUSA").</li>
+  <li><b>Numbers:</b> each goal is a label over a lit number; first-round bye and national title sit small under Playoff. An independent has one goal, so the numbers take one goal's width.</li>
+  <li><b>Phones:</b> the sticky name line keeps the Playoff number. Undo and Reset are 44px icon squares, Share keeps its label, as in the Lab on phones today.</li>
+</ul>
+
+<p class="size">The Lab header today, for comparison (the suite stays as it is)</p>
+<div class="frame w-desk"><div class="board lab"><div class="bar"><span class="ball"></span><div class="nav"><span>Teams</span><span class="on">Season Lab</span></div><span class="date">Through Nov 14</span></div><div class="r"><div class="title"><b>Season Lab</b><span>Play out the rest of the season.</span></div><div class="chg">Pick a game, or fill the rest.</div><div class="count"><span class="plate">3</span><span class="lbl">Picks</span></div><div class="suite" id="labsuite"></div></div></div></div>
+
+<script>
+const T = {
+  lib: { id: 2335, name: 'Liberty', rec: '9-1 · 6-0 CUSA', goals: [['Playoff*', '17%', ['<0.1%', '<0.1%']], ['CUSA title game', 'In'], ['Win CUSA', '72%']] },
+  nd: { id: 87, name: 'Notre Dame', rec: '9-1', goals: [['Playoff*', '99%', ['51%', '19%']]] },
+  uc: { id: 41, name: 'UConn', rec: '5-5', goals: [['Playoff*', '<0.1%']] },
+};
+T.libPicks = { ...T.lib, picks: 2, goals: [['Playoff*', '23%', ['<0.1%', '0.2%']], ['CUSA title game', 'In'], ['Win CUSA', '81%']] };
+const esc = (s) => s.replace(/</g, '&lt;');
+const chev = '<svg class="chev" width="18" height="18" viewBox="0 0 12 12"><path d="M2.5 4.5 6 8 9.5 4.5" stroke="currentColor" stroke-width="2.2" fill="none"/></svg>';
+const undoI = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 5 4 8.5 7.5 12"/><path d="M4 8.5h8a4 4 0 0 1 0 8h-2"/></svg>';
+const resetI = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 10a6 6 0 1 0 1.8-4.3"/><path d="M4 3.5V7h3.5"/></svg>';
+const shareI = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M6 7l4-4 4 4"/><path d="M5 11v4.5A1.5 1.5 0 0 0 6.5 17h7a1.5 1.5 0 0 0 1.5-1.5V11"/></svg>';
+const bar = '<div class="bar"><span class="ball"></span><div class="nav"><span class="on">Teams</span><span>Season Lab</span></div><span class="date">Through Nov 14</span></div>';
+const suite = (picks) => `<div class="suite"><span class="btn ${picks ? '' : 'dim'}">${undoI}<span>Undo</span></span><span class="btn ${picks ? 'lit' : 'dim'}">${resetI}<span>Reset</span></span><span class="btn share sep">${shareI}Share</span></div>`;
+document.getElementById('labsuite').outerHTML = suite(3);
+const picker = (t) => `<span class="picker"><img alt="" src="https://cdn.collegefootballdata.com/logos-dark/64/${t.id}.png"><span class="nm"><b>${t.name}</b><span>${t.rec}</span></span>${chev}</span>`;
+const namebar = (t) => `<div class="namebar"><img alt="" src="https://cdn.collegefootballdata.com/logos-dark/64/${t.id}.png"><b>${t.name}</b><span style="color:var(--board-muted)">${chev}</span><span class="p"><span class="plate">${esc(t.goals[0][1])}</span><small>Playoff*</small></span></div>`;
+const lab = (t) => `<span class="lablink">Open picks in Lab${t.picks ? ` <small>· ${t.picks} picks</small>` : ''} <span class="ar">→</span></span>`;
+const road = (r) => r ? `<span class="road"><span><i class="full">First-round bye</i><i class="short">Bye</i><b>${esc(r[0])}</b></span><span><i class="full">National title</i><i class="short">Natl title</i><b>${esc(r[1])}</b></span></span>` : '';
+const goals = (t) => `<div class="goals">${t.goals.map(([l, v, r], k) => `<div class="g ${k === 0 ? 'lead' : ''}"><span class="lbl ${k === 0 ? 'w' : ''}">${l}</span><span class="plate">${esc(v)}</span>${road(r)}</div>`).join('')}</div>`;
+const below = '<div class="below">What it takes · Week by week …</div>';
+
+const E1 = (t) => `<div class="board E1">${bar}${namebar(t)}<div class="r1">${picker(t)}${goals(t)}</div><div class="r2">${lab(t)}${suite(t.picks)}</div>${below}</div>`;
+const E2 = (t) => `<div class="board E2">${bar}${namebar(t)}<div class="r1">${picker(t)}${suite(t.picks)}</div><div class="r2">${goals(t)}${lab(t)}</div><div class="phone-suite">${suite(t.picks)}</div>${below}</div>`;
+const E3 = (t) => `<div class="board E3">${bar}${namebar(t)}<div class="r1">${picker(t)}${goals(t)}<div class="end">${suite(t.picks)}${lab(t)}</div></div>${below}</div>`;
+
+const show = (f) => document.write(
+  `<p class="size">Desktop 1180 · Liberty</p><div class="frame w-desk">${f(T.lib)}</div>`
+  + `<p class="size">Desktop 1180 · Liberty with 2 picks</p><div class="frame w-desk">${f(T.libPicks)}</div>`
+  + `<p class="size">Desktop 1180 · Notre Dame</p><div class="frame w-desk">${f(T.nd)}</div>`
+  + `<p class="size">Desktop 1180 · UConn</p><div class="frame w-desk">${f(T.uc)}</div>`
+  + `<div class="pair"><div><p class="size">Narrow 820 · Liberty with 2 picks</p><div class="frame w-mid">${f(T.libPicks)}</div></div>`
+  + `<div><p class="size">Phone · Liberty with 2 picks</p><div class="frame w-phone">${f(T.libPicks)}</div></div>`
+  + `<div><p class="size">Phone · Notre Dame</p><div class="frame w-phone">${f(T.nd)}</div></div></div>`);
+</script>
+
+<h2>E1 · Two rows: who and how likely, then what you can do</h2>
+<p class="t"><b>Information on top, controls under a hairline.</b> Row one is the team block and its numbers, both top-aligned; row two is the Lab link at the left and the suite at the right. The suite sits in the same right-hand spot as in the Lab's header. Clear split between reading and doing; the cost is a second row on every page.</p>
+<script>show(E1);</script>
+
+<h2>E2 · Controls up top, numbers on their own row</h2>
+<p class="t"><b>Name and suite share the first row,</b> like a toolbar; the numbers get a clean row of their own under a hairline, with the Lab link at its end. The suite lines up with where it sits in the Lab, top right. The numbers read as the page's content rather than part of the masthead.</p>
+<script>show(E2);</script>
+
+<h2>E3 · One row</h2>
+<p class="t"><b>Everything on one line from 1000px:</b> team block, numbers, then the suite at the right with the Lab link tucked under it. The most compact (about 86px); below 1000px the suite and link drop to a second row. Busiest of the three on wide screens.</p>
+<script>show(E3);</script>
+
+<p class="note">The team page has no Undo today; it would keep a short history of picks like the Lab's (the last 50 changes), and Undo would step back through them, the "likeliest way in" fill and title picks included.</p>
+</body>
+</html>

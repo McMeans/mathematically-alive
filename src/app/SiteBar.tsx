@@ -17,7 +17,7 @@ export type FindTeam = { id: number; name: string; /** "UVA": found by it too. *
 export function SiteBar({ current, teams, lab, through, asOf, find }: {
   /** The page this is, lit as a cream plate; null on a page that is neither (the not-found page). */
   current: "teams" | "lab" | null;
-  /** Where Teams goes (the team last looked at, with its picks), and Season Lab. */
+  /** Where Teams goes (the team last looked at, without the Lab's picks), and Season Lab. */
   teams: string;
   lab: string;
   through: string;

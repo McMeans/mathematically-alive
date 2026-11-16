@@ -2,6 +2,7 @@
 // to the Lab with the picks.
 import type { Metadata } from "next";
 import Link from "next/link";
+import { readLabShareCode } from "@/core";
 import { notFound } from "next/navigation";
 import { sharedCard } from "./shared";
 import { Forward } from "./Forward";
@@ -20,7 +21,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function SharedLab({ params }: Props) {
   const { code } = await params;
   if (sharedCard(code) === undefined) notFound();
-  const to = `/lab?picks=${encodeURIComponent(code)}`;
+  const parts = readLabShareCode(code);
+  const q = new URLSearchParams();
+  if (parts.picks) q.set("picks", parts.picks);
+  if (parts.bracket) q.set("bracket", parts.bracket);
+  const to = `/lab?${q.toString()}`;
   return (
     <main className="p-6 text-sm text-ink-soft">
       <Forward to={to} />

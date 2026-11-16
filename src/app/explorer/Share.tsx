@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { BOARD_ACTION } from "@/app/BoardButton";
 
 /** The older copy route, for browsers or frames that refuse the clipboard API. */
 function copyByHand(text: string): boolean {
@@ -26,7 +27,8 @@ function copyByHand(text: string): boolean {
  */
 export function ShareButton({ small = false, className = "", link, board = false, label }: {
   small?: boolean; className?: string; link?: () => string;
-  /** The cream plate on the board header, not the plain button on the ground. */
+  /** The cream plate on the board header, not the plain button on the ground. Like `BoardButton`, a 44px icon square
+   * below `sm`, the label kept for screen readers. */
   board?: boolean;
   label?: string;
 }) {
@@ -53,20 +55,20 @@ export function ShareButton({ small = false, className = "", link, board = false
   }
 
   const look = board
-    ? "cond h-11 rounded-[3px] bg-plate px-4 text-base tracking-[0.05em] text-plate-ink hover:bg-white lg:h-9"
+    ? `${BOARD_ACTION} border-plate bg-plate text-plate-ink hover:border-white hover:bg-white`
     : `cond ${small ? "h-11 lg:h-9" : "min-h-11 lg:min-h-10"} rounded-[3px] border border-rule bg-white px-3 text-[15px] tracking-[0.05em] text-ink hover:border-ink-muted`;
   return (
     <button
       type="button"
       onClick={share}
       title={note || undefined}
-      className={`press flex shrink-0 items-center gap-1.5 font-bold ${look} ${className}`}
+      className={`${board ? "" : "press flex shrink-0 items-center gap-1.5 font-bold"} ${look} ${board ? "max-sm:min-w-11 max-sm:px-0" : ""} ${className}`}
     >
       {/* The label keeps its width (the phone bar is tight); only the icon shows the result, and screen readers hear it. */}
       <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
         {note === "Link copied" ? <path d="M4.5 10.5l3.5 3.5 7.5-8" /> : note ? <path d="M10 5v6M10 14.5v.5" /> : <><path d="M10 3v10M6 7l4-4 4 4" /><path d="M5 11v4.5A1.5 1.5 0 0 0 6.5 17h7a1.5 1.5 0 0 0 1.5-1.5V11" /></>}
       </svg>
-      <span>{label ?? (small ? "Share picks" : "Share")}</span>
+      <span className={board ? "max-sm:sr-only" : ""}>{label ?? (small ? "Share picks" : "Share")}</span>
       <span aria-live="polite" className="sr-only">{note}</span>
     </button>
   );

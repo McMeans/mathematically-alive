@@ -174,7 +174,7 @@ body {
   }
 }
 .press {
-  transition: background-color 180ms ease-out, color 180ms ease-out, box-shadow 180ms ease-out, transform 120ms ease-out;
+  transition: background-color 180ms ease-out, border-color 180ms ease-out, color 180ms ease-out, opacity 180ms ease-out, box-shadow 180ms ease-out, transform 120ms ease-out;
 }
 .press:active {
   transform: scale(0.97);
