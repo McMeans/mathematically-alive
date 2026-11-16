@@ -541,11 +541,13 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
       t?.scrollIntoView({ block: "center" });
     });
   };
-  const row = (r: LabView["live"][number]) => (
+  const row = (r: LabView["live"][number], tag?: string) => (
     <FieldRow key={r.teamId} flip={`t${r.teamId}`} seed={r.rank} lit={inField.has(r.teamId)} id={r.teamId} name={name(r.teamId)} record={view.records[r.teamId]} me={r.teamId === focus}
       odds={r.change > 0 ? `▲${r.change}` : r.change < 0 ? `▼${-r.change}` : ""} tone={r.change > 0 ? "text-root" : "text-drop"}
-      tag={r.committeeRank === null && r.rank <= view.live.length ? "Unranked" : undefined} />
+      tag={tag ?? (r.committeeRank === null && r.rank <= view.live.length ? "Unranked" : undefined)} />
   );
+  /** The pinned team when it ranks below the folded list: shown under it, as the seeds view shows it under the bubble. */
+  const pinnedBelow = focus === null || view.live.some((r) => r.teamId === focus) ? null : view.liveAll.find((r) => r.teamId === focus) ?? null;
   return (
     <>
       <PaneHeading id="field-h" right={
@@ -598,11 +600,16 @@ function Field({ view, ranks, fieldView, setFieldView, name, abbr, focus, focusO
         <div ref={flipRanks} className="motion-safe:animate-rise">
           <p className="mb-2 text-[13px] text-ink-muted">The committee&rsquo;s latest ranking, moved by results since and your picks. Arrows show the move from the current ranking. Amber numbers are in the field.</p>
           <div className="rounded bg-board-deep py-1.5">
-            {view.live.map(row)}
+            {view.live.map((r) => row(r))}
+            {!all && pinnedBelow && (
+              <div className="mt-1 border-t border-dashed border-board-line pt-1">
+                {row(pinnedBelow, "Pinned")}
+              </div>
+            )}
             {view.liveAll.length > view.live.length && (
               <RankToggle id="rank-toggle" open={all} label={all ? `${view.topLabel} ▴` : `${view.allLabel} ▾`} onClick={() => setAll(!all)} />
             )}
-            {all && view.liveAll.slice(view.live.length).map(row)}
+            {all && view.liveAll.slice(view.live.length).map((r) => row(r))}
             {all && <RankToggle open label={`${view.topLabel} ▴`} name={view.backLabel} onClick={foldBack} />}
           </div>
         </div>

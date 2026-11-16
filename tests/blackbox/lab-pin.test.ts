@@ -10,7 +10,7 @@ const free = seasonLab(season, base);
 
 describe("season lab: a pinned team's odds", () => {
   it("reads the team's playoff, title-game and title odds from the run, worded for display", () => {
-    const o = labTeamOdds(free.national, LOU)!;
+    const o = labTeamOdds(season, free, LOU)!;
     expect(o.teamId).toBe(LOU);
     expect(o.playoff).toBeGreaterThan(0);
     expect(o.titleGame).toBeGreaterThanOrEqual(o.champion!);
@@ -19,12 +19,69 @@ describe("season lab: a pinned team's odds", () => {
 
   it("follows the picks: Louisville winning out raises its playoff odds", () => {
     const wins = Object.fromEntries(season.games.filter((g) => !g.completed && (g.homeId === LOU || g.awayId === LOU)).map((g) => [g.id, LOU]));
-    const after = labTeamOdds(seasonLab(season, { ...base, locks: { games: wins } }).national, LOU)!;
-    expect(after.playoff!).toBeGreaterThan(labTeamOdds(free.national, LOU)!.playoff!);
+    const after = labTeamOdds(season, seasonLab(season, { ...base, locks: { games: wins } }), LOU)!;
+    expect(after.playoff!).toBeGreaterThan(labTeamOdds(season, free, LOU)!.playoff!);
   });
 
   it("a team the run doesn't have gives no odds", () => {
-    expect(labTeamOdds(free.national, -1)).toBeNull();
+    expect(labTeamOdds(season, free, -1)).toBeNull();
+  });
+
+  it("a team the picks put out of its title game reads 0%, not <0.1%, and the two in it read 100%", () => {
+    // Every game picked: each title game with an exact matchup is settled.
+    const lab = seasonLab(season, { ...base, locks: fillLabLocks(season, {}, "favorites", base.conferences) });
+    const settled = lab.conferences.filter((c) => c.matchup?.exact);
+    expect(settled.length).toBeGreaterThan(0);
+    for (const c of settled) {
+      for (const s of c.standings) {
+        const o = labTeamOdds(season, lab, s.teamId)!;
+        if (c.matchup!.teams.includes(s.teamId)) {
+          expect(o.titleGameText).toBe("100%");
+          expect(c.teams.find((t) => t.teamId === s.teamId)!.titleGameText).toBe("100%");
+          // The fill picks each settled title game's winner: it reads 100% to win the conference, the team it beats 0%.
+          expect(o.championText).toBe(c.picked === s.teamId ? "100%" : "0%");
+          expect(c.teams.find((t) => t.teamId === s.teamId)!.championText).toBe(o.championText);
+        } else {
+          expect([o.titleGameText, o.championText]).toEqual(["0%", "0%"]);
+          // Out of the title game isn't proven out of the playoff: an at-large spot stays open.
+          expect(o.playoffText).not.toBe("0%");
+        }
+      }
+    }
+  });
+
+  it("with games still open, a team that can't reach the title game reads 0% and one sure of it 100%, its title still open", () => {
+    // Every game but the last week of conference play picked: some teams are settled while others' games are still to play.
+    const all = fillLabLocks(season, {}, "favorites");
+    const conf = new Map(season.teams.map((t) => [t.id, t.conference]));
+    const last = Math.max(...season.games.filter((g) => !g.completed && !g.titleGame && conf.get(g.homeId) === conf.get(g.awayId) && base.conferences.includes(conf.get(g.homeId) ?? "")).map((g) => g.week));
+    const games = Object.fromEntries(Object.entries(all.games).filter(([id]) => season.games.find((g) => g.id === Number(id))!.week !== last));
+    const lab = seasonLab(season, { ...base, locks: { games } });
+    let out = 0;
+    let sure = 0;
+    for (const c of lab.conferences) {
+      const best = (k: number) => [...c.standings].map((s) => s.wins).sort((a, b) => b - a)[k];
+      for (const s of c.standings) {
+        const o = labTeamOdds(season, lab, s.teamId)!;
+        const others = c.standings.filter((x) => x.teamId !== s.teamId);
+        // Short of the second-best record even winning every open game: out, whatever the tiebreaks say.
+        if (s.wins + s.open < best(1)) {
+          out++;
+          expect([o.titleGameText, o.championText]).toEqual(["0%", "0%"]);
+        }
+        // Ahead of all but at most one other team even if they win every open game and it loses its own: in.
+        if (s.open > 0 || others.some((x) => x.open > 0)) {
+          if (others.filter((x) => x.wins + x.open >= s.wins).length <= 1) {
+            sure++;
+            expect(o.titleGameText).toBe("100%");
+            // No title-game winner picked: the title is still open, never a flat 100% or 0%.
+            expect(["0%", "100%"]).not.toContain(o.championText);
+          }
+        }
+      }
+    }
+    expect(out).toBeGreaterThan(0);
+    expect(sure).toBeGreaterThan(0);
   });
 });
 
