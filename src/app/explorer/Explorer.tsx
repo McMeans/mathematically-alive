@@ -333,7 +333,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
         <>
           {board?.race && <PlayoffRaceCard race={board.race} lab={labHref(locks, teamId, titles)} />}
           <ConferenceRace outlook={outlook} names={names} teamId={teamId} label={`${conferenceName(conference)} race`} sub="Title-game odds" />
-          <YourPicks picks={picks} lab={lab} onRemove={remove} onReset={reset} />
+          <YourPicks picks={picks} onRemove={remove} />
           <p className="text-xs text-ink-muted">* Playoff odds are our own estimate, not the committee. Odds from {ITERATIONS.toLocaleString("en-US")} simulated seasons; “In” and “Out” are proven. {dataNote(through)}</p>
         </>
       }
@@ -382,7 +382,7 @@ export function IndependentExplorer({ initial, ...common }: Common & { initial: 
       rail={
         <>
           {board?.race && <PlayoffRaceCard race={board.race} lab={lab} />}
-          <YourPicks picks={picks} lab={lab} onRemove={(id) => pick(Number(id.slice(1)), undefined)} onReset={() => update({})} />
+          <YourPicks picks={picks} onRemove={(id) => pick(Number(id.slice(1)), undefined)} />
           <p className="text-xs text-ink-muted">* Playoff odds are our own estimate, not the committee. {dataNote(through)}</p>
         </>
       }
@@ -465,7 +465,7 @@ function Frame({ teamId, conference, teams, conferences, names, abbreviations, r
   const chevron = (cls: string) => <svg aria-hidden viewBox="0 0 12 12" className={`transition-transform ${cls} ${sheet ? "rotate-180" : ""}`}><path d="M2.5 4.5 6 8 9.5 4.5" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="square" /></svg>;
   const pickerLabel = `${team.name}: change team`;
   const list = (
-    <TeamList conferences={conferences} names={names} selectedId={going ?? teamId} onSelect={(id) => { if (id !== teamId) setGoing(id); setSheet(false); }} />
+    <TeamList conferences={conferences} names={names} abbreviations={abbreviations} selectedId={going ?? teamId} onSelect={(id) => { if (id !== teamId) setGoing(id); setSheet(false); }} />
   );
   const closeSheet = () => { setSheet(false); focusPicker(); };
   const panel = "scroll-thin absolute z-30 mt-2 max-h-[min(70dvh,34rem)] w-[min(24rem,calc(100vw-1.75rem))] origin-top animate-pop overflow-y-auto rounded-md border border-board-line bg-board-deep shadow-[0_12px_32px_rgba(10,36,26,0.4),0_2px_6px_rgba(10,36,26,0.3)]";

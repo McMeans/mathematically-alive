@@ -9,7 +9,6 @@ import {
   type BestShot, type HelpGroup, type IndependentGame, type PlayoffRace, type RaceItem, type SeasonWeek, type TeamBoard, type TeamOutlook,
 } from "@/core";
 import type { Locks } from "./Explorer";
-import { ShareButton } from "./Share";
 
 export type PickFn = (gameId: number, winner: number | undefined) => void;
 
@@ -394,9 +393,9 @@ export function ConferenceRace({ outlook, names, teamId, label, sub }: { outlook
   );
 }
 
-/** The picks so far, each removable, with Share, the Lab and Reset. */
-export function YourPicks({ picks, lab, onRemove, onReset }: {
-  picks: { id: string; what: string; when: string }[]; lab: string; onRemove: (id: string) => void; onReset: () => void;
+/** The picks so far, each removable. Share, Reset and the Lab live in the header. */
+export function YourPicks({ picks, onRemove }: {
+  picks: { id: string; what: string; when: string }[]; onRemove: (id: string) => void;
 }) {
   return (
     <section className="mb-7 text-sm">
@@ -410,13 +409,6 @@ export function YourPicks({ picks, lab, onRemove, onReset }: {
             </li>
           ))}
         </ul>
-      )}
-      {picks.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <ShareButton small />
-          <Link href={lab} className="cond flex h-11 items-center rounded-[3px] border border-rule bg-white px-3 text-[15px] font-bold tracking-[0.05em] hover:border-ink-muted lg:h-9">Open in Lab</Link>
-          <button type="button" onClick={onReset} className="cond h-11 rounded-[3px] border border-rule bg-white px-3 text-[15px] font-bold tracking-[0.05em] hover:border-ink-muted lg:h-9">Reset</button>
-        </div>
       )}
     </section>
   );

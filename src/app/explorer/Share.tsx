@@ -22,11 +22,10 @@ function copyByHand(text: string): boolean {
 
 /**
  * Shares the page's address, which carries the picks (`?picks=`). Phones get the system share sheet; elsewhere the
- * link is copied. `small` matches the summary column's Reset; otherwise the pinned bar's, with a shorter label to leave room for
- * the team name. `link` overrides the address shared.
+ * link is copied. `link` overrides the address shared.
  */
-export function ShareButton({ small = false, className = "", link, board = false, label }: {
-  small?: boolean; className?: string; link?: () => string;
+export function ShareButton({ className = "", link, board = false, label }: {
+  className?: string; link?: () => string;
   /** The cream plate on the board header, not the plain button on the ground. Like `BoardButton`, a 44px icon square
    * below `sm`, the label kept for screen readers. */
   board?: boolean;
@@ -56,7 +55,7 @@ export function ShareButton({ small = false, className = "", link, board = false
 
   const look = board
     ? `${BOARD_ACTION} border-plate bg-plate text-plate-ink hover:border-white hover:bg-white`
-    : `cond ${small ? "h-11 lg:h-9" : "min-h-11 lg:min-h-10"} rounded-[3px] border border-rule bg-white px-3 text-[15px] tracking-[0.05em] text-ink hover:border-ink-muted`;
+    : `cond min-h-11 lg:min-h-10 rounded-[3px] border border-rule bg-white px-3 text-[15px] tracking-[0.05em] text-ink hover:border-ink-muted`;
   return (
     <button
       type="button"
@@ -68,7 +67,7 @@ export function ShareButton({ small = false, className = "", link, board = false
       <svg aria-hidden viewBox="0 0 20 20" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
         {note === "Link copied" ? <path d="M4.5 10.5l3.5 3.5 7.5-8" /> : note ? <path d="M10 5v6M10 14.5v.5" /> : <><path d="M10 3v10M6 7l4-4 4 4" /><path d="M5 11v4.5A1.5 1.5 0 0 0 6.5 17h7a1.5 1.5 0 0 0 1.5-1.5V11" /></>}
       </svg>
-      <span className={board ? "max-sm:sr-only" : ""}>{label ?? (small ? "Share picks" : "Share")}</span>
+      <span className={board ? "max-sm:sr-only" : ""}>{label ?? "Share"}</span>
       <span aria-live="polite" className="sr-only">{note}</span>
     </button>
   );
