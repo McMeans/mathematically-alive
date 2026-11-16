@@ -65,7 +65,7 @@ All colors are Tailwind v4 tokens in the `@theme` block of `src/app/globals.css`
 | --- | --- | --- |
 | `lamp` | `#F2B134` | Amber. A pick (button fill), the page's own team in a race (left edge and its numbers), the cut line, a big game's 2px outline, the focus ring on the board, a reset button that has something to reset, text selection. |
 | `lamp-ink` | `#8A5D00` | Amber as text on the ground, where `lamp` is too light (1.5:1). Used for notes like "title pick cleared". |
-| `plate` | `#F3F0E6` | The cream plate: the current nav item, Share on the board, the selected conference tab in the team sheet, the mark's ball. |
+| `plate` | `#F3F0E6` | The cream plate: the current nav item, Share on the board, the mark's ball. |
 | `plate-ink` | `#121A16` | Text on `plate` and on `lamp`. |
 | `root` | `#5FD08F` | A gain in odds, lit on the board: "+5" on the side to root for. |
 | `drop` | `#F0806E` | A loss in odds, lit on the board: "−2". |
@@ -76,7 +76,7 @@ All colors are Tailwind v4 tokens in the `@theme` block of `src/app/globals.css`
 | --- | --- | --- |
 | `ground` | `#E4E7E5` | Page background (set on `body`), the Lab's phone tab strip. |
 | `paper` | `#F6F8F7` | Rails and side panes: the team page's summary column, the Lab's field and races panes. |
-| `white` | | Inputs and secondary buttons on the ground (Open in Lab, Reset, unselected chips and segments). |
+| `white` | | Inputs and secondary buttons on the ground (unselected chips and segments). |
 | `rule` | `#D6D4CC` | Borders and dividers on the ground. |
 | `ink` | `#15201B` | Text on the ground. |
 | `ink-soft` | `#3D4A43` | Sub-heading lines, unselected segment text. |
@@ -269,8 +269,8 @@ button is solid `lamp`; once filled it turns to an amber outline, "Undo this pat
 | Share on the board | The cream plate: `bg-plate text-plate-ink`, its border the same cream, hover `bg-white`. Same box as the other board actions. With no picks it dims to `opacity-55` but stays pressable, on the team page and in the Lab alike. |
 | Reset with picks to clear | Lit: `border-lamp bg-lamp text-plate-ink` (`resetLook`). Without: `border-board-line text-board-muted opacity-50`, disabled. The team page and the Lab match. |
 | Primary on the ground | `bg-board text-white`, hover `bg-board-deep` ("Fill the rest", "Pick a team"). |
-| Secondary on the ground | `border border-rule bg-white`, hover `border-ink-muted` (Share picks, Open in Lab, Reset in the rail). |
-| Segmented control / chips | `rounded-[2px] border`. Off: `border-rule bg-white text-ink-soft`. On: `border-board bg-board text-white`. An amber chip (the pinned team's games) is `border-lamp` and fills `lamp` when on. On the board (team sheet tabs) the on state is the cream plate. |
+| Secondary on the ground | `border border-rule bg-white`, hover `border-ink-muted`. |
+| Segmented control / chips | `rounded-[2px] border`. Off: `border-rule bg-white text-ink-soft`. On: `border-board bg-board text-white`. An amber chip (the pinned team's games) is `border-lamp` and fills `lamp` when on. |
 | Icon button | A visible 32px+ hit area and an `aria-label` ("Remove …", "Unpin …", "Find a team"). |
 
 Arrows that lead elsewhere ("Try it in the Lab →") put the arrow in `text-lamp`, `aria-hidden`.
@@ -305,9 +305,20 @@ pattern (on the ground, the border goes to `ink-muted`).
 
 The header's team name is a button styled like a select (name in a field, chevron in its own cell) with
 `aria-expanded` and `aria-controls="team-sheet"`. The sheet floats under it (`animate-pop`), closes on Escape or a tap
-outside, and returns focus to the picker. Inside, `TeamList` (`src/app/explorer/Panels.tsx`): conference tabs as
-`aria-pressed` buttons, a search, sortable Playoff / Title game columns (the active one in `lamp` with a chevron), rows
-of logo, name, record and odds. The current team's row is `bg-lamp/10` with the amber left bar and `aria-current="page"`.
+outside, and returns focus to the picker. Inside, `TeamList` (`src/app/explorer/Panels.tsx`): one row with the conference
+switcher (a native `<select>` laid invisibly over the short name and an amber chevron, styled as a field like the
+search, so phones get the OS picker; its first choice, "All teams", lists every team, and a search spans every conference too)
+and the search. With all teams listed only the Playoff column shows: title-game odds don't compare across conferences. Under it the column
+labels, each a sort button: Team (A–Z) on the left, Playoff and Title game on the right (the active one in `lamp` with a
+stemmed down arrow, not the dropdown's chevron; playoff is the default, ties fall to the other odds column, then the name). Then rows of
+logo, name, record and odds. The current team's row is `bg-lamp/10` with the amber left bar and `aria-current="page"`.
+
+### Your picks (rail)
+
+`YourPicks` (`src/app/explorer/Board.tsx`): picks grouped under their game's kickoff date, Eastern (a `.cond` muted uppercase label), each a
+full-width row as wide as the race cards (`rounded-[2px] border border-rule bg-white`, Public Sans 13px): winner's logo,
+committee rank (muted) and abbreviation, "over", the same for the loser (the name when a team has none, as FCS teams), and a × at the
+right. A title-game pick reads "[logo] ALA wins SEC". No buttons under it: Share, Reset and the Lab are in the header.
 
 ### Status and loading
 

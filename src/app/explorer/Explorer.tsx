@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   conferenceName, conferenceShort, decodeLocks, encodeLocks, formatChampion, formatPlayoff, formatRecord, formatTitleOdds, oddsLabels, playoffDetail, titleGameOutLine,
-  type BoardHelpGame, type HelpGroup, type IndependentGame, type IndependentOutlook, type Locks, type PathTree, type PlayoffSignal, type SeasonWeek, type TeamBoard, type TeamOutlook, type TeamPath,
+  type BoardHelpGame, type HelpGroup, type IndependentGame, type IndependentOutlook, type Locks, type PathTree, type PlayoffSignal, type TeamBoard, type TeamOutlook, type TeamPath,
 } from "@/core";
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
 import { SiteBar } from "@/app/SiteBar";
@@ -32,8 +32,8 @@ export type ConferenceList = { conference: string; teams: TeamInfo[]; rows: List
 export type Result = { outlook: TeamOutlook[]; path: TeamPath; tree: PathTree; playoffGames: PlayoffSignal[]; board: TeamBoard | null };
 export type IndependentResult = { outlook: IndependentOutlook[]; games: IndependentGame[]; playoffGames: PlayoffSignal[]; board: TeamBoard | null };
 export type { Locks };
-/** A game still to play, so a shared link's picks can be checked against it. */
-export type OpenGame = { id: number; homeId: number; awayId: number };
+/** An unplayed game: its teams and kickoff (ISO), for decoding shared picks and dating them. */
+export type OpenGame = { id: number; homeId: number; awayId: number; start: string };
 
 /** What every team page shares: the header, the team picker and the frame around the page's own columns. */
 type Common = {
@@ -181,23 +181,28 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
   return { locks, titles, result, ranks, busy, failed, status, update, pick, pickTitle, undo, canUndo: history.length > 0 };
 }
 
+const PICK_DAY = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
+
+/** Every pick on the page, worded for the rail. */
+export type RailPick = {
+  id: string; what: string; when: string; winner: number; loser: number | null;
+  /** A title-game pick: the conference it wins ("SEC"). */
+  wins?: string;
+};
 /** Every pick on the page, worded for the rail. Ids: "g<game id>" for a game, "t<conference>" for a title game. */
-function pickList(locks: Locks, titles: Titles, weeks: SeasonWeek[], board: TeamBoard | null, games: OpenGame[], names: Record<number, string>, teamId: number) {
-  const when = new Map<number, string>();
-  for (const w of weeks) {
-    if (w.own) when.set(w.own.gameId, w.label);
-    if (w.nonConference) when.set(w.nonConference.gameId, w.nonConference.date);
-    for (const g of w.games) when.set(g.gameId, w.label);
-  }
-  for (const grp of board?.help ?? []) for (const g of grp.games) when.set(g.gameId, g.date);
+function pickList(locks: Locks, titles: Titles, games: OpenGame[], names: Record<number, string>, teamId: number) {
   const byId = new Map(games.map((g) => [g.id, g]));
-  const out = Object.entries(locks).map(([id, winner]) => {
+  // Kickoff order, so the rail's date groups run in calendar order (object keys run by game id). Title games last.
+  const kickoff = (id: string) => Date.parse(byId.get(Number(id))?.start ?? "") || Infinity;
+  const out = Object.entries(locks).sort(([a], [b]) => kickoff(a) - kickoff(b)).map(([id, winner]): RailPick => {
     const g = byId.get(Number(id));
     const loser = g ? (g.homeId === winner ? g.awayId : g.homeId) : null;
     const what = winner === teamId ? `Beat ${loser !== null ? names[loser] : "opponent"}` : loser === teamId ? `Lose to ${names[winner]}` : `${names[winner]} over ${loser !== null ? names[loser] : "opponent"}`;
-    return { id: `g${id}`, what, when: when.get(Number(id)) ?? "" };
+    // Each pick dated by its own kickoff, Eastern, as the boards date games: a week's label is only its first game's day.
+    const start = g ? new Date(g.start) : null;
+    return { id: `g${id}`, what, when: start && !Number.isNaN(start.getTime()) ? PICK_DAY.format(start) : "", winner, loser };
   });
-  for (const [c, w] of Object.entries(titles)) out.push({ id: `t${c}`, what: `${names[w]} wins the ${conferenceName(c)}`, when: "Title game" });
+  for (const [c, w] of Object.entries(titles)) out.push({ id: `t${c}`, what: `${names[w]} wins the ${conferenceName(c)}`, when: "Title game", winner: w, loser: null, wins: conferenceShort(c) });
   return out;
 }
 
@@ -286,7 +291,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
     }
   }
   const lab = labHref(locks, teamId, titles);
-  const picks = pickList(locks, titles, tree.weeks, board, common.openGames, names, teamId);
+  const picks = pickList(locks, titles, common.openGames, names, teamId);
   function remove(id: string) {
     if (id.startsWith("t")) {
       titleKey.current = null;
@@ -333,7 +338,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
         <>
           {board?.race && <PlayoffRaceCard race={board.race} lab={labHref(locks, teamId, titles)} />}
           <ConferenceRace outlook={outlook} names={names} teamId={teamId} label={`${conferenceName(conference)} race`} sub="Title-game odds" />
-          <YourPicks picks={picks} lab={lab} onRemove={remove} onReset={reset} />
+          <YourPicks picks={picks} names={names} onRemove={remove} />
           <p className="text-xs text-ink-muted">* Playoff odds are our own estimate, not the committee. Odds from {ITERATIONS.toLocaleString("en-US")} simulated seasons; “In” and “Out” are proven. {dataNote(through)}</p>
         </>
       }
@@ -350,7 +355,7 @@ export function IndependentExplorer({ initial, ...common }: Common & { initial: 
   const team = teams.find((t) => t.id === teamId)!;
   const board = result.board;
   const lab = labHref(locks, teamId);
-  const picks = pickList(locks, {}, [], board, common.openGames, names, teamId);
+  const picks = pickList(locks, {}, common.openGames, names, teamId);
   const numLabels = { titleGame: "Title game", playoff: "Playoff" };
   const [kept, setKept] = useState<Kept>({});
   function onHelpPick(gameId: number, winner: number | undefined) { setKept((k) => track(board, k, gameId, winner)); pick(gameId, winner); }
@@ -382,7 +387,7 @@ export function IndependentExplorer({ initial, ...common }: Common & { initial: 
       rail={
         <>
           {board?.race && <PlayoffRaceCard race={board.race} lab={lab} />}
-          <YourPicks picks={picks} lab={lab} onRemove={(id) => pick(Number(id.slice(1)), undefined)} onReset={() => update({})} />
+          <YourPicks picks={picks} names={names} onRemove={(id) => pick(Number(id.slice(1)), undefined)} />
           <p className="text-xs text-ink-muted">* Playoff odds are our own estimate, not the committee. {dataNote(through)}</p>
         </>
       }
@@ -465,7 +470,7 @@ function Frame({ teamId, conference, teams, conferences, names, abbreviations, r
   const chevron = (cls: string) => <svg aria-hidden viewBox="0 0 12 12" className={`transition-transform ${cls} ${sheet ? "rotate-180" : ""}`}><path d="M2.5 4.5 6 8 9.5 4.5" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="square" /></svg>;
   const pickerLabel = `${team.name}: change team`;
   const list = (
-    <TeamList conferences={conferences} names={names} selectedId={going ?? teamId} onSelect={(id) => { if (id !== teamId) setGoing(id); setSheet(false); }} />
+    <TeamList conferences={conferences} names={names} abbreviations={abbreviations} selectedId={going ?? teamId} onSelect={(id) => { if (id !== teamId) setGoing(id); setSheet(false); }} />
   );
   const closeSheet = () => { setSheet(false); focusPicker(); };
   const panel = "scroll-thin absolute z-30 mt-2 max-h-[min(70dvh,34rem)] w-[min(24rem,calc(100vw-1.75rem))] origin-top animate-pop overflow-y-auto rounded-md border border-board-line bg-board-deep shadow-[0_12px_32px_rgba(10,36,26,0.4),0_2px_6px_rgba(10,36,26,0.3)]";

@@ -8,8 +8,7 @@ import {
   formatSideOdds, formatTitleOdds, winsLabel,
   type BestShot, type HelpGroup, type IndependentGame, type PlayoffRace, type RaceItem, type SeasonWeek, type TeamBoard, type TeamOutlook,
 } from "@/core";
-import type { Locks } from "./Explorer";
-import { ShareButton } from "./Share";
+import type { Locks, RailPick } from "./Explorer";
 
 export type PickFn = (gameId: number, winner: number | undefined) => void;
 
@@ -394,28 +393,50 @@ export function ConferenceRace({ outlook, names, teamId, label, sub }: { outlook
   );
 }
 
-/** The picks so far, each removable, with Share, the Lab and Reset. */
-export function YourPicks({ picks, lab, onRemove, onReset }: {
-  picks: { id: string; what: string; when: string }[]; lab: string; onRemove: (id: string) => void; onReset: () => void;
-}) {
+/** A pick's team in the rail: light-ground logo, its committee rank if any, then its abbreviation (its name when it has none, as FCS teams). */
+function PickTeam({ id, name }: { id: number; name: string }) {
+  const abbr = useContext(AbbreviationsContext)[id];
+  const rank = useContext(RanksContext)[id];
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1 font-semibold">
+      <TeamLogo id={id} dark={false} size="16px" />
+      <span className="truncate">{rank && <span className="mr-0.5 text-[0.8em] text-ink-muted">{rank}</span>}{abbr || name}</span>
+    </span>
+  );
+}
+
+/**
+ * The picks so far under their date, one full-width row each ("[logo] ALA over [logo] CHAT"), each removable. Share,
+ * Reset and the Lab live in the header. Dates keep the order their first pick has.
+ */
+export function YourPicks({ picks, names, onRemove }: { picks: RailPick[]; names: Record<number, string>; onRemove: (id: string) => void }) {
+  const byDate = new Map<string, RailPick[]>();
+  for (const p of picks) byDate.set(p.when, [...(byDate.get(p.when) ?? []), p]);
   return (
     <section className="mb-7 text-sm">
       <RailHeading>Your picks</RailHeading>
       {picks.length === 0 ? <p className="text-ink-muted">Nothing locked yet.</p> : (
-        <ul>
-          {picks.map((p) => (
-            <li key={p.id} className="flex items-center justify-between gap-3 border-rule py-1.5 not-first:border-t">
-              <span className="min-w-0">{p.what} <span className="text-ink-muted">· {p.when}</span></span>
-              <button type="button" aria-label={`Remove ${p.what}`} onClick={() => onRemove(p.id)} className="-my-1.5 h-11 w-11 shrink-0 rounded text-ink-muted hover:bg-paper lg:my-0 lg:h-8 lg:w-8">×</button>
-            </li>
+        <div className="flex flex-col gap-2">
+          {[...byDate].map(([when, ps]) => (
+            <div key={when}>
+              {when && <h4 className="cond mb-1 text-xs font-bold tracking-[0.08em] text-ink-muted uppercase">{when}</h4>}
+              <ul className="flex flex-col gap-1">
+                {ps.map((p) => (
+                  <li key={p.id} className="flex items-center gap-1.5 rounded-[2px] border border-rule bg-white pl-2 text-[13px]">
+                    <PickTeam id={p.winner} name={names[p.winner]} />
+                    {p.wins ? <span className="text-ink-muted">wins {p.wins}</span> : p.loser !== null && (
+                      <>
+                        <span className="text-ink-muted">over</span>
+                        <PickTeam id={p.loser} name={names[p.loser]} />
+                      </>
+                    )}
+                    <button type="button" aria-label={`Remove ${p.what}`} onClick={() => onRemove(p.id)}
+                      className="ml-auto flex h-11 w-9 shrink-0 items-center justify-center text-ink-muted hover:text-ink lg:h-7 lg:w-7">×</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
-      )}
-      {picks.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <ShareButton small />
-          <Link href={lab} className="cond flex h-11 items-center rounded-[3px] border border-rule bg-white px-3 text-[15px] font-bold tracking-[0.05em] hover:border-ink-muted lg:h-9">Open in Lab</Link>
-          <button type="button" onClick={onReset} className="cond h-11 rounded-[3px] border border-rule bg-white px-3 text-[15px] font-bold tracking-[0.05em] hover:border-ink-muted lg:h-9">Reset</button>
         </div>
       )}
     </section>
