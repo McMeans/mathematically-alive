@@ -192,7 +192,9 @@ export type RailPick = {
 /** Every pick on the page, worded for the rail. Ids: "g<game id>" for a game, "t<conference>" for a title game. */
 function pickList(locks: Locks, titles: Titles, games: OpenGame[], names: Record<number, string>, teamId: number) {
   const byId = new Map(games.map((g) => [g.id, g]));
-  const out = Object.entries(locks).map(([id, winner]): RailPick => {
+  // Kickoff order, so the rail's date groups run in calendar order (object keys run by game id). Title games last.
+  const kickoff = (id: string) => Date.parse(byId.get(Number(id))?.start ?? "") || Infinity;
+  const out = Object.entries(locks).sort(([a], [b]) => kickoff(a) - kickoff(b)).map(([id, winner]): RailPick => {
     const g = byId.get(Number(id));
     const loser = g ? (g.homeId === winner ? g.awayId : g.homeId) : null;
     const what = winner === teamId ? `Beat ${loser !== null ? names[loser] : "opponent"}` : loser === teamId ? `Lose to ${names[winner]}` : `${names[winner]} over ${loser !== null ? names[loser] : "opponent"}`;
