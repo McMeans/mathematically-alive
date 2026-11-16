@@ -49,6 +49,40 @@ describe("season lab: a pinned team's odds", () => {
       }
     }
   });
+
+  it("with games still open, a team that can't reach the title game reads 0% and one sure of it 100%, its title still open", () => {
+    // Every game but the last week of conference play picked: some teams are settled while others' games are still to play.
+    const all = fillLabLocks(season, {}, "favorites");
+    const conf = new Map(season.teams.map((t) => [t.id, t.conference]));
+    const last = Math.max(...season.games.filter((g) => !g.completed && !g.titleGame && conf.get(g.homeId) === conf.get(g.awayId) && base.conferences.includes(conf.get(g.homeId) ?? "")).map((g) => g.week));
+    const games = Object.fromEntries(Object.entries(all.games).filter(([id]) => season.games.find((g) => g.id === Number(id))!.week !== last));
+    const lab = seasonLab(season, { ...base, locks: { games } });
+    let out = 0;
+    let sure = 0;
+    for (const c of lab.conferences) {
+      const best = (k: number) => [...c.standings].map((s) => s.wins).sort((a, b) => b - a)[k];
+      for (const s of c.standings) {
+        const o = labTeamOdds(season, lab, s.teamId)!;
+        const others = c.standings.filter((x) => x.teamId !== s.teamId);
+        // Short of the second-best record even winning every open game: out, whatever the tiebreaks say.
+        if (s.wins + s.open < best(1)) {
+          out++;
+          expect([o.titleGameText, o.championText]).toEqual(["0%", "0%"]);
+        }
+        // Ahead of all but at most one other team even if they win every open game and it loses its own: in.
+        if (s.open > 0 || others.some((x) => x.open > 0)) {
+          if (others.filter((x) => x.wins + x.open >= s.wins).length <= 1) {
+            sure++;
+            expect(o.titleGameText).toBe("100%");
+            // No title-game winner picked: the title is still open, never a flat 100% or 0%.
+            expect(["0%", "100%"]).not.toContain(o.championText);
+          }
+        }
+      }
+    }
+    expect(out).toBeGreaterThan(0);
+    expect(sure).toBeGreaterThan(0);
+  });
 });
 
 describe("season lab: how a pinned team's odds moved", () => {

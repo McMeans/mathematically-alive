@@ -489,8 +489,8 @@ export type LabTeamOdds = {
  * A team's odds in a Lab run, null when the run doesn't have the team. A title-game share the sample puts at 0% or
  * 100% is checked exactly against the run's picks: a team no remaining result can send to its title game reads "0%"
  * (its title too), one every result sends there "100%" (and, with that game's winner picked, "100%" or "0%" for the
- * title); otherwise "<0.1%" or ">99%". Its playoff odds never read a
- * flat 0%: out of the title game is not proven out of the playoff (`formatPlayoff`).
+ * title); otherwise "<0.1%" or ">99%". Its playoff odds never read a flat 0%: out of the title game is not proven out
+ * of the playoff (`formatPlayoff`).
  */
 export function labTeamOdds(season: Season, lab: SeasonLab, teamId: number): LabTeamOdds | null {
   const t = lab.national.teams.find((x) => x.teamId === teamId);
