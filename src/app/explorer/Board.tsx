@@ -393,10 +393,16 @@ export function ConferenceRace({ outlook, names, teamId, label, sub }: { outlook
   );
 }
 
-/** A pick's team in the rail: light-ground logo, then its abbreviation (its name when it has none, as FCS teams). */
+/** A pick's team in the rail: light-ground logo, its committee rank if any, then its abbreviation (its name when it has none, as FCS teams). */
 function PickTeam({ id, name }: { id: number; name: string }) {
   const abbr = useContext(AbbreviationsContext)[id];
-  return <span className="inline-flex min-w-0 items-center gap-1 font-semibold"><TeamLogo id={id} dark={false} size="16px" /><span className="truncate">{abbr || name}</span></span>;
+  const rank = useContext(RanksContext)[id];
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1 font-semibold">
+      <TeamLogo id={id} dark={false} size="16px" />
+      <span className="truncate">{rank && <span className="mr-0.5 text-[0.8em] text-ink-muted">{rank}</span>}{abbr || name}</span>
+    </span>
+  );
 }
 
 /**

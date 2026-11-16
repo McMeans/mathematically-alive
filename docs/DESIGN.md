@@ -315,9 +315,9 @@ logo, name, record and odds. The current team's row is `bg-lamp/10` with the amb
 
 ### Your picks (rail)
 
-`YourPicks` (`src/app/explorer/Board.tsx`): picks grouped under their date (a `.cond` muted uppercase label), each a
-full-width row as wide as the race cards (`rounded-[2px] border border-rule bg-white`, Public Sans 13px): winner's logo
-and abbreviation, "over", loser's logo and abbreviation (the name when a team has none, as FCS teams), and a × at the
+`YourPicks` (`src/app/explorer/Board.tsx`): picks grouped under their game's kickoff date, Eastern (a `.cond` muted uppercase label), each a
+full-width row as wide as the race cards (`rounded-[2px] border border-rule bg-white`, Public Sans 13px): winner's logo,
+committee rank (muted) and abbreviation, "over", the same for the loser (the name when a team has none, as FCS teams), and a × at the
 right. A title-game pick reads "[logo] ALA wins SEC". No buttons under it: Share, Reset and the Lab are in the header.
 
 ### Status and loading

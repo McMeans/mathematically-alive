@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   conferenceName, conferenceShort, decodeLocks, encodeLocks, formatChampion, formatPlayoff, formatRecord, formatTitleOdds, oddsLabels, playoffDetail, titleGameOutLine,
-  type BoardHelpGame, type HelpGroup, type IndependentGame, type IndependentOutlook, type Locks, type PathTree, type PlayoffSignal, type SeasonWeek, type TeamBoard, type TeamOutlook, type TeamPath,
+  type BoardHelpGame, type HelpGroup, type IndependentGame, type IndependentOutlook, type Locks, type PathTree, type PlayoffSignal, type TeamBoard, type TeamOutlook, type TeamPath,
 } from "@/core";
 import type { SimRequest, SimResponse } from "@/app/sim.worker";
 import { SiteBar } from "@/app/SiteBar";
@@ -32,8 +32,8 @@ export type ConferenceList = { conference: string; teams: TeamInfo[]; rows: List
 export type Result = { outlook: TeamOutlook[]; path: TeamPath; tree: PathTree; playoffGames: PlayoffSignal[]; board: TeamBoard | null };
 export type IndependentResult = { outlook: IndependentOutlook[]; games: IndependentGame[]; playoffGames: PlayoffSignal[]; board: TeamBoard | null };
 export type { Locks };
-/** A game still to play, so a shared link's picks can be checked against it. */
-export type OpenGame = { id: number; homeId: number; awayId: number };
+/** An unplayed game: its teams and kickoff (ISO), for decoding shared picks and dating them. */
+export type OpenGame = { id: number; homeId: number; awayId: number; start: string };
 
 /** What every team page shares: the header, the team picker and the frame around the page's own columns. */
 type Common = {
@@ -181,6 +181,8 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
   return { locks, titles, result, ranks, busy, failed, status, update, pick, pickTitle, undo, canUndo: history.length > 0 };
 }
 
+const PICK_DAY = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric" });
+
 /** Every pick on the page, worded for the rail. */
 export type Pick = {
   id: string; what: string; when: string; winner: number; loser: number | null;
@@ -188,20 +190,15 @@ export type Pick = {
   wins?: string;
 };
 /** Every pick on the page, worded for the rail. Ids: "g<game id>" for a game, "t<conference>" for a title game. */
-function pickList(locks: Locks, titles: Titles, weeks: SeasonWeek[], board: TeamBoard | null, games: OpenGame[], names: Record<number, string>, teamId: number) {
-  const when = new Map<number, string>();
-  for (const w of weeks) {
-    if (w.own) when.set(w.own.gameId, w.label);
-    if (w.nonConference) when.set(w.nonConference.gameId, w.nonConference.date);
-    for (const g of w.games) when.set(g.gameId, w.label);
-  }
-  for (const grp of board?.help ?? []) for (const g of grp.games) when.set(g.gameId, g.date);
+function pickList(locks: Locks, titles: Titles, games: OpenGame[], names: Record<number, string>, teamId: number) {
   const byId = new Map(games.map((g) => [g.id, g]));
   const out = Object.entries(locks).map(([id, winner]) => {
     const g = byId.get(Number(id));
     const loser = g ? (g.homeId === winner ? g.awayId : g.homeId) : null;
     const what = winner === teamId ? `Beat ${loser !== null ? names[loser] : "opponent"}` : loser === teamId ? `Lose to ${names[winner]}` : `${names[winner]} over ${loser !== null ? names[loser] : "opponent"}`;
-    return { id: `g${id}`, what, when: when.get(Number(id)) ?? "", winner, loser } as Pick;
+    // Each pick dated by its own kickoff, Eastern, as the boards date games: a week's label is only its first game's day.
+    const start = g ? new Date(g.start) : null;
+    return { id: `g${id}`, what, when: start && !Number.isNaN(start.getTime()) ? PICK_DAY.format(start) : "", winner, loser } as Pick;
   });
   for (const [c, w] of Object.entries(titles)) out.push({ id: `t${c}`, what: `${names[w]} wins the ${conferenceName(c)}`, when: "Title game", winner: w, loser: null, wins: conferenceShort(c) });
   return out;
@@ -292,7 +289,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
     }
   }
   const lab = labHref(locks, teamId, titles);
-  const picks = pickList(locks, titles, tree.weeks, board, common.openGames, names, teamId);
+  const picks = pickList(locks, titles, common.openGames, names, teamId);
   function remove(id: string) {
     if (id.startsWith("t")) {
       titleKey.current = null;
@@ -356,7 +353,7 @@ export function IndependentExplorer({ initial, ...common }: Common & { initial: 
   const team = teams.find((t) => t.id === teamId)!;
   const board = result.board;
   const lab = labHref(locks, teamId);
-  const picks = pickList(locks, {}, [], board, common.openGames, names, teamId);
+  const picks = pickList(locks, {}, common.openGames, names, teamId);
   const numLabels = { titleGame: "Title game", playoff: "Playoff" };
   const [kept, setKept] = useState<Kept>({});
   function onHelpPick(gameId: number, winner: number | undefined) { setKept((k) => track(board, k, gameId, winner)); pick(gameId, winner); }
