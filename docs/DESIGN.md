@@ -313,6 +313,12 @@ labels, each a sort button: Team (A–Z) on the left, Playoff and Title game on 
 stemmed down arrow, not the dropdown's chevron; playoff is the default, ties fall to the other odds column, then the name). Then rows of
 logo, name, record and odds. The current team's row is `bg-lamp/10` with the amber left bar and `aria-current="page"`.
 
+### Your picks (rail)
+
+`YourPicks` (`src/app/explorer/Board.tsx`): picks grouped under their date (a `.cond` muted uppercase label), each a
+white chip (`rounded-[2px] border border-rule bg-white`) with its wording and a × to remove it. No buttons under it:
+Share, Reset and the Lab are in the header.
+
 ### Status and loading
 
 - A what-if in flight dims the main column (`opacity-80`) and sets `aria-busy`; a `role="status"` line says

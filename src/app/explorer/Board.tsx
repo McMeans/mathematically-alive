@@ -393,22 +393,35 @@ export function ConferenceRace({ outlook, names, teamId, label, sub }: { outlook
   );
 }
 
-/** The picks so far, each removable. Share, Reset and the Lab live in the header. */
+/**
+ * The picks so far as white chips under their date, each removable. Share, Reset and the Lab live in the header.
+ * Dates keep the order their first pick has.
+ */
 export function YourPicks({ picks, onRemove }: {
   picks: { id: string; what: string; when: string }[]; onRemove: (id: string) => void;
 }) {
+  const byDate = new Map<string, typeof picks>();
+  for (const p of picks) byDate.set(p.when, [...(byDate.get(p.when) ?? []), p]);
   return (
     <section className="mb-7 text-sm">
       <RailHeading>Your picks</RailHeading>
       {picks.length === 0 ? <p className="text-ink-muted">Nothing locked yet.</p> : (
-        <ul>
-          {picks.map((p) => (
-            <li key={p.id} className="flex items-center justify-between gap-3 border-rule py-1.5 not-first:border-t">
-              <span className="min-w-0">{p.what} <span className="text-ink-muted">· {p.when}</span></span>
-              <button type="button" aria-label={`Remove ${p.what}`} onClick={() => onRemove(p.id)} className="-my-1.5 h-11 w-11 shrink-0 rounded text-ink-muted hover:bg-paper lg:my-0 lg:h-8 lg:w-8">×</button>
-            </li>
+        <div className="flex flex-col gap-3">
+          {[...byDate].map(([when, ps]) => (
+            <div key={when}>
+              {when && <h4 className="cond mb-1.5 text-xs font-bold tracking-[0.08em] text-ink-muted uppercase">{when}</h4>}
+              <ul className="flex flex-wrap gap-1.5">
+                {ps.map((p) => (
+                  <li key={p.id} className="flex min-h-11 items-center rounded-[2px] border border-rule bg-white pl-2.5 lg:min-h-8">
+                    <span className="min-w-0 py-1 leading-snug">{p.what}</span>
+                    <button type="button" aria-label={`Remove ${p.what}`} onClick={() => onRemove(p.id)}
+                      className="flex h-11 w-9 shrink-0 items-center justify-center text-ink-muted hover:text-ink lg:h-8 lg:w-7">×</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </section>
   );
