@@ -8,7 +8,7 @@ import {
   formatSideOdds, formatTitleOdds, winsLabel,
   type BestShot, type HelpGroup, type IndependentGame, type PlayoffRace, type RaceItem, type SeasonWeek, type TeamBoard, type TeamOutlook,
 } from "@/core";
-import type { Locks } from "./Explorer";
+import type { Locks, Pick } from "./Explorer";
 
 export type PickFn = (gameId: number, winner: number | undefined) => void;
 
@@ -393,29 +393,39 @@ export function ConferenceRace({ outlook, names, teamId, label, sub }: { outlook
   );
 }
 
+/** A pick's team in the rail: light-ground logo, then its abbreviation (its name when it has none, as FCS teams). */
+function PickTeam({ id, name }: { id: number; name: string }) {
+  const abbr = useContext(AbbreviationsContext)[id];
+  return <span className="inline-flex min-w-0 items-center gap-1 font-semibold"><TeamLogo id={id} dark={false} size="16px" /><span className="truncate">{abbr || name}</span></span>;
+}
+
 /**
- * The picks so far as white chips under their date, each removable. Share, Reset and the Lab live in the header.
- * Dates keep the order their first pick has.
+ * The picks so far under their date, one full-width row each ("[logo] ALA over [logo] CHAT"), each removable. Share,
+ * Reset and the Lab live in the header. Dates keep the order their first pick has.
  */
-export function YourPicks({ picks, onRemove }: {
-  picks: { id: string; what: string; when: string }[]; onRemove: (id: string) => void;
-}) {
-  const byDate = new Map<string, typeof picks>();
+export function YourPicks({ picks, names, onRemove }: { picks: Pick[]; names: Record<number, string>; onRemove: (id: string) => void }) {
+  const byDate = new Map<string, Pick[]>();
   for (const p of picks) byDate.set(p.when, [...(byDate.get(p.when) ?? []), p]);
   return (
     <section className="mb-7 text-sm">
       <RailHeading>Your picks</RailHeading>
       {picks.length === 0 ? <p className="text-ink-muted">Nothing locked yet.</p> : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           {[...byDate].map(([when, ps]) => (
             <div key={when}>
-              {when && <h4 className="cond mb-1.5 text-xs font-bold tracking-[0.08em] text-ink-muted uppercase">{when}</h4>}
-              <ul className="flex flex-wrap gap-1.5">
+              {when && <h4 className="cond mb-1 text-xs font-bold tracking-[0.08em] text-ink-muted uppercase">{when}</h4>}
+              <ul className="flex flex-col gap-1">
                 {ps.map((p) => (
-                  <li key={p.id} className="flex min-h-11 items-center rounded-[2px] border border-rule bg-white pl-2.5 lg:min-h-8">
-                    <span className="min-w-0 py-1 leading-snug">{p.what}</span>
+                  <li key={p.id} className="flex items-center gap-1.5 rounded-[2px] border border-rule bg-white pl-2 text-[13px]">
+                    <PickTeam id={p.winner} name={names[p.winner]} />
+                    {p.wins ? <span className="text-ink-muted">wins {p.wins}</span> : (
+                      <>
+                        <span className="text-ink-muted">over</span>
+                        {p.loser !== null && <PickTeam id={p.loser} name={names[p.loser]} />}
+                      </>
+                    )}
                     <button type="button" aria-label={`Remove ${p.what}`} onClick={() => onRemove(p.id)}
-                      className="flex h-11 w-9 shrink-0 items-center justify-center text-ink-muted hover:text-ink lg:h-8 lg:w-7">×</button>
+                      className="ml-auto flex h-11 w-9 shrink-0 items-center justify-center text-ink-muted hover:text-ink lg:h-7 lg:w-7">×</button>
                   </li>
                 ))}
               </ul>

@@ -181,6 +181,12 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
   return { locks, titles, result, ranks, busy, failed, status, update, pick, pickTitle, undo, canUndo: history.length > 0 };
 }
 
+/** Every pick on the page, worded for the rail. */
+export type Pick = {
+  id: string; what: string; when: string; winner: number; loser: number | null;
+  /** A title-game pick: the conference it wins ("SEC"). */
+  wins?: string;
+};
 /** Every pick on the page, worded for the rail. Ids: "g<game id>" for a game, "t<conference>" for a title game. */
 function pickList(locks: Locks, titles: Titles, weeks: SeasonWeek[], board: TeamBoard | null, games: OpenGame[], names: Record<number, string>, teamId: number) {
   const when = new Map<number, string>();
@@ -195,9 +201,9 @@ function pickList(locks: Locks, titles: Titles, weeks: SeasonWeek[], board: Team
     const g = byId.get(Number(id));
     const loser = g ? (g.homeId === winner ? g.awayId : g.homeId) : null;
     const what = winner === teamId ? `Beat ${loser !== null ? names[loser] : "opponent"}` : loser === teamId ? `Lose to ${names[winner]}` : `${names[winner]} over ${loser !== null ? names[loser] : "opponent"}`;
-    return { id: `g${id}`, what, when: when.get(Number(id)) ?? "" };
+    return { id: `g${id}`, what, when: when.get(Number(id)) ?? "", winner, loser } as Pick;
   });
-  for (const [c, w] of Object.entries(titles)) out.push({ id: `t${c}`, what: `${names[w]} wins the ${conferenceName(c)}`, when: "Title game" });
+  for (const [c, w] of Object.entries(titles)) out.push({ id: `t${c}`, what: `${names[w]} wins the ${conferenceName(c)}`, when: "Title game", winner: w, loser: null, wins: conferenceShort(c) });
   return out;
 }
 
@@ -333,7 +339,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
         <>
           {board?.race && <PlayoffRaceCard race={board.race} lab={labHref(locks, teamId, titles)} />}
           <ConferenceRace outlook={outlook} names={names} teamId={teamId} label={`${conferenceName(conference)} race`} sub="Title-game odds" />
-          <YourPicks picks={picks} onRemove={remove} />
+          <YourPicks picks={picks} names={names} onRemove={remove} />
           <p className="text-xs text-ink-muted">* Playoff odds are our own estimate, not the committee. Odds from {ITERATIONS.toLocaleString("en-US")} simulated seasons; “In” and “Out” are proven. {dataNote(through)}</p>
         </>
       }
@@ -382,7 +388,7 @@ export function IndependentExplorer({ initial, ...common }: Common & { initial: 
       rail={
         <>
           {board?.race && <PlayoffRaceCard race={board.race} lab={lab} />}
-          <YourPicks picks={picks} onRemove={(id) => pick(Number(id.slice(1)), undefined)} />
+          <YourPicks picks={picks} names={names} onRemove={(id) => pick(Number(id.slice(1)), undefined)} />
           <p className="text-xs text-ink-muted">* Playoff odds are our own estimate, not the committee. {dataNote(through)}</p>
         </>
       }
