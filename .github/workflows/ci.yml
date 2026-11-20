@@ -23,9 +23,7 @@ jobs:
         run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
-      - name: Tests
-        run: pnpm test
-      - name: Black-box coverage gate
+      - name: Tests and black-box coverage gate
         run: .claude/skills/coverage-gate/gate.sh
       - name: Build
         run: pnpm build

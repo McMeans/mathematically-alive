@@ -1,35 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  championshipParticipants, conferenceName, conferenceShort, explore, hasTiebreakRules, pathTree, seasonOutlook, type Game, type Season,
+  championshipParticipants, conferenceName, conferenceShort, explore, hasTiebreakRules, seasonOutlook, type Season,
 } from "@/core";
 
-const SBC = "Sun Belt";
-const EAST = ["App State", "Coastal Carolina", "Georgia Southern", "Georgia State", "James Madison", "Marshall", "Old Dominion"];
-const WEST = ["Arkansas State", "Louisiana", "Louisiana Tech", "South Alabama", "Southern Miss", "Troy", "UL Monroe"];
-
-// The fourteen members by the names the data uses (divisions are configured by name), plus Tulane (FBS) and Nicholls
-// (FCS) outside. Only the games a case needs are listed: [winner, loser], conference games unless both aren't members.
-// `open` games are unplayed. `ratings` stand in for the CFP ranking and the computer composite.
-function build(games: [string, string][], ratings: Record<string, number> = {}, open: ([string, string] | [string, string, number])[] = []): Season & { id: (n: string) => number } {
-  const names = [...EAST, ...WEST, "Tulane", "Nicholls"];
-  const teams = names.map((name, i) => ({
-    id: i + 1, name, abbreviation: null, conference: name === "Tulane" ? "American Athletic" : name === "Nicholls" ? "Southland" : SBC,
-    classification: name === "Nicholls" ? ("fcs" as const) : ("fbs" as const), color: null, altColor: null, rating: ratings[name] ?? 0,
-  }));
-  const id = (n: string) => teams.find((t) => t.name === n)!.id;
-  const member = (n: string) => EAST.includes(n) || WEST.includes(n);
-  const game = (home: string, away: string, winner: string | null, i: number, spread: number | null = null): Game => ({
-    id: i, week: 5 + (i % 8), start: "2026-11-07T18:00:00Z", neutralSite: false, conferenceGame: member(home) && member(away),
-    homeId: id(home), awayId: id(away),
-    homePoints: winner === null ? null : winner === home ? 21 : 14, awayPoints: winner === null ? null : winner === away ? 21 : 14,
-    completed: winner !== null, spread,
-  });
-  return {
-    year: 2026, fetchedAt: "", teams, id,
-    games: [...games.map(([w, l], i) => game(w, l, w, i)), ...open.map(([h, a, spread], i) => game(h, a, null, games.length + i, spread ?? null))],
-  };
-}
-const played = (g: Game) => (g.homePoints! > g.awayPoints! ? g.homeId : g.awayId);
+import { EAST, SBC, WEST, build, played } from "./support/sun-belt";
 const pairWith = (s: Season, d: number) => championshipParticipants(s, SBC, played, { draw: () => d });
 
 // Troy and UL Monroe lead the West at 3-2, 2-1 in division games, and never met. Troy beat Louisiana and Southern Miss
@@ -196,75 +170,4 @@ describe("Sun Belt tiebreakers", () => {
     expect(r.tree.likeliest!.rivals.map((x) => x.team)).toContain("Louisiana");
     for (const rival of r.tree.likeliest!.rivals) expect(WEST).toContain(rival.team);
   });
-});
-
-describe("Sun Belt proofs agree with checking every combination", () => {
-  // Small random seasons among three teams in each division (the other eight never play, so they sit at 0-0),
-  // division and cross-division games alike, each checked against every way its open games and draws can go.
-  const ACTIVE = ["App State", "James Madison", "Marshall", "Louisiana", "Troy", "UL Monroe"];
-  function randomSeason(seed: number) {
-    let x = (seed * 2654435761) >>> 0;
-    const rand = () => ((x = (Math.imul(x ^ (x >>> 15), 2246822519) + 0x9e3779b9) >>> 0) / 4294967296);
-    const done: [string, string][] = [];
-    const open: [string, string][] = [];
-    for (let a = 0; a < ACTIVE.length; a++) {
-      for (let b = a + 1; b < ACTIVE.length; b++) {
-        const r = rand();
-        if (r < 0.25) continue;
-        if (r < 0.6 && open.length < 8) open.push([ACTIVE[a], ACTIVE[b]]);
-        else done.push(rand() < 0.5 ? [ACTIVE[a], ACTIVE[b]] : [ACTIVE[b], ACTIVE[a]]);
-      }
-    }
-    return build(done, {}, open);
-  }
-
-  /** Every pair of title-game teams over every way the draws can go (the team's ranking step fixed by `rank`). */
-  function everyDraw(s: Season, winnerOf: (g: Game) => number, rank: (id: number) => number): [number, number][] {
-    const out: [number, number][] = [];
-    const queue: number[][] = [[]];
-    while (queue.length) {
-      const script = queue.pop()!;
-      let j = 0;
-      out.push(championshipParticipants(s, SBC, winnerOf, {
-        rank,
-        draw: (count) => {
-          if (j === script.length) for (let c = 1; c < count; c++) queue.push([...script, c]);
-          return ((script[j++] ?? 0) + 0.5) / count;
-        },
-      }));
-    }
-    return out;
-  }
-
-  it("never calls a team in or out wrongly, and settles every team that is", () => {
-    let settled = 0;
-    let alive = 0;
-    for (let seed = 1; seed <= 120; seed++) {
-      const s = randomSeason(seed);
-      const open = s.games.filter((g) => !g.completed);
-      const outlook = seasonOutlook(s, { conference: SBC, iterations: 100, seed: 1 });
-      for (const name of ACTIVE) {
-        const teamId = s.id(name);
-        let canIn = false;
-        let canOut = false;
-        for (let m = 0; m < 1 << open.length && !(canIn && canOut); m++) {
-          const pick = new Map(open.map((g, k) => [g.id, (m >> k) & 1 ? g.awayId : g.homeId]));
-          const winnerOf = (g: Game) => (g.completed ? played(g) : pick.get(g.id)!);
-          if (everyDraw(s, winnerOf, (id) => (id === teamId ? Infinity : 0)).some((p) => p.includes(teamId))) canIn = true;
-          if (everyDraw(s, winnerOf, (id) => (id === teamId ? -Infinity : 0)).some((p) => !p.includes(teamId))) canOut = true;
-        }
-        const truth = !canIn ? "eliminated" : !canOut ? "clinched" : "alive";
-        const status = outlook.teams.find((t) => t.teamId === teamId)!.status;
-        expect({ seed, name, status }).toEqual({ seed, name, status: truth });
-        // The tree's root runs the proofs whatever the sample says (the outlook only for a sample at 0% or 100%).
-        const root = pathTree(s, { conference: SBC, teamId, iterations: 100, seed: 1, depth: 0 }).root.outcome;
-        if (root === "in") expect({ seed, name, truth }).toEqual({ seed, name, truth: "clinched" });
-        if (root === "out") expect({ seed, name, truth }).toEqual({ seed, name, truth: "eliminated" });
-        if (truth === "alive") alive++;
-        else settled++;
-      }
-    }
-    expect(settled).toBeGreaterThan(100);
-    expect(alive).toBeGreaterThan(100);
-  }, 120_000);
 });

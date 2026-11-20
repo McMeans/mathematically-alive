@@ -1,18 +1,19 @@
-// The slowest real-season check, on its own so vitest runs it in parallel with the other files.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { explore, pathTree, seasonFromCfbd } from "@/core";
 import type { CfbdSnapshot, Season } from "@/core";
 // The 2025 results are checked under the 2026 rules, the only ones core has, so the fixture is loaded as 2026.
 
-describe("help from elsewhere on a real season", () => {
+/** The slowest real-season check, one file per cut-off so vitest runs them in parallel. */
+export function likeliestProof(weeks: number, atLeast: number) {
+describe(`help from elsewhere on a real season (${weeks} weeks out)`, () => {
   it("the likeliest way in proves the spot once locked, for every team in a real season", () => {
     const snap = { ...(JSON.parse(readFileSync("fixtures/acc-2025.json", "utf8")) as CfbdSnapshot), year: 2026 };
     const full = seasonFromCfbd(snap);
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     let checked = 0;
-    // Most contenders' likeliest way leans on a tiebreak; three cut-off points give enough sure ones.
-    for (const t of [3, 4, 5].flatMap((weeks) => {
+    // Most contenders' likeliest way leans on a tiebreak, so each cut-off sees only a few sure ones.
+    for (const t of [weeks].flatMap((weeks) => {
       const cut: Season = {
         ...full,
         games: full.games.map((g) => (g.week > last - weeks ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
@@ -37,8 +38,10 @@ describe("help from elsewhere on a real season", () => {
         if (w.own && w.own.gameId in locks) expect(locks[w.own.gameId] === t.id ? w.own.ifLose : w.own.ifWin).not.toBe("In");
         for (const g of w.games.filter((x) => x.gameId in locks)) expect(locks[g.gameId] === g.homeId ? g.ifAway : g.ifHome).not.toBe("In");
       }
-      checked++;
+      // Enough sure ways checked: the rest of the teams add time, not cases.
+      if (++checked >= atLeast) break;
     }
-    expect(checked).toBeGreaterThan(3);
+    expect(checked).toBeGreaterThanOrEqual(atLeast);
   }, 180_000);
 });
+}

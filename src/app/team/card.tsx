@@ -3,7 +3,7 @@
 import { ImageResponse } from "next/og";
 import { INDEPENDENTS, conferenceShort, formatChampion, formatPlayoff, formatRecord, formatTitleOdds, liveRanks, oddsLabels } from "@/core";
 import { CREAM, DEEP, INK, LAMP, MUTED, READING, frame, imageOptions, logoData, masthead } from "@/app/og";
-import { baseExplore, baseExploreIndependent, conferenceOf, season, through } from "@/app/season";
+import { baseExploreIndependent, baseTeamOutlook, conferenceOf, season, through } from "@/app/season";
 
 type Score = { label: string; value: string };
 
@@ -22,7 +22,7 @@ export function teamScores(teamId: number): { name: string; rank: string | null;
       scores: [{ label: "Playoff*", value: formatPlayoff(me.playoff, me.cfp, "alive", false, me.postseasonBan) }],
     };
   }
-  const me = baseExplore(teamId, conference).outlook.find((o) => o.teamId === teamId)!;
+  const me = baseTeamOutlook(teamId, conference);
   const labels = oddsLabels(conference);
   return {
     name: team.name, rank: ranks[teamId] ?? null, record: formatRecord(me.record, conference),
