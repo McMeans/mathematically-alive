@@ -15,7 +15,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // No card: the season's playoff isn't simulated; the Lab's own words stand.
   const title = card?.title ?? "Season Lab · Mathematically Alive";
   const description = card?.description ?? "Play out the rest of the college football season.";
-  return { title, description, openGraph: { title, description }, twitter: { card: "summary_large_image", title, description } };
+  // Someone's picks: worth a preview in a chat, not a search result.
+  return { title, description, robots: { index: false }, openGraph: { title, description }, twitter: { card: "summary_large_image", title, description } };
 }
 
 export default async function SharedLab({ params }: Props) {

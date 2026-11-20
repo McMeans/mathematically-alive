@@ -31,7 +31,7 @@ Four things together, which odds-only sites don't offer:
 
 ## Capabilities and Constraints
 
-- Supports all Power Four conferences. Some conference tiebreak rules are partly assumed (see SPEC.md). The Group of Six would need a top-G6 rule.
+- Supports every FBS conference and the FBS independents (independents get playoff odds only). Some conference tiebreak rules are partly assumed (see SPEC.md); the "How it works" page (`/about`) says so in plain words.
 - Conference title odds come from a Monte Carlo simulation (20,000 seasons). Clinched and eliminated come from exact proofs.
 - The playoff estimate is **experimental** and is not the committee. It must be labelled that way.
 - All wording users see (odds formats, path text) is produced in `src/core`, so it can be tested. The UI only displays it.

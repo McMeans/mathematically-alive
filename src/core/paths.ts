@@ -257,10 +257,18 @@ export function titleGameOutLine(conference: string, o: Pick<TeamOutlook, "statu
 }
 
 /**
- * "Florida International wins" and, for a narrow button, "FIU wins". A team without an abbreviation keeps its name.
+ * Abbreviations that read as English words before "wins" ("MOST wins" reads as "most wins"), with the short name to
+ * use instead.
+ */
+const WORD_ABBREVIATIONS: Record<string, string> = { MOST: "Missouri St", MISS: "Ole Miss", MASS: "UMass", USA: "South Alabama" };
+
+/**
+ * "Florida International wins" and, for a narrow button, "FIU wins". A team without an abbreviation keeps its name,
+ * and one whose abbreviation reads as a word gets a short name ("Missouri St wins", not "MOST wins").
  */
 export function winsLabel(name: string, abbreviation: string | null): { full: string; short: string } {
-  return { full: `${name} wins`, short: `${abbreviation || name} wins` };
+  const short = abbreviation ? WORD_ABBREVIATIONS[abbreviation] ?? abbreviation : name;
+  return { full: `${name} wins`, short: `${short} wins` };
 }
 
 /** Whole-percent odds. "<1%" and ">99%" stand in for 0 or 100 when the true value isn't exact. */

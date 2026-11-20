@@ -4,7 +4,7 @@ import { Explorer, IndependentExplorer, type ConferenceList, type TeamInfo } fro
 import { conferenceRows, independentRows } from "./explorer/rows";
 import { asOf, baseExplore, baseExploreIndependent, baseIndependents, baseOutlooks, conferenceOf, conferenceTeams, season, through } from "./season";
 
-export function ExplorerPage({ teamId }: { teamId: number }) {
+export function ExplorerPage({ teamId, intro }: { teamId: number; intro?: string }) {
   const conference = conferenceOf(teamId);
   if (conference === null) throw new Error(`Team ${teamId} is not in a supported conference or an independent`);
   const names = Object.fromEntries(season.teams.map((t) => [t.id, t.name]));
@@ -34,5 +34,5 @@ export function ExplorerPage({ teamId }: { teamId: number }) {
     })),
     { conference: INDEPENDENTS, teams: info(INDEPENDENTS), rows: independentRows(baseIndependents) },
   ];
-  return <Explorer key={teamId} {...common} conferences={conferences} initial={base} />;
+  return <Explorer key={teamId} {...common} conferences={conferences} initial={base} intro={intro} />;
 }
