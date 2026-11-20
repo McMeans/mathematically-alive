@@ -243,7 +243,7 @@ All wording users see is made in the core so tests can check it. `formatTitleOdd
 - `formatPlayoff` (playoff odds): "In" or "Out" once the field is announced, else side odds. `playoffDetail` then gives the seed and the national title as "Won", "Out" or its odds; `playoffRoute` and an independent's `route` give the run's sentence; `mustWinConference` is false.
 - Path summary once the data's title game decides: "Miami plays Duke in the ACC title game, Dec 6." / "Virginia didn't make the ACC title game: Miami and Duke play for it."; once final: "Duke won the ACC title game, 27-20 over Virginia.", "Virginia lost the ACC title game to Duke, 27-20.", "Miami didn't make the ACC title game: Duke beat Virginia 27-20."
 - `formatSideOdds` (title and playoff odds): 1.0 shows ">99%" unless the team has clinched the title game. 0 shows "<0.1%" unless it is eliminated, in which case it may show "0%".
-- Playoff odds (`formatPlayoff`): a team out of its title game is not out of the playoff, so its 0 shows "<0.1%"; a flat "0%" only for a team barred from the postseason. Conference-title odds (`formatChampion`) for a team out of its title game show "0%": it can't win the conference.
+- Playoff odds (`formatPlayoff`): a team out of its title game is not out of the playoff, so its 0 shows "<0.1%"; a flat "0%" only for a team barred from the postseason. Conference-title odds (`formatChampion`) for a team out of its title game show "Out", like its title game: it can't win the conference.
 - Path odds (`formatChance`): "In"/"Out" only when proven, otherwise the same one-decimal format ("<0.1%", ">99%").
 - Under 1%, odds keep one decimal (`formatFine`), and anything above 0 but under 0.1% shows "<0.1%".
 - So a flat 100% or 0% only appears once a proof backs it.

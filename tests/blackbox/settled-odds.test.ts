@@ -17,12 +17,12 @@ const fsu = run(season, FSU);
 const me = fsu.outlook.find((o) => o.teamId === FSU)!;
 
 describe("a team proven out of its title game", { timeout: 60_000 }, () => {
-  it("is Out of the title game and can't win the conference, but its playoff odds read <0.1%, never a flat 0%", () => {
+  it("is Out of the title game and Out of the conference title, but its playoff odds read <0.1%, never a flat 0%", () => {
     expect(me.status).toBe("eliminated");
     expect(me.playoff).toBe(0);
     expect(formatTitleOdds(me.titleGame, me.status)).toBe("Out");
     expect(formatPlayoff(me.playoff, me.cfp, me.status, me.autoBid, me.postseasonBan)).toBe("<0.1%");
-    expect(formatChampion(me)).toBe("0%");
+    expect(formatChampion(me)).toBe("Out");
   });
 
   it("shows a flat 0% for the playoff only when the team is barred from the postseason", () => {

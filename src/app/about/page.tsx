@@ -38,7 +38,7 @@ export default function About() {
       <header className="board-dots text-board-text">
         <SiteBar current={null} teams="/" lab="/lab" through={through} asOf={asOf} find={find} />
       </header>
-      <main className="mx-auto w-full max-w-2xl px-4 pb-16 pt-8 md:pt-12">
+      <main className="mx-auto w-full max-w-xl px-4 pb-16 pt-8 md:pt-12">
         <h1 className="cond text-4xl font-extrabold uppercase tracking-[0.02em] text-ink">How it works</h1>
         <p className="mt-3 text-[17px] leading-relaxed text-ink-soft">
           Pick a college football team and see what has to happen for it to reach its conference title game and the College Football Playoff. Every team gets three answers: how likely it is, whether it&rsquo;s settled, and what has to happen.
@@ -75,7 +75,7 @@ export default function About() {
           <p>That&rsquo;s why playoff numbers carry an asterisk. Treat them as an informed estimate, not a forecast of the committee.</p>
         </Part>
 
-        <Part title="What's covered">
+        <Part title="What&rsquo;s covered">
           <p>Every FBS team: the {conferences}. Independents have playoff odds only, since they have no conference title game.</p>
           <p>
             A few tiebreak details aren&rsquo;t spelled out in the conferences&rsquo; published rules, and we&rsquo;ve had to assume how they work. Where a tie comes down to a coin toss or a ranking, proofs treat it as luck, so a team won&rsquo;t read In or Out on a step nobody can know yet.
@@ -88,7 +88,7 @@ export default function About() {
           </p>
         </Part>
 
-        <Colophon />
+        <Colophon onAbout />
       </main>
     </div>
   );

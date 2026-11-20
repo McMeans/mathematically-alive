@@ -55,9 +55,9 @@ async function bracketImage(card: LabCard, through: string): Promise<ImageRespon
     (
       <div style={frame}>
         {masthead(`Season Lab · ${through}`)}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 20, marginTop: 14 }}>
-          <div style={{ display: "flex", fontSize: 46, fontWeight: 700, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: 1 }}>{card.heading}</div>
-          <div style={{ display: "flex", fontSize: 26, color: MUTED }}>{b.picked}</div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 20, marginTop: 14 }}>
+          <div style={{ display: "flex", fontSize: 46, fontWeight: 700, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: 1, lineHeight: 1 }}>{card.heading}</div>
+          <div style={{ display: "flex", fontSize: 26, color: MUTED, lineHeight: 1, paddingBottom: 3 }}>{b.picked}</div>
         </div>
         <div style={{ display: "flex", flex: 1, gap: 14, marginTop: 14 }}>
           {cols.map((games) => (
@@ -98,7 +98,7 @@ export async function cardImage(card: LabCard | null, through: string): Promise<
     <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
       {seeds.map((s) => (
         <div key={s.seed} style={{ display: "flex", alignItems: "center", gap: 14, height: 48, padding: "0 16px", background: DEEP, borderRadius: 3 }}>
-          <div style={{ display: "flex", width: 36, justifyContent: "center", fontSize: 32, fontWeight: 700, color: s.seed <= 4 ? LAMP : MUTED }}>{s.seed}</div>
+          <div style={{ display: "flex", width: 36, justifyContent: "center", fontSize: 32, fontWeight: 700, color: s.seed <= 4 ? "#FFFFFF" : MUTED }}>{s.seed}</div>
           {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse draws plain img only */}
           {logos.get(s.teamId) ? <img src={logos.get(s.teamId)!} width={36} height={36} alt="" /> : <div style={{ display: "flex", width: 36, flexShrink: 0 }} />}
           <div style={{ display: "block", flex: 1, minWidth: 0, fontSize: 28, fontWeight: 700, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: -0.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
@@ -111,22 +111,25 @@ export async function cardImage(card: LabCard | null, through: string): Promise<
     (
       <div style={frame}>
         {masthead(`Season Lab · ${through}`)}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 20, marginTop: 18 }}>
-          <div style={{ display: "flex", fontSize: 46, fontWeight: 700, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: 1 }}>{card?.heading ?? "Season Lab"}</div>
-          {card && <div style={{ display: "flex", fontSize: 26, color: MUTED }}>{card.picks}</div>}
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 20, marginTop: 30 }}>
+          <div style={{ display: "flex", fontSize: 46, fontWeight: 700, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: 1, lineHeight: 1 }}>{card?.heading ?? "Season Lab"}</div>
+          {card && <div style={{ display: "flex", fontSize: 26, color: MUTED, lineHeight: 1, paddingBottom: 3 }}>{card.picks}</div>}
         </div>
         {!card && (
           <div style={{ display: "flex", flex: 1, fontFamily: READING, fontSize: 32, color: "#D7E4DC", marginTop: 12 }}>
             Pick any game left and watch the playoff field, bracket and ranking follow.
           </div>
         )}
-        <div style={{ display: card ? "flex" : "none", gap: 24, marginTop: 16, flex: 1 }}>
+        <div style={{ display: card ? "flex" : "none", gap: 24, marginTop: 30, flex: 1 }}>
           {column(field.slice(0, half))}
           {column(field.slice(half))}
         </div>
         {card && (
-          <div style={{ display: "flex", alignSelf: "flex-start", marginTop: 14, borderRadius: 3, background: LAMP, color: INK, fontSize: 28, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, padding: "8px 22px" }}>
-            {card.champion}
+          <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 14 }}>
+            <div style={{ display: "flex", borderRadius: 3, background: LAMP, color: INK, fontSize: 28, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, padding: "8px 22px" }}>
+              {card.champion}
+            </div>
+            <div style={{ display: "flex", fontFamily: READING, fontSize: 22, color: MUTED }}>Our model, not the committee.</div>
           </div>
         )}
       </div>

@@ -28,7 +28,7 @@ export const contentType = "image/png";
 export const logo = `data:image/svg+xml;base64,${Buffer.from("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 140 140\" role=\"img\" aria-label=\"Mathematically Alive\"><g transform=\"rotate(-30 70 70)\"><path d=\"M8 70 Q70 2 132 70 Q70 138 8 70 Z\" fill=\"#F3F0E6\"/><path d=\"M22 54 Q24 70 22 86 M118 54 Q116 70 118 86\" fill=\"none\" stroke=\"#133F2E\" stroke-width=\"4\" stroke-linecap=\"round\" opacity=\"0.9\"/><path d=\"M34 70 H54 L60 57 L68 86 L76 48 L83 70 H106\" fill=\"none\" stroke=\"#133F2E\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M40 63 V77 M47 63 V77 M90 63 V77 M98 63 V77\" stroke=\"#133F2E\" stroke-width=\"4\" stroke-linecap=\"round\"/></g></svg>").toString("base64")}`;
 
 // The board's colours (ImageResponse can't use the site's Tailwind tokens).
-export const BOARD = "#133F2E", DEEP = "#0C2C20", LINE = "#2A5A46", MUTED = "#9FBCAE", LAMP = "#F2B134", INK = "#121A16";
+export const BOARD = "#133F2E", DEEP = "#0C2C20", LINE = "#2A5A46", MUTED = "#9FBCAE", LAMP = "#F2B134", INK = "#121A16", CREAM = "#F3F0E6";
 
 // Each team logo as a data URI. A slow or missing logo leaves its row without a logo instead of failing the whole
 // image. The timeout is generous and a failure gets one retry: at build time each worker is also busy simulating other
@@ -58,8 +58,12 @@ export const masthead = (right: string) => (
   </div>
 );
 
+// The board's dot texture (`.board-dots` in globals.css), as a repeating SVG tile: ImageResponse drops the site's
+// 1px radial gradient. A touch stronger than the site's 3.5%, since a card is mostly seen scaled down in a chat.
+const dot = `url("data:image/svg+xml;base64,${Buffer.from("<svg xmlns='http://www.w3.org/2000/svg' width='6' height='6'><circle cx='3' cy='3' r='1.1' fill='#FFFFFF' fill-opacity='0.07'/></svg>").toString("base64")}")`;
+
 export const frame = {
-  display: "flex", flexDirection: "column", width: "100%", height: "100%", background: BOARD, padding: "32px 56px", fontFamily: DISPLAY,
-  backgroundImage: "radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1.2px)", backgroundSize: "6px 6px",
+  display: "flex", flexDirection: "column", width: "100%", height: "100%", padding: "32px 56px", fontFamily: DISPLAY,
+  backgroundColor: BOARD, backgroundImage: dot, backgroundSize: "6px 6px", backgroundRepeat: "repeat",
 } as const;
 

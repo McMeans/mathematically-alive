@@ -239,10 +239,11 @@ export function titleResult(season: Season, conference: string, game: Game | nul
 
 /**
  * Its chance to win the conference, as shown: "Won" or "Lost" once it has played the title game, otherwise the odds
- * (`formatSideOdds`). A team proven out of the title game can't win the conference: a flat "0%".
+ * (`formatSideOdds`). A team proven out of the title game can't win the conference: "Out", as its title game reads.
  */
 export function formatChampion(o: Pick<TeamOutlook, "champion" | "status" | "titleResult">): string {
   if (o.titleResult) return o.titleResult.won ? "Won" : "Lost";
+  if (o.status === "eliminated") return "Out";
   return formatSideOdds(o.champion, o.status);
 }
 
