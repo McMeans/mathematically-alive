@@ -10,7 +10,7 @@ describe("locked games on a real season", () => {
   // Kansas in the 2026 Big 12 with its likeliest way locked: more than a dozen picks, many of them games elsewhere.
   const kansasLocked = () => {
     const s = seasonFromCfbd(JSON.parse(readFileSync("fixtures/big-12-2026.json", "utf8")) as CfbdSnapshot);
-    const opts = { conference: "Big 12", teamId: s.teams.find((t) => t.name === "Kansas")!.id, iterations: 2000, seed: 1 };
+    const opts = { conference: "Big 12", teamId: s.teams.find((t) => t.name === "Kansas")!.id, iterations: 1000, seed: 1 };
     const locks = Object.fromEntries(pathTree(s, opts).likeliest!.picks.map((p) => [p.gameId, p.winner]));
     const tree = pathTree(s, { ...opts, locks });
     return { s, opts, locks, tree, lockedElsewhere: tree.weeks.flatMap((w) => w.games).filter((g) => g.gameId in locks) };

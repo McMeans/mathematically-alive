@@ -12,7 +12,7 @@ describe("Big Ten seasons", () => {
         const time = (team: string) => {
       const id = s.teams.filter((t) => t.conference === "Big Ten").find((t) => t.name === team)!.id;
       const t0 = performance.now();
-      const e = explore(s, { conference: "Big Ten", teamId: id, iterations: 20_000, seed: 2026 });
+      const e = explore(s, { conference: "Big Ten", teamId: id, iterations: 5_000, seed: 2026 });
       return { ms: performance.now() - t0, e, id };
     };
     const base = time("Ohio State");

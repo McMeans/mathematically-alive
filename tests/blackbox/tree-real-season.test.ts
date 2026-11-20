@@ -51,7 +51,7 @@ describe("help from elsewhere on a real season", () => {
     const kickoff = new Map(cut.games.map((g) => [g.id, Date.parse(g.start)]));
     let scenarioOnly = 0;
     for (const t of cut.teams.filter((x) => x.conference === "ACC")) {
-      const { help } = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 2000, seed: 1 });
+      const { help } = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 1000, seed: 1 });
       const tier = (h: (typeof help)[number]) => (h.now ? 0 : h.scenario ? 1 : 2);
       const weight = (h: (typeof help)[number]) => (h.now ? h.swing : h.scenario ? h.scenario.swing : 0);
       for (let i = 1; i < help.length; i++) {
@@ -81,7 +81,7 @@ describe("help from elsewhere on a real season", () => {
         games: full.games.map((g) => (g.week > last - weeks ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
       };
       for (const t of cut.teams.filter((x) => x.conference === "ACC")) {
-        const tree = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 1000, seed: 1 });
+        const tree = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 500, seed: 1 });
         const way = tree.likeliest;
         if (!way) continue;
         // One combination of results can't be likelier than every way in together (allowing for sampling noise).

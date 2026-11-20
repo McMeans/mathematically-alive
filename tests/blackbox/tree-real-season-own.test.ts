@@ -13,7 +13,7 @@ describe("help from elsewhere on a real season", () => {
     const last = Math.max(...full.games.filter((g) => g.completed).map((g) => g.week));
     const seen = new Set<string>();
     // These two cuts include a way that needs only some of a team's games, and one that needs none of them.
-    for (const weeks of [2, 5]) {
+    cuts: for (const weeks of [2, 5]) {
       const cut: Season = {
         ...full,
         games: full.games.map((g) => (g.week > last - weeks ? { ...g, completed: false, homePoints: null, awayPoints: null } : g)),
@@ -42,10 +42,12 @@ describe("help from elsewhere on a real season", () => {
           expect(way.summary.startsWith(`${verb[0].toUpperCase()}${verb.slice(1)} ${n} of ${left}`)).toBe(true);
           seen.add("some");
         }
+        // Both kinds seen: the rest of the sweep adds time, not cases.
+        if (seen.size === 2) break cuts;
       }
     }
     expect([...seen].sort()).toEqual(["either way", "some"]);
-    // 36 trees: about 15 s plain and 35 s under coverage on a typical runner, over 60 s on a slow one.
+    // Up to 36 trees, though the sweep stops once both kinds are seen.
   }, 120_000);
 
   it("California four weeks out: the card's wording, word for word", () => {

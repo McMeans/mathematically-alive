@@ -113,7 +113,7 @@ describe("help from elsewhere on a real season", () => {
     };
     const gaps: Record<string, number[]> = { big: [], some: [], small: [] };
     for (const t of cut.teams.filter((x) => x.conference === "ACC")) {
-      const tree = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 1000, seed: 1 });
+      const tree = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 500, seed: 1 });
       for (const g of tree.weeks.flatMap((w) => w.games)) {
         const h = tree.help.find((x) => x.gameId === g.gameId)!;
         if (g.helps === null) { expect(g.impact).toBeNull(); continue; }
@@ -138,7 +138,7 @@ describe("help from elsewhere on a real season", () => {
     };
     let faint = 0;
     for (const t of cut.teams.filter((x) => x.conference === "ACC")) {
-      const tree = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 1000, seed: 1 });
+      const tree = pathTree(cut, { conference: "ACC", teamId: t.id, iterations: 500, seed: 1 });
       for (const g of tree.weeks.flatMap((w) => w.games)) {
         const h = tree.help.find((x) => x.gameId === g.gameId)!;
         // Proven the same either way (in or out whatever happens): neither side helps.

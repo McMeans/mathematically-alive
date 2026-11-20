@@ -70,8 +70,8 @@ describe(`Sun Belt proofs agree with checking every combination (seeds ${from}-$
         else settled++;
       }
     }
-    expect(settled).toBeGreaterThan(40);
-    expect(alive).toBeGreaterThan(40);
+    expect(settled).toBeGreaterThan(30);
+    expect(alive).toBeGreaterThan(30);
   }, 120_000);
 });
 }

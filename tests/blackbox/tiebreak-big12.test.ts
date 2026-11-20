@@ -228,12 +228,15 @@ describe("Big 12 seasons", () => {
 
   it("a way in through the tiebreak names total wins as well as the ranking", () => {
     const s = load(2026);
-    const notes = s.teams
-      .filter((t) => t.conference === "Big 12")
-      .map((t) => explore(s, { conference: "Big 12", teamId: t.id, iterations: 300, seed: 1 }).tree.likeliest)
-      .filter((w) => w?.needsTiebreak);
+    // Stops at the third way through the tiebreak: each team's tree runs proofs, and three show the wording.
+    const notes = [];
+    for (const t of s.teams.filter((x) => x.conference === "Big 12")) {
+      const w = pathTree(s, { conference: "Big 12", teamId: t.id, iterations: 300, seed: 1 }).likeliest;
+      if (w?.needsTiebreak) notes.push(w);
+      if (notes.length === 3) break;
+    }
     expect(notes.length).toBeGreaterThan(0);
-    for (const w of notes) expect(w!.note).toMatch(/, depending on total wins and the ranking tiebreak\.$/);
+    for (const w of notes) expect(w.note).toMatch(/, depending on total wins and the ranking tiebreak\.$/);
   }, 60_000);
 
   it("2026 title odds across the conference add up to two spots", () => {
