@@ -108,7 +108,7 @@ describe("short result labels that would read as words", () => {
     expect(winsLabel("Missouri State", "MOST").short).toBe("Missouri St wins");
     expect(winsLabel("Ole Miss", "MISS").short).toBe("Ole Miss wins");
     expect(winsLabel("Massachusetts", "MASS").short).toBe("UMass wins");
-    expect(winsLabel("South Alabama", "USA").short).toBe("South Alabama wins");
+    expect(winsLabel("South Alabama", "USA").short).toBe("S. Alabama wins");
     expect(winsLabel("Missouri State", "MOST").full).toBe("Missouri State wins");
   });
 

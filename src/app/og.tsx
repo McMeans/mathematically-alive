@@ -7,17 +7,29 @@ import { join } from "node:path";
 // (OFL-*.txt beside them). Read from the project folder, as Next's docs do; next.config.ts traces the folder into the
 // server functions that draw shared Lab links.
 export const DISPLAY = "Saira Condensed", READING = "Public Sans";
-const loaded = Promise.all([
-  readFile(join(process.cwd(), "src/app/fonts/saira-condensed-600.woff")).then((data) => ({ name: DISPLAY, data, weight: 600 as const, style: "normal" as const })),
-  readFile(join(process.cwd(), "src/app/fonts/saira-condensed-700.woff")).then((data) => ({ name: DISPLAY, data, weight: 700 as const, style: "normal" as const })),
-  readFile(join(process.cwd(), "src/app/fonts/saira-condensed-800.woff")).then((data) => ({ name: DISPLAY, data, weight: 800 as const, style: "normal" as const })),
-  readFile(join(process.cwd(), "src/app/fonts/public-sans-400.woff")).then((data) => ({ name: READING, data, weight: 400 as const, style: "normal" as const })),
-  readFile(join(process.cwd(), "src/app/fonts/public-sans-600.woff")).then((data) => ({ name: READING, data, weight: 600 as const, style: "normal" as const })),
+const font = (file: string, name: string, weight: 400 | 600 | 700 | 800) =>
+  readFile(join(process.cwd(), "src/app/fonts", file)).then((data) => ({ name, data, weight, style: "normal" as const }));
+const readFonts = () => Promise.all([
+  font("saira-condensed-600.woff", DISPLAY, 600),
+  font("saira-condensed-700.woff", DISPLAY, 700),
+  font("saira-condensed-800.woff", DISPLAY, 800),
+  font("public-sans-400.woff", READING, 400),
+  font("public-sans-600.woff", READING, 600),
 ]);
+// Read once and kept, but a failed read is dropped, so the next image tries again instead of every image failing
+// until the server restarts.
+let loaded: ReturnType<typeof readFonts> | null = null;
+function fonts() {
+  loaded ??= readFonts().catch((e: unknown) => {
+    loaded = null;
+    throw e;
+  });
+  return loaded;
+}
 
 /** ImageResponse options for a share image: its size and the brand's fonts. */
 export async function imageOptions(dims: { width: number; height: number } = { width: 1200, height: 630 }) {
-  return { ...dims, fonts: await loaded };
+  return { ...dims, fonts: await fonts() };
 }
 
 export const size = { width: 1200, height: 630 };

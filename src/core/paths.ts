@@ -261,7 +261,7 @@ export function titleGameOutLine(conference: string, o: Pick<TeamOutlook, "statu
  * Abbreviations that read as English words before "wins" ("MOST wins" reads as "most wins"), with the short name to
  * use instead.
  */
-const WORD_ABBREVIATIONS: Record<string, string> = { MOST: "Missouri St", MISS: "Ole Miss", MASS: "UMass", USA: "South Alabama" };
+const WORD_ABBREVIATIONS: Record<string, string> = { MOST: "Missouri St", MISS: "Ole Miss", MASS: "UMass", USA: "S. Alabama" };
 
 /**
  * "Florida International wins" and, for a narrow button, "FIU wins". A team without an abbreviation keeps its name,
