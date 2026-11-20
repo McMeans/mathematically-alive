@@ -42,14 +42,19 @@ export const logo = `data:image/svg+xml;base64,${Buffer.from("<svg xmlns=\"http:
 // The board's colours (ImageResponse can't use the site's Tailwind tokens).
 export const BOARD = "#133F2E", DEEP = "#0C2C20", LINE = "#2A5A46", MUTED = "#9FBCAE", LAMP = "#F2B134", INK = "#121A16", CREAM = "#F3F0E6";
 
+// How long to wait for one logo. At build time it's generous: each worker is also busy simulating other teams, so a
+// fast download can still finish late. A shared Lab link is drawn when a chat app asks for its preview, and the app
+// won't wait long, so there a slow logo gives up sooner.
+const LOGO_TIMEOUT = process.env.NEXT_PHASE === "phase-production-build" ? 15_000 : 4_000;
+
 // Each team logo as a data URI. A slow or missing logo leaves its row without a logo instead of failing the whole
-// image. The timeout is generous and a failure gets one retry: at build time each worker is also busy simulating other
-// teams, so a fast download can still finish late.
+// image, and a failure gets one retry. Callers fetch a card's logos all at once, so a card waits about as long as its
+// slowest logo.
 export async function logoData(teamId: number, dark = true, px = 64): Promise<string | null> {
   const url = `https://cdn.collegefootballdata.com/${dark ? "logos-dark" : "logos"}/${px}/${teamId}.png`;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(LOGO_TIMEOUT) });
       if (res.status === 404) return null;
       if (!res.ok) continue;
       return `data:image/png;base64,${Buffer.from(await res.arrayBuffer()).toString("base64")}`;
