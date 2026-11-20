@@ -671,6 +671,75 @@ export function labOddsChange(before: number | null, after: number | null): stri
   return d === null ? null : `${d} ${d.slice(1) === "1" ? "pt" : "pts"}`;
 }
 
+/** Places of average rank a team can move between two runs and still count as held (`labHeld`). */
+const HELD_RANK = 0.5;
+
+/**
+ * Teams whose odds a change of picks barely moved, by what the Lab shows: `field`, its playoff odds (in the field, a
+ * bye, each seed, the national title); `titles`, its conference's title game and title; `ranks`, its average rank
+ * (less than half a place) and top-12 share. A share counts as held when it moved less than 2 points.
+ */
+export type LabHeld = { field: number[]; titles: number[]; ranks: number[] };
+
+/**
+ * What a change of picks barely moved (`LabHeld`), between `before` and `after`: runs of the same seed and size, so
+ * their simulated seasons line up and the difference is the picks', not sampling's.
+ */
+export function labHeld(before: SeasonLab, after: SeasonLab): LabHeld {
+  const was = new Map(before.national.teams.map((t) => [t.teamId, t]));
+  const near = (a: number | null, b: number | null) => (a === null ? b === null : b !== null && Math.abs(a - b) < MOVE);
+  const held: LabHeld = { field: [], titles: [], ranks: [] };
+  for (const t of after.national.teams) {
+    const w = was.get(t.teamId);
+    if (!w) continue;
+    const p = w.playoff, q = t.playoff;
+    if (p && q ? near(p.field, q.field) && near(p.bye, q.bye) && near(p.champion, q.champion) && p.seeds.every((x, k) => near(x, q.seeds[k])) : p === q) held.field.push(t.teamId);
+    if (near(w.titleGame, t.titleGame) && near(w.champion, t.champion)) held.titles.push(t.teamId);
+    if (Math.abs(w.meanRank - t.meanRank) < HELD_RANK && near(w.top12, t.top12)) held.ranks.push(t.teamId);
+  }
+  return held;
+}
+
+/** What `steadyLab` merges: the parts of a Lab run the page shows per team, and a pinned team's odds. */
+export type LabShown = Pick<SeasonLab, "fieldTexts" | "conferences" | "playoff" | "ranking"> & { focus?: LabTeamOdds | null };
+
+/**
+ * A quick run as the page should show it over `shown` (what the page shows now, from a full run): each odds a change
+ * held (`labHeld`, from quick runs before and after it) keeps its shown value, so sampling noise in the quick run
+ * doesn't move a number the full run would only move back. Odds the change moved take the quick run's. Lists with held
+ * entries are re-sorted by the odds shown. Anything else (the picks, records, matchups) is `quick`'s.
+ */
+export function steadyLab<T extends LabShown>(shown: LabShown, quick: T, held: LabHeld): T {
+  const field = new Set(held.field), titles = new Set(held.titles), ranks = new Set(held.ranks);
+  const keep = <X extends { teamId: number }>(now: X[], was: X[] | undefined, set: Set<number>): X[] => {
+    const prior = new Map((was ?? []).map((x) => [x.teamId, x]));
+    return now.map((x) => (set.has(x.teamId) && prior.has(x.teamId) ? prior.get(x.teamId)! : x));
+  };
+  const fieldTexts = Object.fromEntries(Object.entries(quick.fieldTexts).map(([id, text]) => [id, field.has(Number(id)) && shown.fieldTexts[Number(id)] !== undefined ? shown.fieldTexts[Number(id)] : text]));
+  const conferences = quick.conferences.map((c) => {
+    const was = shown.conferences.find((x) => x.conference === c.conference);
+    const teams = keep(c.teams, was?.teams, titles).sort((a, b) => b.titleGame - a.titleGame || b.champion - a.champion || a.teamId - b.teamId);
+    return { ...c, teams };
+  });
+  const ranking = keep(quick.ranking, shown.ranking, ranks)
+    .sort((a, b) => a.meanRank - b.meanRank || a.teamId - b.teamId)
+    .map((r, k) => ({ ...r, rank: k + 1 }));
+  let playoff = quick.playoff;
+  if (playoff && shown.playoff) {
+    const was = shown.playoff;
+    // A spot keeps its shown odds only with the same team at the same seed: a reseeded field is a real change.
+    const spots = playoff.field.map((s, k) => (field.has(s.teamId) && was.field[k]?.teamId === s.teamId && was.field[k].seed === s.seed ? was.field[k] : s));
+    playoff = { ...playoff, field: spots, bubble: keep(playoff.bubble, was.bubble, field), g6: playoff.g6 && { ...playoff.g6, teams: keep(playoff.g6.teams, was.g6?.teams, field) } };
+  }
+  if (quick.focus === undefined) return { ...quick, fieldTexts, conferences, ranking, playoff };
+  // A pinned team's odds are its playoff and title odds: each part held or not on its own.
+  const f = quick.focus, w = shown.focus;
+  const focus = f && w && f.teamId === w.teamId
+    ? { ...f, ...(field.has(f.teamId) ? { playoff: w.playoff, playoffText: w.playoffText } : {}), ...(titles.has(f.teamId) ? { titleGame: w.titleGame, champion: w.champion, titleGameText: w.titleGameText, championText: w.championText } : {}) }
+    : f;
+  return { ...quick, fieldTexts, conferences, ranking, playoff, focus };
+}
+
 /** How `fillLabLocks` picks the open games: the favourite always wins, or one season drawn from a seed. */
 export type LabFill = "favorites" | { seed: number };
 
