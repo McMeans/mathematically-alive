@@ -32,8 +32,8 @@ Every change to `src/core` behavior ships with black-box tests in the same chang
 
 ## Before calling a change done
 
-1. `pnpm lint`, `pnpm typecheck` and `pnpm test` pass.
-2. Run the `coverage-gate` skill (`.claude/skills/coverage-gate/gate.sh`). It must pass at the threshold in the script. Never lower the threshold without asking.
+1. `pnpm lint` and `pnpm typecheck` pass.
+2. Run the `coverage-gate` skill (`.claude/skills/coverage-gate/gate.sh`). It runs the whole test suite, so skip a separate `pnpm test`. It must pass at the threshold in the script. Never lower the threshold without asking.
 3. For a branch or PR, run the `pr-review` skill.
 
 ## Brand

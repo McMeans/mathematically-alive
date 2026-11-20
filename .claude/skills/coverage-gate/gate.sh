@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Black-box coverage gate: line coverage of src/core reached by tests/blackbox
 # alone. Usage: gate.sh [threshold-percent]
+# Also runs tests/unit (no coverage), so a passing gate means the whole suite passed: no separate `pnpm test`.
 set -euo pipefail
 
 THRESHOLD="${1:-${COVERAGE_THRESHOLD:-85}}"
@@ -15,6 +16,10 @@ node_modules/.bin/vitest run tests/blackbox \
     --coverage.include='src/core/**' \
     --coverage.reporter=text --coverage.reporter=json-summary \
     --coverage.reportsDirectory="$OUT"
+
+if compgen -G "tests/unit/*.test.ts" > /dev/null; then
+    node_modules/.bin/vitest run tests/unit
+fi
 
 PERCENT="$(node -e 'console.log(require(process.argv[1]).total.lines.pct)' "$OUT/coverage-summary.json")"
 if ! [[ "$PERCENT" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
