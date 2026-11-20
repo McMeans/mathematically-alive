@@ -3,7 +3,7 @@
 // simulation and the national run over the same seasons. All wording the page shows is here.
 import { isGroupOfSix, projectedField } from "./projected";
 import type { NationalResult } from "./national";
-import { conferenceName, formatOdds, formatRecord, formatSideOdds, shownChange, winsLabel } from "./paths";
+import { conferenceName, formatOdds, formatRecord, formatSideOdds, formatTitleOdds, shownChange, winsLabel, type PathStatus } from "./paths";
 import { powerConferences } from "./committee";
 import { playoffFormat } from "./playoff";
 import { teamRecord, type Game, type Season } from "./season";
@@ -295,8 +295,10 @@ const G6_SHOWN = 4;
 /**
  * The board for `teamId` (`conference` null for an independent). `sim` and `national` must be the same simulated
  * seasons (same iterations, seed and locks). `locks` are those locks, for the records shown in the title week.
+ * `titleStatus` is the team's proven title-game status: once it is clinched or eliminated, every title-game number
+ * on the board reads "In" or "Out", like the header.
  */
-export function teamBoard(season: Season, sim: SimResult, national: NationalResult, teamId: number, conference: string | null, locks: Record<number, number> = {}, likeliest: Likeliest | null = null): TeamBoard | null {
+export function teamBoard(season: Season, sim: SimResult, national: NationalResult, teamId: number, conference: string | null, locks: Record<number, number> = {}, likeliest: Likeliest | null = null, titleStatus: PathStatus = "alive"): TeamBoard | null {
   if (!national.playoff || sim.iterations !== national.iterations) return null;
   const n = sim.iterations;
   const name = (id: number) => season.teams.find((t) => t.id === id)?.name ?? `Team ${id}`;
@@ -363,6 +365,7 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
   });
 
   const show = (p: number) => formatSideOdds(p, "alive");
+  const showTitle = (p: number) => formatTitleOdds(p, titleStatus);
   const base = teamRecord(season, teamId);
   const most = own.length;
 
@@ -386,7 +389,7 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
       label: w === most && most > 0 ? `${record} · win out` : record,
       share: r.n / n, likely: `${formatOdds(r.n / n)} likely`,
       playoff: r.field / r.n, playoffText: show(r.field / r.n),
-      titleGame: titled ? r.title / r.n : null, titleGameText: titled ? show(r.title / r.n) : null,
+      titleGame: titled ? r.title / r.n : null, titleGameText: titled ? showTitle(r.title / r.n) : null,
     });
   }
 
@@ -437,7 +440,7 @@ export function teamBoard(season: Season, sim: SimResult, national: NationalResu
       return {
         teamId: id, label: winsLabel(name(id), abbreviation(id)).full, shortLabel: winsLabel(name(id), abbreviation(id)).short, chance: `${formatOdds(home ? pHome : 1 - pHome)} chance`,
         playoff: f / k2, playoffText: show(f / k2),
-        titleGame: titled ? t / k2 : null, titleGameText: titled ? show(t / k2) : null, playoffChange: change(f / k2), root: false,
+        titleGame: titled ? t / k2 : null, titleGameText: titled ? showTitle(t / k2) : null, playoffChange: change(f / k2), root: false,
       };
     };
     const home = side(g.homeId, true), away = side(g.awayId, false);

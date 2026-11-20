@@ -1,4 +1,5 @@
 "use client";
+import { Colophon } from "@/app/Colophon";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -237,8 +238,11 @@ function track(board: TeamBoard | null, kept: Kept, gameId: number, winner: numb
   return next;
 }
 
-/** A conference team's page. */
-export function Explorer({ initial, ...common }: Common & { initial: Result }) {
+/**
+ * A conference team's page. `intro`: a line over the page for a visitor who didn't pick this team (the home page shows the team with the best
+ * title-game odds).
+ */
+export function Explorer({ initial, intro, ...common }: Common & { initial: Result; intro?: string }) {
   const { teamId, conference, teams, names, through } = common;
   // A title-game pick stands while its matchup is the same two teams (in either order); then it clears, with a note.
   const titleKey = useRef<string | null>(null);
@@ -321,6 +325,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
       ]}
       main={
         <>
+          {intro && <p className="mb-4 text-[15px] text-ink-soft">{intro}</p>}
           {board && board.records.length > 0 && <WhatItTakes board={board} />}
           <section aria-labelledby="weeks">
             <Heading id="weeks" sub={`${team.name}’s playoff and ${conferenceName(conference)} title-game odds after each of its own results. Tap one to lock it.`}>Week by week</Heading>
@@ -340,6 +345,7 @@ export function Explorer({ initial, ...common }: Common & { initial: Result }) {
           <ConferenceRace outlook={outlook} names={names} teamId={teamId} label={`${conferenceName(conference)} race`} sub="Title-game odds" />
           <YourPicks picks={picks} names={names} onRemove={remove} />
           <p className="text-xs text-ink-muted">* Playoff odds are our own estimate, not the committee. Odds from {ITERATIONS.toLocaleString("en-US")} simulated seasons; “In” and “Out” are proven. {dataNote(through)}</p>
+          <Colophon />
         </>
       }
     />
@@ -389,6 +395,7 @@ export function IndependentExplorer({ initial, ...common }: Common & { initial: 
           {board?.race && <PlayoffRaceCard race={board.race} lab={lab} />}
           <YourPicks picks={picks} names={names} onRemove={(id) => pick(Number(id.slice(1)), undefined)} />
           <p className="text-xs text-ink-muted">* Playoff odds are our own estimate, not the committee. {dataNote(through)}</p>
+          <Colophon />
         </>
       }
     />

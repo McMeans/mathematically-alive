@@ -109,8 +109,9 @@ export function WhatItTakes({ board }: { board: TeamBoard }) {
           <p className="mt-1.5 text-xs text-board-muted">{board.flat.records}</p>
         </div>
       ) : <div className="grid grid-cols-2 gap-px overflow-hidden rounded bg-board-line sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
-        {board.records.map((r) => (
-          <div key={r.record} className={`flex flex-col gap-1 bg-board-deep px-4 pb-3.5 pt-3 text-board-muted ${r === best ? "shadow-[inset_0_3px_0_var(--color-lamp)]" : ""}`}>
+        {board.records.map((r, k, all) => (
+          // On a phone's two columns, an odd last tile takes the whole row instead of leaving an empty cell.
+          <div key={r.record} className={`flex flex-col gap-1 bg-board-deep px-4 pb-3.5 pt-3 text-board-muted ${r === best ? "shadow-[inset_0_3px_0_var(--color-lamp)]" : ""} ${all.length % 2 === 1 && k === all.length - 1 ? "col-span-2 sm:col-span-1" : ""}`}>
             <span className={`cond text-[15px] font-bold tracking-[0.06em] ${r === best ? "text-lamp" : ""}`}>{r.label}</span>
             <Lit value={r.playoffText} className="text-[34px] text-white" />
             {r.titleGameText && <span className="text-xs text-board-text">Title game <b className="font-bold text-white">{r.titleGameText}</b></span>}
@@ -180,13 +181,17 @@ export function WeekByWeek({ weeks, outlook, board, teamId, team, names, locks, 
   const pick = (gameId: number, winner: number) => onPick(gameId, locks[gameId] === winner ? undefined : winner);
   const result = (gameId: number, opponentId: number, opponent: string, titleWin?: string, titleLose?: string) => {
     const o = odds.get(gameId), c = chances.get(gameId);
-    const nums = (playoff: number | undefined, titleText: string | undefined, titleP: number | undefined) =>
-      settled ? [{ value: show(playoff), label: labels.playoff }] : [{ value: show(playoff), label: labels.playoff }, { value: titleText ?? show(titleP), label: labels.titleGame }];
+    // The header's proven status covers a result the picks allow; the other side of a picked game swaps the pick.
+    const nums = (playoff: number | undefined, titleText: string | undefined, titleP: number | undefined, winner: number) =>
+      settled ? [{ value: show(playoff), label: labels.playoff }] : [{ value: show(playoff), label: labels.playoff }, {
+        value: titleText ?? (titleP === undefined ? "—" : formatTitleOdds(titleP, locks[gameId] === undefined || locks[gameId] === winner ? outlook.status : status)),
+        label: labels.titleGame,
+      }];
     const mine = wins(teamId, team), theirs = wins(opponentId, opponent);
     return (
       <Pair>
-        <Outcome label={mine.full} shortLabel={mine.short} chance={c?.win} nums={nums(o?.playoffIfWin, titleWin, o?.titleIfWin)} picked={locks[gameId] === teamId} onClick={() => pick(gameId, teamId)} />
-        <Outcome label={theirs.full} shortLabel={theirs.short} chance={c?.lose} nums={nums(o?.playoffIfLose, titleLose, o?.titleIfLose)} picked={locks[gameId] === opponentId} onClick={() => pick(gameId, opponentId)} />
+        <Outcome label={mine.full} shortLabel={mine.short} chance={c?.win} nums={nums(o?.playoffIfWin, titleWin, o?.titleIfWin, teamId)} picked={locks[gameId] === teamId} onClick={() => pick(gameId, teamId)} />
+        <Outcome label={theirs.full} shortLabel={theirs.short} chance={c?.lose} nums={nums(o?.playoffIfLose, titleLose, o?.titleIfLose, opponentId)} picked={locks[gameId] === opponentId} onClick={() => pick(gameId, opponentId)} />
       </Pair>
     );
   };

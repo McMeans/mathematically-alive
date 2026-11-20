@@ -10,6 +10,7 @@ import { TeamLogo } from "@/app/explorer/Board";
 import { SiteBar, type FindTeam } from "@/app/SiteBar";
 import { BoardButton } from "@/app/BoardButton";
 import { Lit } from "@/app/Lit";
+import { Colophon } from "@/app/Colophon";
 
 /** The address to share: a link with its own preview image (`/lab/s/<code>`) once there are picks or a filled-in bracket. */
 function labLink(): string {
@@ -1024,6 +1025,7 @@ function Races({ conferences, name, paged, focus }: { conferences: LabConference
           );
         })}
       </div>
+      <Colophon />
     </>
   );
 }

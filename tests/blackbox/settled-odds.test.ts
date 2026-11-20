@@ -17,12 +17,12 @@ const fsu = run(season, FSU);
 const me = fsu.outlook.find((o) => o.teamId === FSU)!;
 
 describe("a team proven out of its title game", { timeout: 60_000 }, () => {
-  it("is Out of the title game and can't win the conference, but its playoff odds read <0.1%, never a flat 0%", () => {
+  it("is Out of the title game and Out of the conference title, but its playoff odds read <0.1%, never a flat 0%", () => {
     expect(me.status).toBe("eliminated");
     expect(me.playoff).toBe(0);
     expect(formatTitleOdds(me.titleGame, me.status)).toBe("Out");
     expect(formatPlayoff(me.playoff, me.cfp, me.status, me.autoBid, me.postseasonBan)).toBe("<0.1%");
-    expect(formatChampion(me)).toBe("0%");
+    expect(formatChampion(me)).toBe("Out");
   });
 
   it("shows a flat 0% for the playoff only when the team is barred from the postseason", () => {
@@ -100,5 +100,23 @@ describe("conference names on the board", { timeout: 60_000 }, () => {
     expect(oddsLabels("Mountain West").champion).toBe("Win MW");
     expect(oddsLabels("Sun Belt").mustWin).toBe("Must win Sun Belt");
     expect(oddsLabels("Sun Belt").conferenceRecord).toBe("Sun Belt record, counting your picks");
+  });
+});
+
+describe("short result labels that would read as words", () => {
+  it("swap an abbreviation that reads as an English word for a short name, so 'MOST wins' never reads as 'most wins'", () => {
+    expect(winsLabel("Missouri State", "MOST").short).toBe("Missouri St wins");
+    expect(winsLabel("Ole Miss", "MISS").short).toBe("Ole Miss wins");
+    expect(winsLabel("Massachusetts", "MASS").short).toBe("UMass wins");
+    expect(winsLabel("South Alabama", "USA").short).toBe("S. Alabama wins");
+    expect(winsLabel("Illinois", "ILL").short).toBe("Illinois wins");
+    expect(winsLabel("Washington", "WASH").short).toBe("Washington wins");
+    expect(winsLabel("Missouri State", "MOST").full).toBe("Missouri State wins");
+  });
+
+  it("keeps an abbreviation that is a team's own name or no common word", () => {
+    expect(winsLabel("Army", "ARMY").short).toBe("ARMY wins");
+    expect(winsLabel("Iowa", "IOWA").short).toBe("IOWA wins");
+    expect(winsLabel("Florida International", "FIU").short).toBe("FIU wins");
   });
 });

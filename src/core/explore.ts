@@ -28,6 +28,6 @@ export function explore(season: Season, opts: PathOptions): Exploration {
   const status: TeamOutlook["status"] | null = tree.root.outcome === "in" ? "clinched" : tree.root.outcome === "out" ? "eliminated" : null;
   const outlook = teams.map((o) => (o.teamId === opts.teamId && status ? { ...o, status } : o));
   const playoffGames = national ? playoffSignals(season, sim, national, opts.teamId) : [];
-  const board = national ? teamBoard(season, sim, national, opts.teamId, opts.conference, opts.locks, tree.likeliest) : null;
+  const board = national ? teamBoard(season, sim, national, opts.teamId, opts.conference, opts.locks, tree.likeliest, status ?? "alive") : null;
   return { outlook, path: teamPath(season, opts, sim), tree, playoffGames, board, national };
 }

@@ -631,6 +631,13 @@ export function pathTree(season: Season, opts: TreeOptions, shared?: SimResult, 
   const swapped = (gameId: number): string => swappedShown.get(gameId)!;
   const proofOf = (gameId: number, winner: number) => proven({ ...opts.locks, [gameId]: winner });
   const verdict = (odds: number | null, gameId: number, winner: number): string => {
+    // A proven spot holds whatever happens next, so every result reads the same as the header; but the other side of
+    // a picked game swaps the pick, which the proof didn't cover.
+    const picked = opts.locks?.[gameId];
+    if (picked === undefined || picked === winner) {
+      if (root.outcome === "in") return "In";
+      if (root.outcome === "out") return "Out";
+    }
     if (odds === 1 || odds === 0) {
       const s = proofOf(gameId, winner);
       if (s === "clinched") return "In";

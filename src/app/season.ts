@@ -34,9 +34,18 @@ export const baseOutlooks = SUPPORTED_CONFERENCES.map((conference) => {
 });
 
 /** Outlook, path and tree for one team from one shared simulation in its conference, with no locks (no national run: not serializable). */
-export const baseExplore = (teamId: number, conference: string) => {
+// Kept per team, so a team's page and its share image in the same build process run it once.
+const explored = new Map<number, ReturnType<typeof exploreTeam>>();
+const exploreTeam = (teamId: number, conference: string) => {
   const { outlook, path, tree, playoffGames, board } = explore(season, { conference, teamId, iterations: ITERATIONS, seed: SEED, reuse: baseNational });
   return { outlook, path, tree, playoffGames, board };
+};
+export const baseExplore = (teamId: number, conference: string) => {
+  const hit = explored.get(teamId);
+  if (hit) return hit;
+  const r = exploreTeam(teamId, conference);
+  explored.set(teamId, r);
+  return r;
 };
 
 /** An independent's odds, games and results elsewhere, with no locks (no national run: not serializable). */

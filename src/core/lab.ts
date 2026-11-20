@@ -15,6 +15,10 @@ import { pairKey } from "./steps";
 import { conferenceData, decidedTitleGame } from "./tiebreak";
 import { nationalView, type NationalView } from "./view";
 
+// The proof budget for each race row the sample puts in every season: enough for a settled race, small enough that a
+// pick in the Lab stays quick.
+const RACE_PROOF_BUDGET = 20_000;
+
 /** Every pick in the Lab. */
 export type LabLocks = {
   /** Regular-season game id -> the team that wins it. */
@@ -221,7 +225,10 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
       .map((t) => {
         // A team the picks settle into the title game plays in it for sure: "100%", not ">99%".
         const m = tables.get(conference)!.matchup;
-        const settled = m?.exact === true && m.teams.includes(t.teamId);
+        // Or one every sampled season puts in that the proof confirms (a small budget keeps picks quick; a proof that
+        // runs out leaves ">99%").
+        const settled = (m?.exact === true && m.teams.includes(t.teamId))
+          || (t.titleGame === 1 && provenStatus(season, conference, t.teamId, locks.games, RACE_PROOF_BUDGET) === "clinched");
         const game = formatSideOdds(t.titleGame!, settled ? "clinched" : "alive");
         // With the settled game's winner picked, the title is settled too.
         const pick = locks.titles[conference];

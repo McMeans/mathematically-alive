@@ -191,7 +191,7 @@ describe("a listed title game decides who plays (2025 data under the 2026 rules)
     expect([at("Miami").champion, at("Duke").champion]).toEqual([1, 0]);
     expect(at("Miami").titleResult).toEqual({ won: true, text: "Beat Duke 24-17 in the ACC title game" });
     expect(at("Duke").titleResult).toEqual({ won: false, text: "Lost to Miami 24-17 in the ACC title game" });
-    expect([formatChampion(at("Miami")), formatChampion(at("Duke")), formatChampion(at("Virginia"))]).toEqual(["Won", "Lost", "0%"]);
+    expect([formatChampion(at("Miami")), formatChampion(at("Duke")), formatChampion(at("Virginia"))]).toEqual(["Won", "Lost", "Out"]);
     const path = (n: string) => teamPath(s, { conference: "ACC", teamId: id(s, n), iterations: 100, seed: 1 }).summary;
     expect(path("Miami")).toBe("Miami won the ACC title game, 24-17 over Duke.");
     expect(path("Duke")).toBe("Duke lost the ACC title game to Miami, 24-17.");

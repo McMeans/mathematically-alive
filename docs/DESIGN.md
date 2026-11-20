@@ -223,7 +223,7 @@ stand in, except in race rows.
 a `cond` label under it. A number may carry an odds change, `plate text-[13px]`: `text-root` when it starts with `+`,
 `text-drop` otherwise. Once the title game is proven Out, the buttons show only the Playoff number under the
 `titleGameOutLine` sentence, and record tiles that all read the same fold into one "Any finish: <value> playoff" block
-(from the core's board). In the Lab, a picked `TeamButton` swaps its odds for `PickMark` (a heavy square-ended check,
+(from the core's board). On a phone's two columns, an odd last record tile spans the row, so no empty cell shows. Once the title game is proven In or Out, every title-game number on the page reads the same as the header. In the Lab, a picked `TeamButton` swaps its odds for `PickMark` (a heavy square-ended check,
 `role="img" aria-label="Picked"`), and the beaten side fades to `opacity-40` (no strike-through: the fade and the amber winner say it).
 
 ### Week-by-week and help cards
@@ -319,6 +319,24 @@ logo, name, record and odds. The current team's row is `bg-lamp/10` with the amb
 full-width row as wide as the race cards (`rounded-[2px] border border-rule bg-white`, Public Sans 13px): winner's logo,
 committee rank (muted) and abbreviation, "over", the same for the loser (the name when a team has none, as FCS teams), and a × at the
 right. A title-game pick reads "[logo] ALA wins SEC". No buttons under it: Share, Reset and the Lab are in the header.
+
+### Intro, colophon and How it works
+
+- The home page (`/`) opens on the team with the best title-game odds, with one `text-[15px] text-ink-soft` line over
+  "What it takes" saying the tagline, why that team is up first, and how to switch. Team pages have no intro line.
+- `Colophon` (`src/app/Colophon.tsx`) closes the last column of every page: the team page's rail (under the playoff
+  footnote), the Lab's races pane and the How it works page. `text-xs text-ink-muted`: "How it works", the
+  CollegeFootballData credit and "Not affiliated with the College Football Playoff or the NCAA.", links underlined in
+  `ink-muted` at half strength. On How it works it leaves out its own link.
+- How it works (`/about`): the site bar with nothing lit, then one reading column (`max-w-xl`, about 75 characters a line) on the ground: a `cond`
+  4xl title, a 17px lead, and sections with `cond` 2xl uppercase headings over 15px Public Sans paragraphs.
+
+### Share images
+
+Every share image is drawn by `ImageResponse` in the brand's fonts: Saira Condensed (600 to 800) for lettering and numbers and Public Sans for reading lines (the record, the data date, footnotes), loaded from static `.woff` files in `src/app/fonts` (`imageOptions` in `src/app/og.tsx`, which also holds the colours, mark, logos and top line). Every card sits on the board green with the header's dot texture, drawn as a repeating SVG tile (ImageResponse drops the site's radial gradient) at 7% white, a little stronger than the site's 3.5% since cards are mostly seen scaled down. They are the site card (`src/app/opengraph-image.tsx`: the mark, the name, the tagline in amber), each team's (`src/app/team/card.tsx`: the team's logo, its live rank in cream and name, its record, then the header's odds as three dark tiles, a tile lit with an amber top rule only when it reads In; an independent's single Playoff* tile keeps a third of the width with "Independent: no conference title game, so playoff odds only." beside it; then a cream "Every path to the playoff" plate, like the site's Share, and "*Our model, not the committee."), and `src/app/lab/card.tsx` (the Lab's share image: green ground with dot texture, cream mark, seeds
+  as board rows with team logos, seeds 1 to 4 in white and the rest muted, an outlined "SEC champ" tag on each projected conference champion and "G6 bid" on the Group of Six bid, the title favorite on an amber plate, the one lit thing, with "Our model, not the committee." beside it; or, for a link with a filled-in bracket, "My playoff bracket": a column per round, each game level with the games feeding it, the pick filled amber with the light logo and the beaten side faded, then "My champion" with its logo, name in amber and seed).
+
+The iPhone icon (`src/app/apple-icon.tsx`) is the favicon's board-green ball and cream pulse on a cream plate.
 
 ### Status and loading
 
@@ -471,6 +489,3 @@ Places where shipped code doesn't yet follow this guide. Fix them when you touch
 - **Toledo on amber.** The Lab draft (`b-lab.html`) notes Toledo's light logo is mostly gold and disappears on an amber
   pick, and shows its dark logo on a small dark disc instead. The shipped `TeamLogo` has no exception yet, so a
   picked Toledo shows the light logo on amber.
-- **Share card font.** `src/app/lab/card.tsx` (the Lab's share image: green ground with dot texture, cream mark, seeds
-  as board rows with team logos, amber seeds 1 to 4, an outlined "SEC champ" tag on each projected conference champion and "G6 bid" on the Group of Six bid, the title favorite on an amber plate; or, for a link with a filled-in bracket, "My playoff bracket": a column per round, each game level with the games feeding it, the pick filled amber with the light logo and the beaten side faded, then "My champion" with its logo, name in amber and seed) uses a bold sans
-  stand-in, because no Saira Condensed `.ttf` is in the repo for `ImageResponse`.

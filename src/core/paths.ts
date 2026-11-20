@@ -239,10 +239,11 @@ export function titleResult(season: Season, conference: string, game: Game | nul
 
 /**
  * Its chance to win the conference, as shown: "Won" or "Lost" once it has played the title game, otherwise the odds
- * (`formatSideOdds`). A team proven out of the title game can't win the conference: a flat "0%".
+ * (`formatSideOdds`). A team proven out of the title game can't win the conference: "Out", as its title game reads.
  */
 export function formatChampion(o: Pick<TeamOutlook, "champion" | "status" | "titleResult">): string {
   if (o.titleResult) return o.titleResult.won ? "Won" : "Lost";
+  if (o.status === "eliminated") return "Out";
   return formatSideOdds(o.champion, o.status);
 }
 
@@ -257,10 +258,18 @@ export function titleGameOutLine(conference: string, o: Pick<TeamOutlook, "statu
 }
 
 /**
- * "Florida International wins" and, for a narrow button, "FIU wins". A team without an abbreviation keeps its name.
+ * Abbreviations that read as English words before "wins" ("MOST wins" reads as "most wins"), with the short name to
+ * use instead.
+ */
+const WORD_ABBREVIATIONS: Record<string, string> = { MOST: "Missouri St", MISS: "Ole Miss", MASS: "UMass", USA: "S. Alabama", ILL: "Illinois", WASH: "Washington" };
+
+/**
+ * "Florida International wins" and, for a narrow button, "FIU wins". A team without an abbreviation keeps its name,
+ * and one whose abbreviation reads as a word gets a short name ("Missouri St wins", not "MOST wins").
  */
 export function winsLabel(name: string, abbreviation: string | null): { full: string; short: string } {
-  return { full: `${name} wins`, short: `${abbreviation || name} wins` };
+  const short = abbreviation ? WORD_ABBREVIATIONS[abbreviation] ?? abbreviation : name;
+  return { full: `${name} wins`, short: `${short} wins` };
 }
 
 /** Whole-percent odds. "<1%" and ">99%" stand in for 0 or 100 when the true value isn't exact. */
