@@ -1,5 +1,5 @@
 // Server-side season data and the base (no what-if) computation, shared by pages.
-import { INDEPENDENTS, explore, exploreIndependent, independentOutlook, seasonLab, seasonOutlook, simulateNational, simulateSeason, type Season } from "@/core";
+import { INDEPENDENTS, explore, exploreIndependent, independentOutlook, pathTree, seasonLab, seasonOutlook, simulateNational, simulateSeason, type Season, type TeamOutlook } from "@/core";
 import data from "./data/season.json";
 
 import { ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
@@ -33,8 +33,21 @@ export const baseOutlooks = SUPPORTED_CONFERENCES.map((conference) => {
   return { conference, outlook: { iterations, teams } };
 });
 
+/**
+ * One team's line of `baseExplore(...).outlook`, without building its whole path tree: the conference outlook, with the
+ * team's status from the tree's root proof (`explore` does the same). The share images use it, so a build process that
+ * draws a team's image doesn't also build the tree its page needs.
+ */
+export const baseTeamOutlook = (teamId: number, conference: string) => {
+  const teams = baseOutlooks.find((b) => b.conference === conference)!.outlook.teams;
+  const root = pathTree(season, { conference, teamId, iterations: ITERATIONS, seed: SEED, reuse: baseNational, depth: 0 }, baseSim, teams).root;
+  const me = teams.find((o) => o.teamId === teamId)!;
+  const status: TeamOutlook["status"] | null = root.outcome === "in" ? "clinched" : root.outcome === "out" ? "eliminated" : null;
+  return status ? { ...me, status } : me;
+};
+
 /** Outlook, path and tree for one team from one shared simulation in its conference, with no locks (no national run: not serializable). */
-// Kept per team, so a team's page and its share image in the same build process run it once.
+// Kept per team, so a process that renders a team twice (a page and its metadata, say) builds the tree once.
 const explored = new Map<number, ReturnType<typeof exploreTeam>>();
 const exploreTeam = (teamId: number, conference: string) => {
   const { outlook, path, tree, playoffGames, board } = explore(season, { conference, teamId, iterations: ITERATIONS, seed: SEED, reuse: baseNational });
