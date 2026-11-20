@@ -16,6 +16,9 @@ import { TeamList } from "./Panels";
 import { AbbreviationsContext, BestShotCard, ConferenceRace, RanksContext, Heading, HelpElsewhere, IndependentWeeks, PlayoffRaceCard, TeamLogo, WeekByWeek, WhatItTakes, YourPicks } from "./Board";
 import { ConferenceProvider } from "./conference";
 
+/** How long after a pick the run waits for another: a burst of picks runs once. */
+const DEBOUNCE_MS = 150;
+
 export type GameInfo = { id: number; homeId: number; awayId: number; week: number; start: string };
 export type TeamInfo = { id: number; name: string; color: string | null; altColor: string | null };
 /** One team in the team picker: its record and odds as shown, `key` to sort by (higher first), `out` to grey it. */
@@ -90,6 +93,8 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
   const [failed, setFailed] = useState(false);
   const worker = useRef<Worker | null>(null);
   const latest = useRef(0);
+  // Picks made in quick succession send one request, after the last of them.
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const reader = useRef(read);
   const checker = useRef(check);
   // The picks as of the last change, for the worker's reply (its handler sees only the first render).
@@ -125,7 +130,7 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
       url.searchParams.delete("picks");
       window.history.replaceState(window.history.state, "", url);
     }
-    return () => w.terminate();
+    return () => { clearTimeout(timer.current); w.terminate(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load: the worker and a shared link's picks
   }, []);
 
@@ -144,6 +149,7 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
     if (text) url.searchParams.set("picks", text);
     else url.searchParams.delete("picks");
     window.history.replaceState(window.history.state, "", url);
+    clearTimeout(timer.current);
     if (Object.keys(next).length === 0 && Object.keys(nextTitles).length === 0) {
       latest.current++; // drop any pending result
       setResult(initial);
@@ -154,7 +160,8 @@ function useWhatIf<R>(initial: R, initialRanks: Record<number, string>, conferen
     }
     setBusy(true);
     setFailed(false);
-    worker.current?.postMessage({ id: ++latest.current, conference, teamId, locks: next, titles: nextTitles } satisfies SimRequest);
+    const id = ++latest.current;
+    timer.current = setTimeout(() => worker.current?.postMessage({ id, conference, teamId, locks: next, titles: nextTitles } satisfies SimRequest), DEBOUNCE_MS);
   }
 
   /** Lock a game to a winner; a missing winner (or the current one, when toggling) clears it. */
