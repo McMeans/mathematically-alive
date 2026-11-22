@@ -203,9 +203,9 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
       if (g.homePoints === g.awayPoints) throw new Error(`completed game ${g.id} ended in a tie`);
       fixed[i] = g.homePoints > g.awayPoints ? 1 : 0;
     }
-    else if (locked[i] >= 0) fixed[i] = locked[i];
     else {
-      fixed[i] = -1;
+      // A locked game keeps its spread: its natural result (as if unlocked) is drawn too.
+      fixed[i] = locked[i] >= 0 ? locked[i] : -1;
       spread[i] = homeSpread(byId, g);
     }
   }
@@ -213,6 +213,8 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
 
   const stride = (G + 7) >> 3;
   const bits = new Uint8Array(stride * iterations);
+  // Each unplayed game's result as if no game were locked (the same draw): what a later run with other locks plays.
+  const natural = new Uint8Array(stride * iterations);
   const dist = new Uint32Array(T * (maxGames + 1));
   const winSum = new Float64Array(T);
   const confSum = new Float64Array(T);
@@ -223,7 +225,7 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
   // A team's shift is one hashed draw per (seed, iteration, team): the same value `IterationTeams.shift`
   // and `rank` return later. Teams with no game left to simulate have nothing to use it for here, so their
   // slots aren't filled; they still get that same shift for ranking and the title game.
-  const active = Int32Array.from(new Set(Array.from({ length: G }, (_, i) => i).filter((i) => fixed[i] < 0).flatMap((i) => [homeIdx[i], awayIdx[i]])));
+  const active = Int32Array.from(new Set(Array.from({ length: G }, (_, i) => i).filter((i) => !games[i].completed).flatMap((i) => [homeIdx[i], awayIdx[i]])));
 
   for (let it = 0; it < iterations; it++) {
     wins.fill(0);
@@ -236,7 +238,10 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
       // Draw for every game, fixed or not, so a lock changes only its own game
       // and what-if runs at the same seed stay paired.
       const r = rand();
-      const homeWon = f >= 0 ? f === 1 : r < fastCdf((shift[homeIdx[i]] - shift[awayIdx[i]] - spread[i]) / GAME_SD);
+      const done = games[i].completed;
+      const drawn = !done && r < fastCdf((shift[homeIdx[i]] - shift[awayIdx[i]] - spread[i]) / GAME_SD);
+      const homeWon = f >= 0 ? f === 1 : drawn;
+      if (done ? homeWon : drawn) natural[base + (i >> 3)] |= 1 << (i & 7);
       const w = homeWon ? homeIdx[i] : awayIdx[i];
       if (homeWon) bits[base + (i >> 3)] |= 1 << (i & 7);
       wins[w]++;
@@ -303,14 +308,49 @@ export function simulateSeason(season: Season, opts: SimOptions): SimResult {
     rank: (id) => rankAt(id, -1),
     rankIf: rankAt,
   };
-  return {
+  const result: SimResult = {
     iterations,
     teams,
     forEachIteration(cb) {
       for (current = 0; current < iterations; current++) cb(current, winnerOf, teamsNow);
     },
   };
+  naturals.set(result, { bits: natural, stride });
+  return result;
 }
+
+/**
+ * A season's draws, worked out without a run: each team's rating shift in simulated season `it`, and each unplayed
+ * game's chance of going to its home team that season, given those shifts (what its draw is compared against). Not
+ * part of the public API.
+ */
+export function seasonDraws(season: Season, seed: number): { shift(it: number, teamId: number): number; homeChance(it: number, gameIndex: number): number } {
+  const byId = new Map<number, Team>(season.teams.map((t) => [t.id, t]));
+  const teamIndex = new Map<number, number>([...byId.keys()].map((id, i) => [id, i]));
+  const shift = (it: number, teamId: number): number => SHOCK_SD * normalAt(seed, it, SHIFT_SALT + teamIndex.get(teamId)!);
+  const spreads = new Map<number, number>();
+  return {
+    shift,
+    homeChance(it, i) {
+      const g = season.games[i];
+      let spread = spreads.get(i);
+      if (spread === undefined) spreads.set(i, (spread = homeSpread(byId, g)));
+      return fastCdf((shift(it, g.homeId) - shift(it, g.awayId) - spread) / GAME_SD);
+    },
+  };
+}
+
+/** Each simulated season's natural results (`naturalResults`), by run. */
+const naturals = new WeakMap<SimResult, NaturalResults>();
+
+/**
+ * Every game's result in each simulated season as if no game were locked: bit (i & 7) of
+ * `bits[iteration * stride + (i >> 3)]` is set when game i (into `season.games`) goes to the home team. A completed
+ * game's is its real result. Draws don't depend on locks, so runs of the same season and seed share these. Not part
+ * of the public API.
+ */
+export type NaturalResults = { bits: Uint8Array; stride: number };
+export const naturalResults = (sim: SimResult): NaturalResults | undefined => naturals.get(sim);
 
 // mulberry32: small, fast, seedable PRNG.
 export function mulberry32(seed: number): () => number {

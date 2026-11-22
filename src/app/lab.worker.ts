@@ -1,8 +1,11 @@
 // The Season Lab's simulations and link codec, off the main thread (the codec needs the whole season, which only
-// this worker loads). Each pick runs twice: a quick pass for numbers right away, then the full run. A newer pick
-// skips the full run of an older one.
-import { decodeLabBracket, decodeLabLocks, decodeLocks, decodeTitlePick, encodeLabLocks, fillLabLocks, labChanges, labHeld, labTeamOdds, seasonLab, simulateBracket, type BracketGame, type LabBracketPicks, type LabChanges, type LabFill, type LabHeld, type LabLocks, type LabTeamOdds, type NationalResult, type Season, type SeasonLab } from "@/core";
-import { ITERATIONS, QUICK_ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
+// this worker loads). Each pick answers twice: an estimate at once (the last full run's seasons the pick doesn't
+// change), then the full run, which copies those seasons and plays the rest. A newer pick skips an older one's full run.
+import { decodeLabBracket, decodeLabLocks, decodeLocks, decodeTitlePick, encodeLabLocks, fillLabLocks, labChanges, labHeld, labTeamOdds, seasonLab, simulateBracket, type BracketGame, type LabBracketPicks, type LabChanges, type LabFill, type LabHeld, type LabLocks, type LabTeamOdds, type Season, type SeasonLab } from "@/core";
+import { ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
+
+/** Fewest seasons an estimate counts to be shown: fewer and the full run's numbers come alone. */
+const MIN_ESTIMATE = 2000;
 import data from "./data/season.json";
 
 /**
@@ -25,7 +28,7 @@ export type LabRequest =
   /** Back to no picks (the page shows its own no-picks view): the next pick's changes are against no picks. */
   | { kind: "reset"; id: number };
 export type LabResponse =
-  /** `held`: on a quick run, the odds the pick barely moved (`labHeld`), which the page keeps as shown. */
+  /** `held`: on an estimate, the odds the pick barely moved (`labHeld`), which the page keeps as shown. */
   | { kind: "result"; id: number; final: boolean; view: LabView; code: string; held?: LabHeld }
   /** `bracket`: the link's filled-in bracket, checked against the season (null when it has none, or it doesn't fit). */
   | { kind: "opened"; id: number; locks: LabLocks; note: string; bracket: LabBracketPicks | null }
@@ -35,17 +38,36 @@ export type LabResponse =
 
 const season = data as Season;
 const base = { iterations: ITERATIONS, seed: SEED, conferences: SUPPORTED_CONFERENCES };
-// The latest run at each size (none until the first pick: a visit without picks simulates nothing here): the next pick copies the title races its changed picks don't touch.
-let quick: NationalResult | undefined;
-let full: NationalResult | undefined;
+const none = (): LabLocks => ({ games: {}, titles: {}, bracket: {} });
+/**
+ * The last few full runs, newest first (each about 14 MB), with their picks and link code. A pick's estimate starts
+ * from the closest one with only picks it keeps; its full run copies the seasons it doesn't change. Going back to picks
+ * one of them has (an undo, a pick taken back) shows it again at once.
+ */
+const fulls: { lab: SeasonLab; locks: LabLocks; code: string }[] = [];
+const KEEP_RUNS = 3;
+function remember(lab: SeasonLab, locks: LabLocks, code: string) {
+  const at = fulls.findIndex((f) => f.code === code);
+  if (at >= 0) fulls.splice(at, 1);
+  fulls.unshift({ lab, locks, code });
+  fulls.length = Math.min(fulls.length, KEEP_RUNS);
+}
+const latestFull = () => {
+  if (fulls.length === 0) remember(run(none()), none(), "");
+  return fulls[0];
+};
+// Run the no-picks season while the page is read, so even the first pick shows its estimate at once.
+setTimeout(latestFull, 0);
+/** Whether every pick in `a` is in `b`, the same way. */
+const within = (a: LabLocks, b: LabLocks) =>
+  (["games", "titles", "bracket"] as const).every((k) => Object.entries(a[k]).every(([id, w]) => (b[k] as Record<string, number>)[id] === w));
+const size = (l: LabLocks) => Object.keys(l.games).length + Object.keys(l.titles).length + Object.keys(l.bracket).length;
 let newest = 0;
-// The last quick run, what the next pick's change log compares against (the same size and seed, so seasons line up).
-let shown: SeasonLab | undefined;
 // A shared link's picks aren't the visitor's last change: its first run shows none.
 let opened = false;
 
-function run(locks: LabLocks, iterations: number, reuse: NationalResult | undefined) {
-  return seasonLab(season, { ...base, iterations, locks, reuse });
+function run(locks: LabLocks, opts: { reuse?: SeasonLab; estimate?: boolean } = {}) {
+  return seasonLab(season, { ...base, locks, reuse: opts.reuse?.national, estimate: opts.estimate });
 }
 const strip = (lab: SeasonLab, changes: LabChanges | null, focus: number | null): LabView => ({
   summary: lab.summary, fieldTexts: lab.fieldTexts, loaded: lab.loaded, picks: lab.picks, open: lab.open, playoff: lab.playoff, champions: lab.champions, conferences: lab.conferences,
@@ -65,7 +87,6 @@ self.onmessage = async (e: MessageEvent<LabRequest>) => {
       return;
     }
     if (req.kind === "reset") {
-      shown = undefined;
       opened = false; // a link with no usable picks never runs: the next pick is the visitor's own
       return;
     }
@@ -78,20 +99,32 @@ self.onmessage = async (e: MessageEvent<LabRequest>) => {
       self.postMessage({ kind: "filled", id: req.id, locks: fillLabLocks(season, req.locks, req.how, SUPPORTED_CONFERENCES) } satisfies LabResponse);
       return;
     }
-    const code = encodeLabLocks(season, req.locks);
-    const before = shown ?? run({ games: {}, titles: {}, bracket: {} }, QUICK_ITERATIONS, quick);
-    const q = run(req.locks, QUICK_ITERATIONS, quick ?? before.national);
-    quick = q.national;
-    shown = q;
-    const changes = opened ? null : labChanges(season, before, q);
-    opened = false;
-    const held = labHeld(before, q);
-    self.postMessage({ kind: "result", id: req.id, final: false, view: strip(q, changes, req.focus), code, held } satisfies LabResponse);
     await new Promise((r) => setTimeout(r, 0)); // let a newer pick arrive
     if (req.id !== newest) return;
-    const f = run(req.locks, ITERATIONS, full);
-    full = f.national;
-    self.postMessage({ kind: "result", id: req.id, final: true, view: strip(f, changes, req.focus), code } satisfies LabResponse);
+    const code = encodeLabLocks(season, req.locks);
+    const before = latestFull();
+    const done = (lab: SeasonLab) => {
+      remember(lab, req.locks, code);
+      const changes = opened ? null : labChanges(season, before.lab, lab);
+      opened = false;
+      self.postMessage({ kind: "result", id: req.id, final: true, view: strip(lab, changes, req.focus), code } satisfies LabResponse);
+    };
+    // Picks a recent full run has: that run, exact, at once.
+    const again = fulls.find((f) => f.code === code);
+    if (again) return done(again.lab);
+    // The estimate: the closest recent run with only picks this one keeps, its seasons the new picks don't change,
+    // weighed, with nothing simulated. Without such a run it simulates in full: that is the answer.
+    const from = fulls.filter((f) => within(f.locks, req.locks)).sort((x, y) => size(y.locks) - size(x.locks))[0] ?? before;
+    const est = run(req.locks, { reuse: from.lab, estimate: true });
+    if (est.national.iterations === ITERATIONS) return done(est);
+    // Too few seasons kept (a link's or a fill's many picks) say little: the full run's numbers come alone.
+    if (est.national.iterations >= MIN_ESTIMATE) {
+      // The change log waits for the full run: an estimate's smaller sample could name a team the full run doesn't.
+      self.postMessage({ kind: "result", id: req.id, final: false, view: strip(est, null, req.focus), code, held: labHeld(before.lab, est) } satisfies LabResponse);
+    }
+    await new Promise((r) => setTimeout(r, 0)); // let a newer pick arrive
+    if (req.id !== newest) return;
+    done(run(req.locks, { reuse: from.lab }));
   } catch {
     self.postMessage({ kind: "error", id: req.id } satisfies LabResponse);
   }

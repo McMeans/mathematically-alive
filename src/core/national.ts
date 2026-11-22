@@ -14,7 +14,7 @@ import { announcedField, bracketGames, championsNeeded, fieldPicker, findFormat,
 import { holdCeilings, liveModel, movedScore, resultPoints } from "./live";
 import { isArmyNavy, type Game, type Season } from "./season";
 import { HOME_FIELD } from "./odds";
-import { COMMITTEE_SALT, PLAYOFF_SALT, mix, neutralOdds, simulateSeason, tiebreakDraw, titleRoll, type SimResult } from "./sim";
+import { COMMITTEE_SALT, PLAYOFF_SALT, mix, naturalResults, neutralOdds, seasonDraws, simulateSeason, tiebreakDraw, titleRoll, type IterationTeams, type NaturalResults, type SimResult } from "./sim";
 import { pairKey } from "./steps";
 import { championshipFromData, conferenceData, type ConferenceData } from "./tiebreak";
 
@@ -44,9 +44,22 @@ export type NationalOptions = {
    * An earlier run of the same season, seed and iterations, with any locks. Title races it simulated that no lock
    * differing between the two runs touches (a differing locked game's teams aren't in them) are copied from it
    * instead of played again: the same draws give the same games. When nothing differs and no `teamId` is asked for,
-   * the earlier run itself comes back. Anything else is ignored.
+   * the earlier run itself comes back. Seasons in which every lock that differs comes out the way the earlier run
+   * played it (the same draws give the same season) are copied whole. Anything else is ignored.
    */
   reuse?: NationalResult;
+  /**
+   * With `reuse` (a run of the same season, seed, iterations and conferences, in the same order) and only locks added
+   * to its own: simulate nothing, and give the odds over its seasons in which each added lock's result came out that
+   * way on its own (the same seasons the full run plays there). Each is weighed by 1 over the chance its added results
+   * had, given the season's rating shifts, so the seasons kept count as the full run's do and the picked teams' odds
+   * aren't tilted toward the seasons they were strong. It counts the first 8,000 such seasons at most, so it stays
+   * quick. `iterations` is how many seasons it counts, and
+   * `forEachIteration` replays them, unweighted, under their own iteration numbers. Without such a run, with a lock it
+   * had that this one changes or drops, with no season kept, or with a `teamId` it didn't follow, the run is
+   * simulated in full.
+   */
+  estimate?: boolean;
 };
 
 export type NationalTeam = {
@@ -133,14 +146,27 @@ export type NationalResult = {
    * sampling alone would show). 0 for a game one side always wins (a locked game).
    */
   swings: { gameId: number; home: number; spots: number }[];
-  /** Replay every simulated season's title games and ranking. */
+  /**
+   * Replay every simulated season's title games and ranking. `iteration` is the season's number in the run, 0 to
+   * the run's size less 1 (an estimate's seasons keep the numbers they had in the run they came from).
+   */
   forEachIteration(cb: (iteration: number, season: NationalSeason) => void): void;
 };
 
-/** What a later run needs to reuse a run's title games (NationalOptions.reuse). */
+/** Most seasons an estimate counts: the first ones kept (any seasons are a fair sample), so it stays quick. */
+const ESTIMATE_SEASONS = 8000;
+
+/**
+ * What a later run needs to reuse a run's seasons (NationalOptions.reuse): per season, the title games ([seed 1,
+ * seed 2, champion] per race) and each one's natural champion (as if no title game were locked), the ranking, the
+ * field, the bracket's winners and each one's natural winner (as if no playoff game were locked), the focus team's
+ * games the other way (bit 0: in the field, bit 1: in the title game), and every game's natural result.
+ */
 type Reusable = {
   season: Season; seed: number; iterations: number; conferences: readonly string[]; locks: Record<number, number>;
-  titleLocks: Record<string, number>; bracketLocks: Record<number, number>; titles: Int32Array; rankings: Uint16Array; focus: boolean };
+  titleLocks: Record<string, number>; bracketLocks: Record<number, number>; titles: Int32Array; rankings: Uint16Array; focus: boolean;
+  focusId: number | null; natTitle: Int32Array; fields: Int32Array; slots: Int32Array; natSlots: Int32Array; champs: Int32Array;
+  own: Uint8Array; ownGames: number[]; natural: NaturalResults };
 const reusable = new WeakMap<NationalResult, Reusable>();
 
 /** Whether an earlier run is this one: same season, seed, iterations, conferences (any order) and locks, and no focus team. */
@@ -155,7 +181,7 @@ const sameKeys = (x: Record<string | number, number>, y: Record<string | number,
   [...new Set([...Object.keys(x), ...Object.keys(y)])].every((k) => x[k] === y[k]);
 
 /** Per race, where to copy the earlier run's title games from (its titles at (iteration * stride + at) * 3), or null to play them. */
-function reusedTitles(season: Season, opts: NationalOptions, n: number, races: TitleRace[]): ({ titles: Int32Array; stride: number; at: number } | null)[] {
+function reusedTitles(season: Season, opts: NationalOptions, n: number, races: TitleRace[]): ({ titles: Int32Array; natTitle: Int32Array; stride: number; at: number } | null)[] {
   const r = opts.reuse && reusable.get(opts.reuse);
   const locks = opts.locks ?? {};
   if (!r || r.season !== season || r.seed !== opts.seed || r.iterations !== n) return races.map(() => null);
@@ -171,7 +197,7 @@ function reusedTitles(season: Season, opts: NationalOptions, n: number, races: T
   const titleLocks = opts.titleLocks ?? {};
   return races.map((race) => {
     const at = r.conferences.indexOf(race.conference);
-    return at < 0 || titleLocks[race.conference] !== r.titleLocks[race.conference] || [...touched].some((id) => race.data.ids.has(id)) ? null : { titles: r.titles, stride: r.conferences.length, at };
+    return at < 0 || titleLocks[race.conference] !== r.titleLocks[race.conference] || [...touched].some((id) => race.data.ids.has(id)) ? null : { titles: r.titles, natTitle: r.natTitle, stride: r.conferences.length, at };
   });
 }
 
@@ -220,6 +246,13 @@ export function playTitleGame(
   return [a, b, titleRoll(seed, iteration, race.conference) < race.odds(a, b, shift(a), shift(b)) ? a : b];
 }
 
+/** The title game between `a` and `b` as if no title game were locked: the data's game, or the season's roll. */
+const naturalTitle = (race: TitleRace, seed: number, iteration: number, a: number, b: number, winnerOf: (game: Game) => number, shift: (teamId: number) => number): number => {
+  const g = gameBetween(race, a, b);
+  if (g) return winnerOf(g);
+  return titleRoll(seed, iteration, race.conference) < race.odds(a, b, shift(a), shift(b)) ? a : b;
+};
+
 /** Simulate the season, every listed conference's title game, and the committee stand-in ranking. */
 export function simulateNational(season: Season, opts: NationalOptions, shared?: SimResult): NationalResult {
   const { iterations, seed } = opts;
@@ -234,8 +267,8 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
     if (!race.data.ids.has(id)) throw new Error(`team ${id} is not in ${c}`);
   }
   const bracketLocks = opts.bracketLocks ?? {};
-  const sim = shared ?? simulateSeason(season, { iterations, seed, locks: opts.locks });
-  const n = sim.iterations;
+  const locks = opts.locks ?? {};
+  const n = shared?.iterations ?? iterations;
   const C = races.length;
   const power = new Set(powerConferences(season.year));
   const format = findFormat(season.year);
@@ -247,9 +280,10 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const finals = new Map((announced ? season.playoffGames ?? [] : []).filter((g) => g.completed).map((g) => [pairKey(g.homeId, g.awayId), g]));
   const T = format?.teams ?? 12;
   const bracket = bracketGames(T);
+  const B = bracket.length;
   for (const k of Object.keys(bracketLocks)) {
     const g = Number(k);
-    if (!Number.isInteger(g) || g < 0 || g >= bracket.length) throw new Error(`bracket game ${k} doesn't exist`);
+    if (!Number.isInteger(g) || g < 0 || g >= B) throw new Error(`bracket game ${k} doesn't exist`);
   }
   const odds = neutralOdds(season);
 
@@ -261,12 +295,113 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const idx = (id: number): number => fbsIndex.get(id) ?? -1;
   const games = season.games;
   const gameIndex = new Map<number, number>(games.map((g, i) => [g.id, i]));
+  // The focus team's unplayed games (season.games indexes), with field counts by its result: [win, lose].
+  const focus = opts.teamId !== undefined && fbsIndex.has(opts.teamId) && playoff ? opts.teamId : null;
+  const own = focus === null ? [] : games.flatMap((g, i) =>
+    !g.completed && (g.homeId === focus || g.awayId === focus) ? [{ i, field: [0, 0], title: [0, 0] }] : []);
+
+  // The earlier run, when its seasons line up with this run's: same season, seed, size and conferences in order.
+  const prior = opts.reuse ? reusable.get(opts.reuse) : undefined;
+  const basis = prior && prior.season === season && prior.seed === seed && prior.iterations === n && prior.conferences.join() === conferences.join() ? prior : undefined;
+  // Its focus team's games the other way can be copied too when it followed the same team.
+  const ownKept = basis !== undefined && basis.focusId === focus && basis.ownGames.join() === own.map((o) => o.i).join();
+  const lockSide = (id: number, l: Record<number, number>): number => {
+    const i = gameIndex.get(id);
+    if (i === undefined) throw new Error(`lock for unknown game ${id}`);
+    return l[id] === undefined ? -1 : l[id] === games[i].homeId ? 1 : 0;
+  };
+  // Which of the earlier run's seasons this run plays the same: every lock that differs comes out the way it went there.
+  const kept = new Uint8Array(basis ? n : 0);
+  let keptCount = 0;
+  // Whether every lock that differs is new here (the earlier run left those results free): only then can an estimate
+  // weigh the seasons it keeps back to what the full run plays (`weightOf`).
+  let onlyAdded = false;
+  let weightOf: (it: number) => number = () => 1;
+  if (basis) {
+    const nat = basis.natural;
+    const changed = [...new Set([...Object.keys(locks), ...Object.keys(basis.locks)].map(Number))]
+      .filter((id) => locks[id] !== basis.locks[id])
+      .map((id) => ({ i: gameIndex.get(id) ?? -1, now: lockSide(id, locks), was: lockSide(id, basis.locks) }));
+    const titled = races.flatMap((r, c) => (titleLocks[r.conference] !== basis.titleLocks[r.conference] ? [{ c, race: r, lock: titleLocks[r.conference] }] : []));
+    const bracketed = [...new Set([...Object.keys(bracketLocks), ...Object.keys(basis.bracketLocks)].map(Number))]
+      .filter((g) => bracketLocks[g] !== basis.bracketLocks[g]).sort((x, y) => x - y);
+    onlyAdded = changed.every((c) => c.was < 0) && titled.every(({ race }) => basis.titleLocks[race.conference] === undefined)
+      && bracketed.every((g) => basis.bracketLocks[g] === undefined);
+    // A kept season is one where each new lock's result came out that way on its own: likelier in seasons whose
+    // rating shifts favoured it. Weighing each by 1 over that chance (given the season's shifts) puts the seasons kept
+    // back in the proportions every season has, which the full run plays, the lock forced.
+    const draws = seasonDraws(season, seed);
+    weightOf = (it) => {
+      let chance = 1;
+      for (const { i, now } of changed) {
+        const home = draws.homeChance(it, i);
+        chance *= now === 1 ? home : 1 - home;
+      }
+      for (const { c, race, lock } of titled) {
+        const at = (it * C + c) * 3;
+        const [a, b] = [basis.titles[at], basis.titles[at + 1]];
+        if (lock !== a && lock !== b) continue;
+        const g = gameBetween(race, a, b);
+        if (g?.completed) continue;
+        const gi = g ? gameIndex.get(g.id)! : -1;
+        // A title game in the data plays as a game: its own lock, if any, settles it.
+        if (g && locks[g.id] !== undefined) continue;
+        const other = lock === a ? b : a;
+        chance *= g ? (lock === g.homeId ? draws.homeChance(it, gi) : 1 - draws.homeChance(it, gi)) : race.odds(lock, other, draws.shift(it, lock), draws.shift(it, other));
+      }
+      for (const g of bracketed) {
+        const [x, y, hosted] = bracket[g];
+        const a = x >= 0 ? basis.fields[it * T + x] : basis.slots[it * B + ~x];
+        const b = y >= 0 ? basis.fields[it * T + y] : basis.slots[it * B + ~y];
+        const lock = bracketLocks[g];
+        if (finals.has(pairKey(a, b)) || (lock !== a && lock !== b)) continue;
+        const aWins = odds(a, b, draws.shift(it, a), draws.shift(it, b), hosted ? HOME_FIELD : 0);
+        chance *= lock === a ? aWins : 1 - aWins;
+      }
+      return 1 / Math.max(chance, 1e-9);
+    };
+    for (let it = 0; it < n; it++) {
+      let same = true;
+      for (const { i, now, was } of changed) {
+        const natHome = (nat.bits[it * nat.stride + (i >> 3)] >> (i & 7)) & 1;
+        if ((now >= 0 ? now : natHome) !== (was >= 0 ? was : natHome)) { same = false; break; }
+      }
+      for (let j = 0; same && j < titled.length; j++) {
+        const { c, race, lock } = titled[j];
+        const at = (it * C + c) * 3;
+        const [a, b, ch] = [basis.titles[at], basis.titles[at + 1], basis.titles[at + 2]];
+        if (gameBetween(race, a, b)?.completed) continue;
+        if ((lock === a || lock === b ? lock : basis.natTitle[it * C + c]) !== ch) same = false;
+      }
+      if (same && playoff && bracketed.length > 0) {
+        const slot = (x: number): number => (x >= 0 ? basis.fields[it * T + x] : basis.slots[it * B + ~x]);
+        for (const g of bracketed) {
+          const [x, y] = bracket[g];
+          const a = slot(x), b = slot(y);
+          if (finals.has(pairKey(a, b))) continue;
+          const lock = bracketLocks[g];
+          if ((lock === a || lock === b ? lock : basis.natSlots[it * B + g]) !== basis.slots[it * B + g]) { same = false; break; }
+        }
+      }
+      if (same) { kept[it] = 1; keptCount++; }
+    }
+  }
+  // An estimate: the earlier run's seasons these locks don't change, with nothing simulated.
+  const estimating = opts.estimate === true && basis !== undefined && onlyAdded && keptCount > 0 && (focus === null || ownKept) && shared === undefined;
+  if (estimating) for (const id of Object.keys(locks)) if (games[gameIndex.get(Number(id)) ?? 0]?.completed) throw new Error(`game ${id} is already final and can't be locked`);
+  const sim = estimating ? null : shared ?? simulateSeason(season, { iterations, seed, locks: opts.locks });
+  const natural = sim ? naturalResults(sim)! : basis!.natural;
+  // Each game's locked side here (1 home, 0 away), or -1: a season's result is its lock, else its natural one.
+  const side = new Int8Array(games.length).fill(-1);
+  for (const id of Object.keys(locks)) side[gameIndex.get(Number(id))!] = lockSide(Number(id), locks);
+
   // Army-Navy is played the week after the field is picked, so it counts in none of the records the stand-in ranks on.
   const name = new Map(season.teams.map((t) => [t.id, t.name]));
   const late = games.map((g) => isArmyNavy(name.get(g.homeId), name.get(g.awayId)));
   const home = Int32Array.from(games, (g, i) => (late[i] ? -1 : idx(g.homeId)));
   const away = Int32Array.from(games, (g, i) => (late[i] ? -1 : idx(g.awayId)));
   const unplayed = Int32Array.from(games.flatMap((g, i) => (g.completed ? [] : [i])));
+  const homeOf = Int32Array.from(games, (g) => g.homeId);
   const rating = Float64Array.from(fbs, (t) => teamRating(t));
   // Strength of schedule: opponents' ratings summed over the season's games, and how many.
   const oppSum = new Float64Array(F);
@@ -285,13 +420,12 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const allIndex = new Map<number, number>(season.teams.map((t, j) => [t.id, j]));
   const allOf = Int32Array.from(fbsIds, (id) => allIndex.get(id)!);
   const moved = new Float64Array(season.teams.length);
-  const opps: number[][] = fbs.map(() => []);
   const playedBy: number[][] = season.teams.map(() => []);
   games.forEach((g, i) => {
     const h = home[i];
     const a = away[i];
-    if (h >= 0) { opps[h].push(allIndex.get(g.awayId)!); playedBy[allIndex.get(g.awayId)!].push(h); }
-    if (a >= 0) { opps[a].push(allIndex.get(g.homeId)!); playedBy[allIndex.get(g.homeId)!].push(a); }
+    if (h >= 0) playedBy[allIndex.get(g.awayId)!].push(h);
+    if (a >= 0) playedBy[allIndex.get(g.homeId)!].push(a);
   });
   // Games whose results move ratings: every counted game the ranking didn't see.
   const fresh = Int32Array.from(anchored ? games.flatMap((_, i) => (live.counts[i] && !live.seen[i] ? [i] : [])) : []);
@@ -315,42 +449,43 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const champ = new Uint8Array(F);
   const score = new Float64Array(F);
   const order = new Uint16Array(F);
-  // Stored per iteration for forEachIteration: the ranking (FBS indexes) and each race's [seed 1, seed 2, champion].
+  // Stored per iteration, for forEachIteration and for later runs (Reusable): the ranking (FBS indexes), each race's
+  // [seed 1, seed 2, champion] and natural champion, the field, the bracket's winners and natural winners, the
+  // champion, and the focus team's games the other way.
   const rankings = new Uint16Array(n * F);
   const titles = new Int32Array(n * C * 3);
-  const copied = reusedTitles(season, opts, n, races);
+  const natTitle = new Int32Array(n * C);
+  const copied = estimating ? races.map(() => null) : reusedTitles(season, opts, n, races);
   // The earlier run's ranking, as each season's starting order: nearly sorted already, so the sort is close to linear.
-  const prior = opts.reuse && reusable.get(opts.reuse);
   const startOrder = prior && prior.season === season && prior.iterations === n ? prior.rankings : null;
   const rankSum = new Float64Array(F);
   // The stand-in's features summed over seasons (NationalTeam.profile).
   const winSum = new Float64Array(F);
   const lossSum = new Float64Array(F);
-  const sosSum = new Float64Array(F);
+  // Strength of schedule: each team's regular season's, and the seasons' title games' changes to it, summed.
+  const regularSos = Float64Array.from(oppSum, (x, k) => (oppCount[k] === 0 ? 0 : x / oppCount[k]));
+  const sosMoved = new Float64Array(F);
   const champSum = new Float64Array(F);
-  // Per regular-season game still to play: seasons the home team wins it, and of those, seasons each team is in the field.
+  // Regular-season games still to play, for `swings`.
   const open = Int32Array.from([...unplayed].filter((i) => !games[i].titleGame));
-  const homeWon = new Uint32Array(open.length);
-  const homeField = new Uint32Array(playoff ? open.length * F : 0);
-  const fieldIdx = new Int32Array(T);
-  const top = [new Uint32Array(F), new Uint32Array(F), new Uint32Array(F)];
+  const top = [new Float64Array(F), new Float64Array(F), new Float64Array(F)];
   const cuts = [4, 12, 25];
   const rankIds = new Int32Array(F);
   const fields = new Int32Array(playoff ? n * T : 0);
   const playoffChamps = new Int32Array(playoff ? n : 0);
-  const seedCount = new Uint32Array(F * T);
-  const inField = new Uint32Array(F);
-  const reached = [new Uint32Array(F), new Uint32Array(F), new Uint32Array(F), new Uint32Array(F)]; // QF, SF, final, title
-  const roundOf = (g: number): number => (g === bracket.length - 1 ? 2 : T === 4 || g >= 8 ? 1 : g >= 4 ? 0 : -1);
-  const slot = new Int32Array(bracket.length);
+  const slots = new Int32Array(playoff ? n * B : 0);
+  const natSlots = new Int32Array(playoff ? n * B : 0);
+  const ownBits = new Uint8Array(n * own.length);
+  // Counted in seasons, each weighing `weight` (1, but for an estimate's seasons).
+  const seedCount = new Float64Array(F * T);
+  const inField = new Float64Array(F);
+  const reached = [new Float64Array(F), new Float64Array(F), new Float64Array(F), new Float64Array(F)]; // QF, SF, final, title
+  let weight = 1;
+  const roundOf = (g: number): number => (g === B - 1 ? 2 : T === 4 || g >= 8 ? 1 : g >= 4 ? 0 : -1);
   const inTitle = new Map<number, number>();
   const won = new Map<number, number>();
   for (const r of races) for (const id of r.data.ids) { inTitle.set(id, 0); won.set(id, 0); }
 
-  // The focus team's unplayed games (season.games indexes), with field counts by its result: [win, lose].
-  const focus = opts.teamId !== undefined && fbsIndex.has(opts.teamId) && playoff ? opts.teamId : null;
-  const own = focus === null ? [] : games.flatMap((g, i) =>
-    !g.completed && (g.homeId === focus || g.awayId === focus) ? [{ i, field: [0, 0], title: [0, 0] }] : []);
   const focusRace = focus === null ? -1 : races.findIndex((r) => r.data.ids.has(focus));
   const raceOf = (id: number): number => races.findIndex((r) => r.data.ids.has(id));
   const gumbel = new Float64Array(F);
@@ -390,193 +525,265 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
   const fscore = new Float64Array(F);
   const forder = new Uint16Array(F);
   const fIds = new Int32Array(F);
+  const field: number[] = new Array<number>(playoff ? T : 0);
 
-  sim.forEachIteration((it, winnerAt, teams) => {
+  /**
+   * One season: played (`copy` false), or copied from the earlier run (`basis`), which played it the same; then
+   * counted. `homeWins` says whether game i (into `season.games`) went to its home team. `teams` is null only for an
+   * estimate, which copies every season it counts and never scores.
+   */
+  const season1 = (it: number, homeWins: (gameIndex: number) => boolean, winnerAt: (gameIndex: number) => number, teams: IterationTeams | null, copy: boolean) => {
     const winnerOf = (g: Game): number => winnerAt(gameIndex.get(g.id)!);
     w.set(baseW);
     l.set(baseL);
     for (let j = 0; j < unplayed.length; j++) {
       const i = unplayed[j];
-      const homeWon = winnerAt(i) === games[i].homeId;
-      const win = homeWon ? home[i] : away[i];
-      const lose = homeWon ? away[i] : home[i];
+      const h = homeWins(i);
+      const win = h ? home[i] : away[i];
+      const lose = h ? away[i] : home[i];
       if (win >= 0) w[win]++;
       if (lose >= 0) l[lose]++;
     }
     titleSos.fill(0);
     titleN.fill(0);
     champ.fill(0);
-    if (anchored) {
+    // A copied season is scored only when the focus team's games the other way must be played again.
+    const scoring = !copy || (own.length > 0 && !ownKept);
+    if (anchored && scoring) {
       moved.fill(0);
       for (let j = 0; j < fresh.length; j++) {
         const i = fresh[j];
         const g = games[i];
-        const homeWon = winnerAt(i) === g.homeId;
-        const pts = resultPoints(live.home[i], homeWon);
-        moved[allIndex.get(homeWon ? g.homeId : g.awayId)!] += pts;
-        moved[allIndex.get(homeWon ? g.awayId : g.homeId)!] -= pts;
+        const h = homeWins(i);
+        const pts = resultPoints(live.home[i], h);
+        moved[allIndex.get(h ? g.homeId : g.awayId)!] += pts;
+        moved[allIndex.get(h ? g.awayId : g.homeId)!] -= pts;
       }
     }
 
     // Stage 2.
     for (let c = 0; c < C; c++) {
-      const from = copied[c];
-      const at = from ? (it * from.stride + from.at) * 3 : 0;
-      const [a, b, ch] = from ? [from.titles[at], from.titles[at + 1], from.titles[at + 2]] : playTitleGame(races[c], seed, it, winnerOf, teams.rank, teams.shift, titleLocks[races[c].conference]);
-      titles.set([a, b, ch], (it * C + c) * 3);
-      inTitle.set(a, inTitle.get(a)! + 1);
-      inTitle.set(b, inTitle.get(b)! + 1);
-      won.set(ch, won.get(ch)! + 1);
+      let a: number, b: number, ch: number, nat: number;
+      if (copy) {
+        const at = (it * C + c) * 3;
+        [a, b, ch] = [basis!.titles[at], basis!.titles[at + 1], basis!.titles[at + 2]];
+        nat = basis!.natTitle[it * C + c];
+      } else {
+        const from = copied[c];
+        if (from) {
+          const at = (it * from.stride + from.at) * 3;
+          [a, b, ch] = [from.titles[at], from.titles[at + 1], from.titles[at + 2]];
+          nat = from.natTitle[it * from.stride + from.at];
+        } else {
+          [a, b, ch] = playTitleGame(races[c], seed, it, winnerOf, teams!.rank, teams!.shift, titleLocks[races[c].conference]);
+          nat = naturalTitle(races[c], seed, it, a, b, winnerOf, teams!.shift);
+        }
+      }
+      titles[(it * C + c) * 3] = a;
+      titles[(it * C + c) * 3 + 1] = b;
+      titles[(it * C + c) * 3 + 2] = ch;
+      natTitle[it * C + c] = nat;
+      inTitle.set(a, inTitle.get(a)! + weight);
+      inTitle.set(b, inTitle.get(b)! + weight);
+      won.set(ch, won.get(ch)! + weight);
       creditTitle(c, a, b, ch);
     }
 
     // Stage 3: the committee stand-in's score plus standard Gumbel noise, so any two teams are ordered with the
     // pair odds the model was fitted on.
-    for (let k = 0; k < F; k++) {
-      const u = (mix(seed, it, COMMITTEE_SALT + k) + 0.5) / 4294967296;
-      gumbel[k] = -Math.log(-Math.log(u));
-      if (!startOrder) order[k] = k;
+    if (scoring) {
+      for (let k = 0; k < F; k++) {
+        const u = (mix(seed, it, COMMITTEE_SALT + k) + 0.5) / 4294967296;
+        gumbel[k] = -Math.log(-Math.log(u));
+        score[k] = scoreOf(k, teams!.shift);
+      }
     }
-    if (startOrder) order.set(startOrder.subarray(it * F, (it + 1) * F));
     for (let k = 0; k < F; k++) {
-      score[k] = scoreOf(k, teams.shift);
-      winSum[k] += w[k];
-      lossSum[k] += l[k];
-      sosSum[k] += oppCount[k] + titleN[k] === 0 ? 0 : (oppSum[k] + titleSos[k]) / (oppCount[k] + titleN[k]);
-      champSum[k] += champ[k];
+      winSum[k] += w[k] * weight;
+      lossSum[k] += l[k] * weight;
+      champSum[k] += champ[k] * weight;
     }
-    sortBy(order, score);
-    holdCeilings(order, (k) => l[k]);
+    // Strength of schedule moves only for teams in a title game not in the data: the rest add their regular season's.
+    for (let c = 0; c < C; c++) {
+      const at = (it * C + c) * 3;
+      for (let x = 0; x < 2; x++) {
+        const k = idx(titles[at + x]);
+        if (k >= 0 && titleN[k] > 0) sosMoved[k] += ((oppSum[k] + titleSos[k]) / (oppCount[k] + titleN[k]) - regularSos[k]) * weight;
+      }
+    }
+    if (copy) order.set(basis!.rankings.subarray(it * F, (it + 1) * F));
+    else {
+      if (startOrder) order.set(startOrder.subarray(it * F, (it + 1) * F));
+      else for (let k = 0; k < F; k++) order[k] = k;
+      sortBy(order, score);
+      holdCeilings(order, (k) => l[k]);
+    }
     rankings.set(order, it * F);
-    for (let p = 0; p < F; p++) {
-      const k = order[p];
-      rankSum[k] += p + 1;
-      for (let q = 0; q < cuts.length; q++) if (p < cuts[q]) top[q][k]++;
-    }
+    for (let p = 0; p < F; p++) rankSum[order[p]] += (p + 1) * weight;
+    for (let q = 0; q < cuts.length; q++) for (let p = 0; p < Math.min(cuts[q], F); p++) top[q][order[p]] += weight;
     if (!playoff) return;
 
     // Stage 4.
-    for (let p = 0; p < F; p++) rankIds[p] = fbsIds[order[p]];
-    const field = pick(rankIds, (id) => champ[idx(id)] === 1);
+    if (copy) for (let s = 0; s < T; s++) field[s] = basis!.fields[it * T + s];
+    else {
+      for (let p = 0; p < F; p++) rankIds[p] = fbsIds[order[p]];
+      const picked = pick(rankIds, (id) => champ[idx(id)] === 1);
+      for (let s = 0; s < T; s++) field[s] = picked[s];
+    }
     fields.set(field, it * T);
     field.forEach((id, s) => {
       const k = idx(id);
-      seedCount[k * T + s]++;
-      inField[k]++;
-      if (T === 12 && s < 4) reached[0][k]++;
+      seedCount[k * T + s] += weight;
+      inField[k] += weight;
+      if (T === 12 && s < 4) reached[0][k] += weight;
     });
-    for (let s = 0; s < T; s++) fieldIdx[s] = idx(field[s]);
-    for (let j = 0; j < open.length; j++) {
-      if (winnerAt(open[j]) !== games[open[j]].homeId) continue;
-      homeWon[j]++;
-      for (let s = 0; s < T; s++) homeField[j * F + fieldIdx[s]]++;
-    }
 
     // The focus team's games the other way, one at a time, everything else in the season unchanged: stage 2 again
-    // only for the title races the game's two teams are in, then stages 3 and 4.
-    for (const o of own) {
+    // only for the title races the game's two teams are in, then stages 3 and 4. Copied when the earlier run
+    // followed the same team.
+    own.forEach((o, j) => {
       const g = games[o.i];
-      const was = winnerAt(o.i);
-      const other = was === g.homeId ? g.awayId : g.homeId;
-      const flipped = (x: Game): number => (x.id === g.id ? other : winnerOf(x));
-      // Only the flipped game's two teams and the touched races' title-game teams can score differently.
-      fscore.set(score);
-      const changed: number[] = [was, other];
-      // Army-Navy counts in no record, so flipping it changes none: its odds come out the same either way.
-      const swap = (k: number, dw: number, dl: number) => { if (k >= 0 && !late[o.i]) { w[k] += dw; l[k] += dl; } };
-      const wi = idx(was);
-      const oi = idx(other);
-      // Take the touched races' title games back out of the season's records, flip the game, play them again.
-      const touched = [raceOf(was), raceOf(other)].filter((c, j, all) => c >= 0 && all.indexOf(c) === j);
-      for (const c of touched) {
-        const at = (it * C + c) * 3;
-        changed.push(titles[at], titles[at + 1]);
-        uncredit(c, titles[at], titles[at + 1], titles[at + 2]);
-      }
-      swap(wi, -1, 1);
-      swap(oi, 1, -1);
-      // The flipped result moves both teams' ratings the other way, and with them their opponents' schedules.
-      const flipMoved = anchored && live.counts[o.i] && !live.seen[o.i];
-      const before = flipMoved ? resultPoints(live.home[o.i], was === g.homeId) : 0;
-      const after = flipMoved ? resultPoints(live.home[o.i], other === g.homeId) : 0;
-      const wa = allIndex.get(was)!;
-      const oa = allIndex.get(other)!;
-      if (flipMoved) {
-        moved[wa] -= before + after;
-        moved[oa] += before + after;
-        for (const k of playedBy[wa]) changed.push(fbsIds[k]);
-        for (const k of playedBy[oa]) changed.push(fbsIds[k]);
-      }
-      const replayed = touched.map((c) => {
-        const r = playTitleGame(races[c], seed, it, flipped, (id) => teams.rankIf(id, o.i), teams.shift, titleLocks[races[c].conference]);
-        creditTitle(c, r[0], r[1], r[2]);
-        changed.push(r[0], r[1]);
-        return r;
-      });
-      for (const id of changed) {
-        const k = idx(id);
-        if (k >= 0) fscore[k] = scoreOf(k, teams.shift);
-      }
-      forder.set(order);
-      sortBy(forder, fscore);
-      holdCeilings(forder, (k) => l[k]);
-      for (let p = 0; p < F; p++) fIds[p] = fbsIds[forder[p]];
-      const makes = pick(fIds, (id) => champ[idx(id)] === 1).includes(focus!);
-      // Put the season back as it was.
-      touched.forEach((c, j) => uncredit(c, replayed[j][0], replayed[j][1], replayed[j][2]));
-      swap(wi, 1, -1);
-      swap(oi, -1, 1);
-      if (flipMoved) {
-        moved[wa] += before + after;
-        moved[oa] -= before + after;
-      }
-      for (const c of touched) {
-        const at = (it * C + c) * 3;
-        creditTitle(c, titles[at], titles[at + 1], titles[at + 2]);
-      }
+      const was = homeWins(o.i) ? g.homeId : g.awayId;
       const side = was === focus ? 0 : 1;
-      o.field[side] += field.includes(focus!) ? 1 : 0;
-      o.field[1 - side] += makes ? 1 : 0;
+      o.field[side] += field.includes(focus!) ? weight : 0;
       if (focusRace >= 0) {
         const at = (it * C + focusRace) * 3;
-        const r = replayed[touched.indexOf(focusRace)];
-        o.title[side] += titles[at] === focus || titles[at + 1] === focus ? 1 : 0;
-        o.title[1 - side] += r[0] === focus || r[1] === focus ? 1 : 0;
+        o.title[side] += titles[at] === focus || titles[at + 1] === focus ? weight : 0;
       }
-    }
+      let bits: number;
+      if (copy && ownKept) bits = basis!.own[it * own.length + j];
+      else {
+        const other = was === g.homeId ? g.awayId : g.homeId;
+        const flipped = (x: Game): number => (x.id === g.id ? other : winnerOf(x));
+        // Only the flipped game's two teams and the touched races' title-game teams can score differently.
+        fscore.set(score);
+        const changed: number[] = [was, other];
+        // Army-Navy counts in no record, so flipping it changes none: its odds come out the same either way.
+        const swap = (k: number, dw: number, dl: number) => { if (k >= 0 && !late[o.i]) { w[k] += dw; l[k] += dl; } };
+        const wi = idx(was);
+        const oi = idx(other);
+        // Take the touched races' title games back out of the season's records, flip the game, play them again.
+        const touched = [raceOf(was), raceOf(other)].filter((c, k, all) => c >= 0 && all.indexOf(c) === k);
+        for (const c of touched) {
+          const at = (it * C + c) * 3;
+          changed.push(titles[at], titles[at + 1]);
+          uncredit(c, titles[at], titles[at + 1], titles[at + 2]);
+        }
+        swap(wi, -1, 1);
+        swap(oi, 1, -1);
+        // The flipped result moves both teams' ratings the other way, and with them their opponents' schedules.
+        const flipMoved = anchored && live.counts[o.i] && !live.seen[o.i];
+        const before = flipMoved ? resultPoints(live.home[o.i], was === g.homeId) : 0;
+        const after = flipMoved ? resultPoints(live.home[o.i], other === g.homeId) : 0;
+        const wa = allIndex.get(was)!;
+        const oa = allIndex.get(other)!;
+        if (flipMoved) {
+          moved[wa] -= before + after;
+          moved[oa] += before + after;
+          for (const k of playedBy[wa]) changed.push(fbsIds[k]);
+          for (const k of playedBy[oa]) changed.push(fbsIds[k]);
+        }
+        const replayed = touched.map((c) => {
+          const r = playTitleGame(races[c], seed, it, flipped, (id) => teams!.rankIf(id, o.i), teams!.shift, titleLocks[races[c].conference]);
+          creditTitle(c, r[0], r[1], r[2]);
+          changed.push(r[0], r[1]);
+          return r;
+        });
+        for (const id of changed) {
+          const k = idx(id);
+          if (k >= 0) fscore[k] = scoreOf(k, teams!.shift);
+        }
+        forder.set(order);
+        sortBy(forder, fscore);
+        holdCeilings(forder, (k) => l[k]);
+        for (let p = 0; p < F; p++) fIds[p] = fbsIds[forder[p]];
+        const makes = pick(fIds, (id) => champ[idx(id)] === 1).includes(focus!);
+        // Put the season back as it was.
+        touched.forEach((c, k) => uncredit(c, replayed[k][0], replayed[k][1], replayed[k][2]));
+        swap(wi, 1, -1);
+        swap(oi, -1, 1);
+        if (flipMoved) {
+          moved[wa] += before + after;
+          moved[oa] -= before + after;
+        }
+        for (const c of touched) {
+          const at = (it * C + c) * 3;
+          creditTitle(c, titles[at], titles[at + 1], titles[at + 2]);
+        }
+        const r = focusRace >= 0 ? replayed[touched.indexOf(focusRace)] : null;
+        bits = (makes ? 1 : 0) | (r && (r[0] === focus || r[1] === focus) ? 2 : 0);
+      }
+      ownBits[it * own.length + j] = bits;
+      o.field[1 - side] += (bits & 1) * weight;
+      if (focusRace >= 0) o.title[1 - side] += ((bits >> 1) & 1) * weight;
+    });
+
     // Stage 5.
-    for (let g = 0; g < bracket.length; g++) {
+    for (let g = 0; g < B; g++) {
       const [x, y, hosted] = bracket[g];
-      const a = x >= 0 ? field[x] : slot[~x];
-      const b = y >= 0 ? field[y] : slot[~y];
-      const u = (mix(seed, it, PLAYOFF_SALT + g) + 0.5) / 4294967296;
-      const real = finals.get(pairKey(a, b));
-      const forced = bracketLocks[g];
-      const win = real ? (real.homePoints! > real.awayPoints! ? real.homeId : real.awayId)
-        : forced === a || forced === b ? forced
-        : u < odds(a, b, teams.shift(a), teams.shift(b), hosted ? HOME_FIELD : 0) ? a : b;
-      slot[g] = win;
+      const a = x >= 0 ? field[x] : slots[it * B + ~x];
+      const b = y >= 0 ? field[y] : slots[it * B + ~y];
+      let win: number, nat: number;
+      if (copy) {
+        win = basis!.slots[it * B + g];
+        nat = basis!.natSlots[it * B + g];
+      } else {
+        const u = (mix(seed, it, PLAYOFF_SALT + g) + 0.5) / 4294967296;
+        const real = finals.get(pairKey(a, b));
+        const forced = bracketLocks[g];
+        nat = real ? (real.homePoints! > real.awayPoints! ? real.homeId : real.awayId)
+          : u < odds(a, b, teams!.shift(a), teams!.shift(b), hosted ? HOME_FIELD : 0) ? a : b;
+        win = real ? nat : forced === a || forced === b ? forced : nat;
+      }
+      slots[it * B + g] = win;
+      natSlots[it * B + g] = nat;
       // Rounds reached: a first-round win is a quarterfinal (byes were counted with the seeds); semifinals and the
       // final count both teams.
       const r = roundOf(g);
-      if (r < 0) reached[0][idx(win)]++;
-      else if (r > 0) { reached[r][idx(a)]++; reached[r][idx(b)]++; }
+      if (r < 0) reached[0][idx(win)] += weight;
+      else if (r > 0) { reached[r][idx(a)] += weight; reached[r][idx(b)] += weight; }
     }
-    const champion = slot[bracket.length - 1];
+    const champion = slots[it * B + B - 1];
     playoffChamps[it] = champion;
-    reached[3][idx(champion)]++;
-  });
+    reached[3][idx(champion)] += weight;
+  };
+
+  // The seasons counted, in order: every one, or for an estimate the earlier run's seasons kept, with their weights.
+  const counted: number[] = [];
+  const weights: number[] = [];
+  if (sim) {
+    sim.forEachIteration((it, winnerAt, teams) => {
+      counted.push(it);
+      season1(it, (i) => winnerAt(i) === homeOf[i], winnerAt, teams, basis !== undefined && kept[it] === 1);
+    });
+  } else {
+    // An estimate's results: each game locked here goes that way; every other game its natural way (the same
+    // results the earlier run had in the seasons kept).
+    let at = 0;
+    const homeWins = (i: number): boolean => (side[i] >= 0 ? side[i] : (natural.bits[at + (i >> 3)] >> (i & 7)) & 1) === 1;
+    const winnerAt = (i: number): number => (homeWins(i) ? games[i].homeId : games[i].awayId);
+    for (let it = 0; it < n && counted.length < ESTIMATE_SEASONS; it++) {
+      if (kept[it] !== 1) continue;
+      counted.push(it);
+      weight = weightOf(it);
+      weights.push(weight);
+      at = it * natural.stride;
+      season1(it, homeWins, winnerAt, null, true);
+    }
+  }
+  // What each share is out of: the seasons counted, or for an estimate their weights.
+  const m = sim ? counted.length : weights.reduce((sum, x) => sum + x, 0);
 
   const playoffOdds = (k: number): NationalPlayoff => {
-    const seeds = Array.from({ length: T }, (_, s) => seedCount[k * T + s] / n);
+    const seeds = Array.from({ length: T }, (_, s) => seedCount[k * T + s] / m);
     return {
-      field: inField[k] / n,
+      field: inField[k] / m,
       bye: T === 12 ? seeds.slice(0, 4).reduce((sum, x) => sum + x, 0) : 0,
       seeds,
-      quarterfinal: T === 12 ? reached[0][k] / n : null,
-      semifinal: reached[1][k] / n,
-      final: reached[2][k] / n,
-      champion: reached[3][k] / n,
+      quarterfinal: T === 12 ? reached[0][k] / m : null,
+      semifinal: reached[1][k] / m,
+      final: reached[2][k] / m,
+      champion: reached[3][k] / m,
       run: announced ? playoffRun(season, announced.seeds, fbsIds[k]) : null,
     };
   };
@@ -586,14 +793,14 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
     return {
       teamId: t.id,
       conference: t.conference,
-      titleGame: simulated ? inTitle.get(t.id)! / n : null,
-      champion: simulated ? won.get(t.id)! / n : null,
-      meanRank: rankSum[k] / n,
-      top4: top[0][k] / n,
-      top12: top[1][k] / n,
-      top25: top[2][k] / n,
+      titleGame: simulated ? inTitle.get(t.id)! / m : null,
+      champion: simulated ? won.get(t.id)! / m : null,
+      meanRank: rankSum[k] / m,
+      top4: top[0][k] / m,
+      top12: top[1][k] / m,
+      top25: top[2][k] / m,
       playoff: playoff ? playoffOdds(k) : null,
-      profile: { wins: winSum[k] / n, losses: lossSum[k] / n, rating: rating[k], strength: sosSum[k] / n, champion: champSum[k] / n },
+      profile: { wins: winSum[k] / m, losses: lossSum[k] / m, rating: rating[k], strength: regularSos[k] + sosMoved[k] / m, champion: champSum[k] / m },
     };
   });
   teamsOut.sort((a, b) => a.meanRank - b.meanRank || a.teamId - b.teamId);
@@ -616,45 +823,75 @@ export function simulateNational(season: Season, opts: NationalOptions, shared?:
     playoffChampion: null,
   };
   const fieldView: number[] = new Array<number>(playoff ? T : 0);
+  let swingsMemo: NationalResult["swings"] | undefined;
+  const swingsOf = (): NationalResult["swings"] => {
+    if (!playoff) return [];
+    // Per open game: seasons the home team wins it, and of those, seasons each team is in the field.
+    const homeWon = new Float64Array(open.length);
+    const homeField = new Float64Array(open.length * F);
+    const fieldIdx = new Int32Array(T);
+    for (const [c, it] of counted.entries()) {
+      const wt = sim ? 1 : weights[c];
+      const at = it * natural.stride;
+      for (let s = 0; s < T; s++) fieldIdx[s] = idx(fields[it * T + s]);
+      for (let j = 0; j < open.length; j++) {
+        const i = open[j];
+        if ((side[i] >= 0 ? side[i] : (natural.bits[at + (i >> 3)] >> (i & 7)) & 1) === 0) continue;
+        homeWon[j] += wt;
+        for (let s = 0; s < T; s++) homeField[j * F + fieldIdx[s]] += wt;
+      }
+    }
+    return Array.from(open, (i, j) => {
+      const h = homeWon[j];
+      let sum = 0;
+      if (h > 0 && h < m) {
+        for (let k = 0; k < F; k++) {
+          if (inField[k] === 0) continue;
+          const fh = homeField[j * F + k] / h;
+          const fa = (inField[k] - homeField[j * F + k]) / (m - h);
+          // Less the change sampling alone would show (the mean of |noise| for a true change of 0), so a lopsided
+          // game's few seasons on one side don't read as a big swing.
+          const noise = Math.sqrt((2 / Math.PI) * (fh * (1 - fh) / h + fa * (1 - fa) / (m - h)));
+          sum += Math.max(0, Math.abs(fh - fa) - noise);
+        }
+      }
+      return { gameId: games[i].id, home: h / m, spots: sum / 2 };
+    });
+  };
   const result: NationalResult = {
-    iterations: n,
+    iterations: counted.length,
     conferences,
     playoff,
     announced,
     teams: teamsOut,
     games: own.map((o) => ({
-      gameId: games[o.i].id, fieldIfWin: o.field[0] / n, fieldIfLose: o.field[1] / n,
-      titleIfWin: focusRace < 0 ? null : o.title[0] / n, titleIfLose: focusRace < 0 ? null : o.title[1] / n,
+      gameId: games[o.i].id, fieldIfWin: o.field[0] / m, fieldIfLose: o.field[1] / m,
+      titleIfWin: focusRace < 0 ? null : o.title[0] / m, titleIfLose: focusRace < 0 ? null : o.title[1] / m,
     })),
-    swings: !playoff ? [] : Array.from(open, (i, j) => {
-      const h = homeWon[j];
-      let sum = 0;
-      if (h > 0 && h < n) {
-        for (let k = 0; k < F; k++) {
-          if (inField[k] === 0) continue;
-          const fh = homeField[j * F + k] / h;
-          const fa = (inField[k] - homeField[j * F + k]) / (n - h);
-          // Less the change sampling alone would show (the mean of |noise| for a true change of 0), so a lopsided
-          // game's few seasons on one side don't read as a big swing.
-          const noise = Math.sqrt((2 / Math.PI) * (fh * (1 - fh) / h + fa * (1 - fa) / (n - h)));
-          sum += Math.max(0, Math.abs(fh - fa) - noise);
-        }
-      }
-      return { gameId: games[i].id, home: h / n, spots: sum / 2 };
-    }),
+    // Worked out when first read (the Lab's big games), from the seasons kept: each game's result is its lock, or
+    // its natural result.
+    get swings() {
+      swingsMemo ??= swingsOf();
+      return swingsMemo;
+    },
     forEachIteration(cb) {
-      for (current = 0; current < n; current++) {
-        for (let p = 0; p < F; p++) ranking[p] = fbs[rankings[current * F + p]].id;
+      for (const it of counted) {
+        current = it;
+        for (let p = 0; p < F; p++) ranking[p] = fbs[rankings[it * F + p]].id;
         if (playoff) {
-          for (let s = 0; s < T; s++) fieldView[s] = fields[current * T + s];
+          for (let s = 0; s < T; s++) fieldView[s] = fields[it * T + s];
           view.field = fieldView;
-          view.playoffChampion = playoffChamps[current];
+          view.playoffChampion = playoffChamps[it];
         }
-        cb(current, view);
+        cb(it, view);
       }
     },
   };
-  reusable.set(result, { season, seed, iterations: n, conferences, locks: { ...(opts.locks ?? {}) },
-    titleLocks: { ...titleLocks }, bracketLocks: { ...bracketLocks }, titles, rankings, focus: opts.teamId !== undefined });
+  // An estimate holds only some seasons, so a later run can't take the rest from it.
+  if (sim) {
+    reusable.set(result, { season, seed, iterations: n, conferences, locks: { ...locks },
+      titleLocks: { ...titleLocks }, bracketLocks: { ...bracketLocks }, titles, rankings, focus: opts.teamId !== undefined,
+      focusId: focus, natTitle, fields, slots, natSlots, champs: playoffChamps, own: ownBits, ownGames: own.map((o) => o.i), natural });
+  }
   return result;
 }

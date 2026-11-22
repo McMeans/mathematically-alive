@@ -21,19 +21,32 @@ setTimeout(() => {
 
 // The newest request seen. Requests queue while a run is busy; once it's done, only the newest of them runs.
 let newest = 0;
+// The last few answers, by their picks, newest first: going back to picks one has (an undo, a pick taken back) is instant.
+const answers: { key: string; response: Omit<SimResponse, "id"> }[] = [];
+const KEEP_ANSWERS = 6;
 
 self.onmessage = async (e: MessageEvent<SimRequest>) => {
   const { id, conference, teamId, locks, titles } = e.data;
   newest = Math.max(newest, id);
   await new Promise((r) => setTimeout(r, 0)); // let queued newer requests arrive
   if (id !== newest) return; // the page would drop this result anyway
+  const key = JSON.stringify([conference, teamId, Object.entries(locks).sort(), Object.entries(titles ?? {}).sort()]);
+  const answer = (response: Omit<SimResponse, "id">) => {
+    const at = answers.findIndex((a) => a.key === key);
+    if (at >= 0) answers.splice(at, 1);
+    answers.unshift({ key, response });
+    answers.length = Math.min(answers.length, KEEP_ANSWERS);
+    self.postMessage({ ...response, id } as SimResponse);
+  };
+  const again = answers.find((a) => a.key === key);
+  if (again) return answer(again.response);
   if (conference === null) {
     const { national, ...r } = exploreIndependent(season, { iterations: ITERATIONS, seed: SEED, teamId, locks, reuse: last });
     last = national;
-    self.postMessage({ id, independent: true, ranks, ...r } satisfies SimResponse);
+    answer({ independent: true, ranks, ...r });
     return;
   }
   const { national, ...r } = explore(season, { conference, iterations: ITERATIONS, seed: SEED, teamId, locks, titleLocks: titles, reuse: last });
   last = national ?? last;
-  self.postMessage({ id, independent: false, ranks, ...r } satisfies SimResponse);
+  answer({ independent: false, ranks, ...r });
 };
