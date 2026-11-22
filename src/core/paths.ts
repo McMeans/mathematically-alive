@@ -142,7 +142,7 @@ export type OddsLabels = {
 };
 
 /** What a projected matchup (`Game.projected`) is, in a sentence without its period. */
-export const PROJECTED_NOTE = "A projected matchup, not yet confirmed";
+export const PROJECTED_NOTE = "A matchup the league announced that the schedule data doesn't list yet";
 
 /** Labels for the odds tiles, so every view names each number the same way. */
 export function oddsLabels(key: string): OddsLabels {
@@ -156,7 +156,7 @@ export function oddsLabels(key: string): OddsLabels {
     conferenceRecord: `${conference} record, counting your picks`,
     mustWin: `Must win ${conference}`,
     nonConference: "Non-con",
-    projected: "Projected",
+    projected: "Unlisted",
     projectedNote: `${PROJECTED_NOTE}.`,
     conference: conferenceShort(key),
     cfp: "CFP",

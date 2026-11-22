@@ -123,7 +123,7 @@ describe("Group of Six conferences in the national simulation (all six: the MAC,
     const boise = season.teams.find((t) => t.name === "Boise State")!.id;
     const flex = season.games.find((g) => g.week === 13 && [g.homeId, g.awayId].includes(boise))!;
     expect(flex.conferenceGame).toBe(false);
-    expect(season.teams.find((t) => t.id === flex.homeId)!.name).toBe("Utah State");
+    expect(season.teams.find((t) => t.id === flex.homeId)!.name).toBe("Colorado State");
     const r = simulateNational(season, { iterations: 100, seed: SEED, conferences: CONFERENCES, teamId: boise });
     const t = r.teams.find((x) => x.teamId === boise)!;
     expect(t.titleGame).toBeGreaterThan(0.1);
@@ -137,11 +137,11 @@ describe("Group of Six conferences in the national simulation (all six: the MAC,
     const tree = pathTree(season, { conference: "Pac-12", teamId: boise, iterations: N, seed: SEED, depth: 0 });
     const week = tree.weeks.find((w) => w.week === 13)!;
     expect(week.label).toBe("Nov 28");
-    expect(week.nonConference).toMatchObject({ opponent: "Utah State", site: "away", date: "Nov 28", projected: true, won: null, titleIfWin: null });
+    expect(week.nonConference).toMatchObject({ opponent: "Colorado State", site: "away", date: "Nov 28", projected: true, won: null, titleIfWin: null });
     expect(week.nonConference!.ifWin).not.toBeNull();
     // A game the data has is never tagged.
     for (const w of tree.weeks) if (w.week !== 13 && w.nonConference) expect(w.nonConference.projected).toBe(false);
-    expect(oddsLabels("Pac-12")).toMatchObject({ projected: "Projected", projectedNote: "A projected matchup, not yet confirmed." });
+    expect(oddsLabels("Pac-12")).toMatchObject({ projected: "Unlisted", projectedNote: "A matchup the league announced that the schedule data doesn't list yet." });
   });
 
   it("a projected flex game among results elsewhere for the playoff says it's projected", () => {
@@ -150,7 +150,7 @@ describe("Group of Six conferences in the national simulation (all six: the MAC,
     const newMexico = season.teams.find((t) => t.name === "New Mexico")!.id;
     const signals = playoffSignals(season, sim, run, newMexico, 30);
     const flex = signals.find((g) => g.projected)!;
-    expect(flex.text).toMatch(/^Root for Utah State over Boise State: .* A projected matchup, not yet confirmed\.$/);
+    expect(flex.text).toMatch(/^Root for Colorado State over Boise State: .* A matchup the league announced that the schedule data doesn't list yet\.$/);
     for (const g of signals.filter((x) => !x.projected)) expect(g.text).not.toMatch(/projected/);
   });
 

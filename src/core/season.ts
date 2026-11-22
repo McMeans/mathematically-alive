@@ -383,7 +383,7 @@ export const isArmyNavy = (home: string | undefined, away: string | undefined): 
  * teams are set after week 12. In week 13 each plays another member, a game "considered a non-conference matchup for
  * standings", so seasonFromCfbd makes every game between members that week a non-conference game. The league named
  * projected pairings, its home teams fixed, to be confirmed six days before at the latest and changeable for CFP
- * considerations ("The new Pac-12 announces its 2026 football schedule", Feb. 11, 2026:
+ * considerations; it confirmed new road teams on Nov. 21 ("The new Pac-12 announces its 2026 football schedule", Feb. 11, 2026:
  * https://pac-12.com/news/2026/2/9/general-the-new-pac-12-announces-its-2026-football-schedule.aspx). Until the
  * data has a member's week-13 game, the projected one stands in, with a negative id.
  */
@@ -392,14 +392,17 @@ const FLEX_WEEKS = [
     year: 2026,
     conference: "Pac-12",
     week: 13,
-    // Saturday, Nov. 28; no kickoff time yet, so noon Eastern.
-    start: "2026-11-28T17:00:00.000Z",
-    /** [home, away]. */
+    /**
+     * [home, away, kickoff]. The pairings the league announced on Nov. 21, 2026, with its home teams unchanged and
+     * the road teams reshuffled ("Matchups for Pac-12 flex week and football championship game are set",
+     * https://pac-12.com/news/2026/11/22/matchups-for-pac-12-flex-week-and-football-championship-game-are-set.aspx).
+     * Saturday, Nov. 28: 6:00, 6:30, 9:30 and 10:00 p.m. Eastern.
+     */
     projected: [
-      ["Utah State", "Boise State"],
-      ["Colorado State", "Texas State"],
-      ["Fresno State", "San Diego State"],
-      ["Washington State", "Oregon State"],
+      ["Colorado State", "Boise State", "2026-11-28T23:00:00.000Z"],
+      ["Washington State", "San Diego State", "2026-11-28T23:30:00.000Z"],
+      ["Utah State", "Texas State", "2026-11-29T02:30:00.000Z"],
+      ["Fresno State", "Oregon State", "2026-11-29T03:00:00.000Z"],
     ],
   },
 ] as const;
@@ -415,12 +418,12 @@ function projectedFlexGames(year: number, teams: Map<number, Team>, games: Game[
     if (f.year !== year) continue;
     const busy = new Set(games.filter((g) => g.week === f.week).flatMap((g) => [g.homeId, g.awayId]));
     const member = (name: string) => [...teams.values()].find((t) => t.name === name && t.conference === f.conference);
-    f.projected.forEach(([h, a], k) => {
+    f.projected.forEach(([h, a, start], k) => {
       const home = member(h);
       const away = member(a);
       if (!home || !away || busy.has(home.id) || busy.has(away.id)) return;
       out.push({
-        id: -(k + 1), week: f.week, start: f.start, neutralSite: false, conferenceGame: false,
+        id: -(k + 1), week: f.week, start, neutralSite: false, conferenceGame: false,
         homeId: home.id, awayId: away.id, homePoints: null, awayPoints: null, completed: false, spread: null, projected: true,
       });
     });

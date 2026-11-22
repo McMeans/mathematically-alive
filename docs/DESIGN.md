@@ -37,7 +37,7 @@ The site is **light-only**. There is no dark mode, and none is planned.
 - **Numbers are lit digits on the board, never boxes.** A number is Saira Condensed set straight on the board, not in a
   pill, chip or tile with its own border.
 - **Only buttons get an outline.** A 1px border means "you can press this". Labels, tags and readouts don't get one,
-  with one narrow exception noted below (the dashed "Projected" tag).
+  with one narrow exception noted below (the dashed "Unlisted" tag).
 - **A pick fills amber.** A pressed result fills the whole button with `lamp`, with dark `plate-ink` text.
 - **The core writes the words.** Every odds string and path sentence a user sees comes from `@/core`. The app lays it
   out.
@@ -235,7 +235,7 @@ a `cond` label under it. A number may carry an odds change, `plate text-[13px]`:
 Tags on a row:
 
 - `Non-con`: a solid 1px `board-muted` outline, `cond text-[11px]`.
-- **Projected** (a game not yet confirmed): the same tag with a **dashed** outline, the explanation in its `title` and
+- **Unlisted** (a game the league announced that the schedule data lacks): the same tag with a **dashed** outline, the explanation in its `title` and
   in an `sr-only` span.
 
 `HelpElsewhere` groups games by the team to root against, one board per team, heading "Root against [team]".

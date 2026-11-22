@@ -57,7 +57,7 @@ export type IndependentGame = {
   ifLose: string;
   /** "58% to win", from the game itself, so a locked pick still shows it. */
   winChance: string;
-  /** A matchup not yet confirmed (`Game.projected`). */
+  /** A matchup the league announced that the data lacks (`Game.projected`). */
   projected: boolean;
 };
 
