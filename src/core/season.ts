@@ -396,7 +396,7 @@ const FLEX_WEEKS = [
      * [home, away, kickoff]. The pairings the league announced on Nov. 21, 2026, with its home teams unchanged and
      * the road teams reshuffled ("Matchups for Pac-12 flex week and football championship game are set",
      * https://pac-12.com/news/2026/11/22/matchups-for-pac-12-flex-week-and-football-championship-game-are-set.aspx).
-     * Saturday, Nov. 28: 6:00, 6:30, 9:30 and 10:00 p.m. Eastern.
+     * Saturday, Nov. 28: 6:00, 6:30, 9:30 and 10:00 p.m. Eastern (kickoffs from fbschedules.com; the league's page has none).
      */
     projected: [
       ["Colorado State", "Boise State", "2026-11-28T23:00:00.000Z"],
