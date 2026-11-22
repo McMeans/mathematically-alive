@@ -144,6 +144,14 @@ describe("Group of Six conferences in the national simulation (all six: the MAC,
     expect(oddsLabels("Pac-12")).toMatchObject({ projected: "Unlisted", projectedNote: "A matchup the league announced that the schedule data doesn't list yet." });
   });
 
+  it("the late flex kickoffs, past midnight UTC, are still dated Nov 28 (Oregon State's 10 p.m. Eastern game)", () => {
+    const oregonState = season.teams.find((t) => t.name === "Oregon State")!.id;
+    const tree = pathTree(season, { conference: "Pac-12", teamId: oregonState, iterations: N, seed: SEED, depth: 0 });
+    const week = tree.weeks.find((w) => w.week === 13)!;
+    expect(week.nonConference).toMatchObject({ opponent: "Fresno State", site: "away", date: "Nov 28", projected: true });
+    expect(week.label).toBe("Nov 28");
+  });
+
   it("a projected flex game among results elsewhere for the playoff says it's projected", () => {
     const sim = simulateSeason(season, { iterations: 2000, seed: SEED });
     const run = simulateNational(season, { iterations: 2000, seed: SEED, conferences: CONFERENCES }, sim);

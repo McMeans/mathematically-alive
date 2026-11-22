@@ -382,10 +382,11 @@ export const isArmyNavy = (home: string | undefined, away: string | undefined): 
  * The Pac-12's 2026 flex week. Its eight members play a seven-game round robin in weeks 5-12, and the title-game
  * teams are set after week 12. In week 13 each plays another member, a game "considered a non-conference matchup for
  * standings", so seasonFromCfbd makes every game between members that week a non-conference game. The league named
- * projected pairings, its home teams fixed, to be confirmed six days before at the latest and changeable for CFP
- * considerations; it confirmed new road teams on Nov. 21 ("The new Pac-12 announces its 2026 football schedule", Feb. 11, 2026:
- * https://pac-12.com/news/2026/2/9/general-the-new-pac-12-announces-its-2026-football-schedule.aspx). Until the
- * data has a member's week-13 game, the projected one stands in, with a negative id.
+ * projected pairings in February, its home teams fixed, to be confirmed six days before at the latest and changeable
+ * for CFP considerations ("The new Pac-12 announces its 2026 football schedule", Feb. 11, 2026:
+ * https://pac-12.com/news/2026/2/9/general-the-new-pac-12-announces-its-2026-football-schedule.aspx). It confirmed
+ * new road teams on Nov. 21 (see `projected` below). Until the data has a member's week-13 game, the announced one
+ * stands in, with a negative id.
  */
 const FLEX_WEEKS = [
   {
