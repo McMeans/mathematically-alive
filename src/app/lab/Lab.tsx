@@ -58,7 +58,8 @@ type Props = {
 
 const none = (): LabLocks => ({ games: {}, titles: {}, bracket: {} });
 const count = (l: LabLocks) => Object.keys(l.games).length + Object.keys(l.titles).length + Object.keys(l.bracket).length;
-const DEBOUNCE_MS = 250;
+/** How long after a pick the run waits for another. Estimates are quick, and the worker skips runs a newer pick replaced. */
+const DEBOUNCE_MS = 0;
 
 /** Picks, the worker, the address bar and the pinned team. */
 function useLab(initial: LabView) {
@@ -171,7 +172,7 @@ function useLab(initial: LabView) {
       }
       if (r.id !== latest.current) return; // a newer pick is on its way
       if (r.kind === "result") {
-        // A quick run keeps the shown odds of teams the pick barely moved: its sampling noise would only bounce them.
+        // An estimate keeps the shown odds the pick barely moved: its smaller sample's noise would only bounce them.
         const shown = r.held ? steadyLab(shownView.current, r.view, r.held) : r.view;
         setView(shown);
         shownView.current = shown;

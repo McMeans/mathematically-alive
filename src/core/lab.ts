@@ -10,7 +10,7 @@ import { conferenceName, conferenceShort, formatFine, formatOdds, formatSideOdds
 import { announcedField, bracketGames, findFormat } from "./playoff";
 import { INDEPENDENTS, teamRecord, type Game, type Season } from "./season";
 import { gameWinProbability, mix, mulberry32, neutralOdds } from "./sim";
-import { provenStatus } from "./proof";
+import { provenStatus, type ProvenStatus } from "./proof";
 import { pairKey } from "./steps";
 import { conferenceData, decidedTitleGame } from "./tiebreak";
 import { nationalView, type NationalView } from "./view";
@@ -42,6 +42,11 @@ export type LabOptions = {
   locks?: Partial<LabLocks>;
   /** The no-picks run (or any earlier run of the same season, seed and iterations), to reuse what it can. */
   reuse?: NationalResult;
+  /**
+   * With `reuse`: simulate nothing, and show the odds over its seasons these picks don't change (`NationalOptions.estimate`).
+   * The summary counts those seasons.
+   */
+  estimate?: boolean;
   /** How many teams the ranking lists (default 25). */
   top?: number;
 };
@@ -183,6 +188,22 @@ export type SeasonLab = {
 };
 
 const empty = (): LabLocks => ({ games: {}, titles: {}, bracket: {} });
+
+// Proofs read only the season and the picks, never the simulated seasons, so each run after a pick reuses them.
+const proofs = new WeakMap<Season, Map<string, ProvenStatus>>();
+function provenOnce(season: Season, conference: string, teamId: number, locks: Record<number, number>, budget?: number): ProvenStatus {
+  let cache = proofs.get(season);
+  if (!cache) proofs.set(season, (cache = new Map()));
+  const key = `${conference}|${teamId}|${budget ?? ""}|${Object.keys(locks).sort().map((id) => `${id}-${locks[Number(id)]}`).join(".")}`;
+  let status = cache.get(key);
+  if (status === undefined) {
+    status = provenStatus(season, conference, teamId, locks, budget);
+    // A long session's picks: start over rather than grow without end.
+    if (cache.size >= 5000) cache.clear();
+    cache.set(key, status);
+  }
+  return status;
+}
 /** Picks with every kind present, even when the caller passed one as undefined. */
 const filled = (l: Partial<LabLocks> | undefined): LabLocks => ({ games: l?.games ?? {}, titles: l?.titles ?? {}, bracket: l?.bracket ?? {} });
 
@@ -211,7 +232,7 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
   }
   const national = simulateNational(season, {
     iterations: opts.iterations, seed: opts.seed, conferences: opts.conferences,
-    locks: locks.games, titleLocks: locks.titles, bracketLocks: locks.bracket, reuse: opts.reuse,
+    locks: locks.games, titleLocks: locks.titles, bracketLocks: locks.bracket, reuse: opts.reuse, estimate: opts.estimate,
   });
   const picks = Object.keys(locks.games).length + Object.keys(locks.titles).length + Object.keys(locks.bracket).length;
   const seasons = `${national.iterations.toLocaleString("en-US")} simulated seasons`;
@@ -228,7 +249,7 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
         // Or one every sampled season puts in that the proof confirms (a small budget keeps picks quick; a proof that
         // runs out leaves ">99%").
         const settled = (m?.exact === true && m.teams.includes(t.teamId))
-          || (t.titleGame === 1 && provenStatus(season, conference, t.teamId, locks.games, RACE_PROOF_BUDGET) === "clinched");
+          || (t.titleGame === 1 && provenOnce(season, conference, t.teamId, locks.games, RACE_PROOF_BUDGET) === "clinched");
         const game = formatSideOdds(t.titleGame!, settled ? "clinched" : "alive");
         // With the settled game's winner picked, the title is settled too.
         const pick = locks.titles[conference];
@@ -248,7 +269,9 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     text: `Average rank ${t.meanRank.toFixed(1)} · top 12 in ${formatFine(t.top12)}`,
     reason: rankReason(t, listed),
   }));
-  const bigGames = national.swings
+  // Worked out when first read: the page builds its list from the no-picks run, so a run after a pick rarely needs it.
+  let bigGames: LabBigGame[] | undefined;
+  const bigGamesOf = (): LabBigGame[] => national.swings
     .filter((g) => g.home >= 0.1 && g.home <= 0.9 && g.spots >= 0.1)
     .sort((a, b) => b.spots - a.spots || a.gameId - b.gameId)
     .slice(0, 15)
@@ -282,7 +305,10 @@ export function seasonLab(season: Season, opts: LabOptions): SeasonLab {
     champions: Object.fromEntries(projected.champions),
     conferences,
     ranking,
-    bigGames,
+    get bigGames() {
+      bigGames ??= bigGamesOf();
+      return bigGames;
+    },
     records: Object.fromEntries(season.teams.filter((t) => t.classification === "fbs").map((t) => {
       const r = teamRecord(season, t.id, locks.games);
       // A picked title game counts: a win for the winner, a loss for the team it beat.
@@ -648,7 +674,7 @@ export function labTeamOdds(season: Season, lab: SeasonLab, teamId: number): Lab
   const t = lab.national.teams.find((x) => x.teamId === teamId);
   if (!t) return null;
   const titled = t.titleGame !== null && t.conference !== null && t.conference !== INDEPENDENTS;
-  const proven = titled && (t.titleGame === 0 || t.titleGame === 1) ? provenStatus(season, t.conference!, teamId, lab.locks.games) : "open";
+  const proven = titled && (t.titleGame === 0 || t.titleGame === 1) ? provenOnce(season, t.conference!, teamId, lab.locks.games) : "open";
   const status = proven === "open" ? "alive" : proven;
   // A picked winner of a title game the team is sure to play in settles the title: won by the pick, lost by the other.
   const picked = titled ? lab.locks.titles[t.conference!] : undefined;
@@ -675,26 +701,27 @@ export function labOddsChange(before: number | null, after: number | null): stri
 const HELD_RANK = 0.5;
 
 /**
- * Teams whose odds a change of picks barely moved, by what the Lab shows: `field`, its playoff odds (in the field, a
- * bye, each seed, the national title); `titles`, its conference's title game and title; `ranks`, its average rank
+ * Teams whose odds a change of picks barely moved, by what the Lab shows: `field`, its playoff odds (in the field, and
+ * the national title); `titleGame` and `champion`, its conference's title game and title; `ranks`, its average rank
  * (less than half a place) and top-12 share. A share counts as held when it moved less than 2 points.
  */
-export type LabHeld = { field: number[]; titles: number[]; ranks: number[] };
+export type LabHeld = { field: number[]; titleGame: number[]; champion: number[]; ranks: number[] };
 
 /**
- * What a change of picks barely moved (`LabHeld`), between `before` and `after`: runs of the same seed and size, so
- * their simulated seasons line up and the difference is the picks', not sampling's.
+ * What a change of picks barely moved (`LabHeld`), between `before` and `after`: runs of the same seed whose simulated
+ * seasons line up (the same size, or `after` an estimate from `before`), so the difference is mostly the picks'.
  */
 export function labHeld(before: SeasonLab, after: SeasonLab): LabHeld {
   const was = new Map(before.national.teams.map((t) => [t.teamId, t]));
   const near = (a: number | null, b: number | null) => (a === null ? b === null : b !== null && Math.abs(a - b) < MOVE);
-  const held: LabHeld = { field: [], titles: [], ranks: [] };
+  const held: LabHeld = { field: [], titleGame: [], champion: [], ranks: [] };
   for (const t of after.national.teams) {
     const w = was.get(t.teamId);
     if (!w) continue;
     const p = w.playoff, q = t.playoff;
-    if (p && q ? near(p.field, q.field) && near(p.bye, q.bye) && near(p.champion, q.champion) && p.seeds.every((x, k) => near(x, q.seeds[k])) : p === q) held.field.push(t.teamId);
-    if (near(w.titleGame, t.titleGame) && near(w.champion, t.champion)) held.titles.push(t.teamId);
+    if (p && q ? near(p.field, q.field) && near(p.champion, q.champion) : p === q) held.field.push(t.teamId);
+    if (near(w.titleGame, t.titleGame)) held.titleGame.push(t.teamId);
+    if (near(w.champion, t.champion)) held.champion.push(t.teamId);
     if (Math.abs(w.meanRank - t.meanRank) < HELD_RANK && near(w.top12, t.top12)) held.ranks.push(t.teamId);
   }
   return held;
@@ -704,13 +731,14 @@ export function labHeld(before: SeasonLab, after: SeasonLab): LabHeld {
 export type LabShown = Pick<SeasonLab, "fieldTexts" | "conferences" | "playoff" | "ranking"> & { focus?: LabTeamOdds | null };
 
 /**
- * A quick run as the page should show it over `shown` (what the page shows now, from a full run): each odds a change
- * held (`labHeld`, from quick runs before and after it) keeps its shown value, so sampling noise in the quick run
- * doesn't move a number the full run would only move back. Odds the change moved take the quick run's. Lists with held
- * entries are re-sorted by the odds shown. Anything else (the picks, records, matchups) is `quick`'s.
+ * A quick run or an estimate as the page should show it over `shown` (what the page shows now, from a full run): each
+ * odds a change held (`labHeld`) keeps its shown value, so sampling noise in the smaller sample doesn't move a number
+ * the full run would only move back; the rest take `quick`'s. Lists with held entries are re-sorted by the odds shown,
+ * and a title game not yet settled keeps its shown matchup while those two still lead the race. Anything else (the
+ * picks, records, settled matchups) is `quick`'s.
  */
 export function steadyLab<T extends LabShown>(shown: LabShown, quick: T, held: LabHeld): T {
-  const field = new Set(held.field), titles = new Set(held.titles), ranks = new Set(held.ranks);
+  const field = new Set(held.field), titleGame = new Set(held.titleGame), champion = new Set(held.champion), ranks = new Set(held.ranks);
   const keep = <X extends { teamId: number }>(now: X[], was: X[] | undefined, set: Set<number>): X[] => {
     const prior = new Map((was ?? []).map((x) => [x.teamId, x]));
     return now.map((x) => (set.has(x.teamId) && prior.has(x.teamId) ? prior.get(x.teamId)! : x));
@@ -718,8 +746,19 @@ export function steadyLab<T extends LabShown>(shown: LabShown, quick: T, held: L
   const fieldTexts = Object.fromEntries(Object.entries(quick.fieldTexts).map(([id, text]) => [id, field.has(Number(id)) && shown.fieldTexts[Number(id)] !== undefined ? shown.fieldTexts[Number(id)] : text]));
   const conferences = quick.conferences.map((c) => {
     const was = shown.conferences.find((x) => x.conference === c.conference);
-    const teams = keep(c.teams, was?.teams, titles).sort((a, b) => b.titleGame - a.titleGame || b.champion - a.champion || a.teamId - b.teamId);
-    return { ...c, teams };
+    const prior = new Map((was?.teams ?? []).map((x) => [x.teamId, x]));
+    // Each race row's two odds held or not on their own.
+    const teams = c.teams.map((t) => {
+      const p = prior.get(t.teamId);
+      if (!p) return t;
+      const game = titleGame.has(t.teamId) ? p : t;
+      const title = champion.has(t.teamId) ? p : t;
+      return { ...t, titleGame: game.titleGame, titleGameText: game.titleGameText, champion: title.champion, championText: title.championText,
+        text: `Title game ${game.titleGameText} · champion ${title.championText}` };
+    }).sort((a, b) => b.titleGame - a.titleGame || b.champion - a.champion || a.teamId - b.teamId);
+    const lead = teams.slice(0, 2).map((t) => t.teamId).sort((x, y) => x - y).join("|");
+    const final = c.final && !c.final.exact && was?.final && !was.final.exact && was.final.key === lead ? was.final : c.final;
+    return { ...c, teams, final };
   });
   const ranking = keep(quick.ranking, shown.ranking, ranks)
     .sort((a, b) => a.meanRank - b.meanRank || a.teamId - b.teamId)
@@ -732,10 +771,12 @@ export function steadyLab<T extends LabShown>(shown: LabShown, quick: T, held: L
     playoff = { ...playoff, field: spots, bubble: keep(playoff.bubble, was.bubble, field), g6: playoff.g6 && { ...playoff.g6, teams: keep(playoff.g6.teams, was.g6?.teams, field) } };
   }
   if (quick.focus === undefined) return { ...quick, fieldTexts, conferences, ranking, playoff };
-  // A pinned team's odds are its playoff and title odds: each part held or not on its own.
+  // A pinned team's odds: each held or not on its own.
   const f = quick.focus, w = shown.focus;
   const focus = f && w && f.teamId === w.teamId
-    ? { ...f, ...(field.has(f.teamId) ? { playoff: w.playoff, playoffText: w.playoffText } : {}), ...(titles.has(f.teamId) ? { titleGame: w.titleGame, champion: w.champion, titleGameText: w.titleGameText, championText: w.championText } : {}) }
+    ? { ...f, ...(field.has(f.teamId) ? { playoff: w.playoff, playoffText: w.playoffText } : {}),
+      ...(titleGame.has(f.teamId) ? { titleGame: w.titleGame, titleGameText: w.titleGameText } : {}),
+      ...(champion.has(f.teamId) ? { champion: w.champion, championText: w.championText } : {}) }
     : f;
   return { ...quick, fieldTexts, conferences, ranking, playoff, focus };
 }

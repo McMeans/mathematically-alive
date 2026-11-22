@@ -92,6 +92,16 @@ export function powerTeam(season: Season, id: number): boolean {
 
 /** Not part of the public API. */
 export function liveModel(season: Season): LiveModel {
+  // Every simulation asks for it, and it reads only the season: worked out once per season.
+  const hit = models.get(season);
+  if (hit) return hit;
+  const model = buildLiveModel(season);
+  models.set(season, model);
+  return model;
+}
+const models = new WeakMap<Season, LiveModel>();
+
+function buildLiveModel(season: Season): LiveModel {
   const release = (season.committeeRankings ?? []).at(-1) ?? null;
   const byId = new Map(season.teams.map((t) => [t.id, t]));
   const fbsIds = season.teams.filter((t) => t.classification === "fbs").map((t) => t.id);

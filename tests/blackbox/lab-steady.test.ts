@@ -23,7 +23,7 @@ const held = labHeld(quickBefore, quick);
 const steady = steadyLab(shown, quick, held);
 const field = (l: SeasonLab, id: number) => l.national.teams.find((t) => t.teamId === id)!.playoff!.field;
 
-describe("season lab: a quick run doesn't bounce numbers the full run would move back", () => {
+describe("season lab: a quick run or an estimate doesn't bounce numbers the full run would move back", () => {
   it("an upset holds the playoff odds of teams it barely touches, not the teams it moves", () => {
     expect(held.field).not.toContain(favourite);
     expect(held.field).not.toContain(underdog);
@@ -33,17 +33,18 @@ describe("season lab: a quick run doesn't bounce numbers the full run would move
 
   it("an in-conference upset moves the title odds of the two teams in it", () => {
     if (big.conferenceGame) {
-      expect(held.titles).not.toContain(favourite);
-      expect(held.titles).not.toContain(underdog);
+      expect(held.titleGame).not.toContain(favourite);
+      expect(held.titleGame).not.toContain(underdog);
     }
-    expect(held.titles.length).toBeGreaterThan(20);
+    expect(held.titleGame.length).toBeGreaterThan(20);
+    expect(held.champion.length).toBeGreaterThan(20);
     expect(held.ranks.length).toBeGreaterThan(20);
   });
 
   it("no picks changed holds everything", () => {
     const same = labHeld(quickBefore, run(QUICK, {}, quickBefore));
     const all = quickBefore.national.teams.length;
-    expect([same.field.length, same.titles.length, same.ranks.length]).toEqual([all, all, all]);
+    expect([same.field.length, same.titleGame.length, same.champion.length, same.ranks.length]).toEqual([all, all, all, all]);
   });
 
   it("a held team keeps the odds shown before the pick; a moved team shows the quick run's", () => {
@@ -82,13 +83,13 @@ describe("season lab: a quick run doesn't bounce numbers the full run would move
   });
 
   it("a pinned team keeps its shown odds when held, and shows the quick run's when the pick moved it", () => {
-    const pinned = held.field.find((id) => held.titles.includes(id) && labTeamOdds(season, shown, id)?.titleGame !== null)!;
+    const pinned = held.field.find((id) => held.titleGame.includes(id) && held.champion.includes(id) && labTeamOdds(season, shown, id)?.titleGame !== null)!;
     const keep = steadyLab({ ...shown, focus: labTeamOdds(season, shown, pinned) }, { ...quick, focus: labTeamOdds(season, quick, pinned) }, held);
     expect(keep.focus).toEqual(labTeamOdds(season, shown, pinned));
     const moved = steadyLab({ ...shown, focus: labTeamOdds(season, shown, favourite) }, { ...quick, focus: labTeamOdds(season, quick, favourite) }, held);
     expect(moved.focus!.playoffText).toBe(labTeamOdds(season, quick, favourite)!.playoffText);
     // Held playoff odds with moved title odds: each part on its own.
-    const mixed = held.field.find((id) => !held.titles.includes(id) && labTeamOdds(season, shown, id)?.titleGame !== null);
+    const mixed = held.field.find((id) => !held.titleGame.includes(id) && labTeamOdds(season, shown, id)?.titleGame !== null);
     if (mixed !== undefined) {
       const m = steadyLab({ ...shown, focus: labTeamOdds(season, shown, mixed) }, { ...quick, focus: labTeamOdds(season, quick, mixed) }, held);
       expect(m.focus!.playoffText).toBe(labTeamOdds(season, shown, mixed)!.playoffText);
@@ -96,19 +97,57 @@ describe("season lab: a quick run doesn't bounce numbers the full run would move
     }
   });
 
-  it("a held race entry keeps its shown odds, and a held ranking entry its average rank", () => {
+  it("each odds in a race row is held or not on its own, and a held ranking entry keeps its average rank", () => {
+    let mixed = 0;
     for (const c of steady.conferences) {
       const was = shown.conferences.find((x) => x.conference === c.conference)!;
+      const now = quick.conferences.find((x) => x.conference === c.conference)!;
       for (const t of c.teams) {
         const before = was.teams.find((x) => x.teamId === t.teamId);
-        if (held.titles.includes(t.teamId) && before) expect(t.text).toBe(before.text);
+        const after = now.teams.find((x) => x.teamId === t.teamId)!;
+        if (!before) { expect(t).toEqual(after); continue; }
+        const game = held.titleGame.includes(t.teamId) ? before : after;
+        const title = held.champion.includes(t.teamId) ? before : after;
+        if (game !== title) mixed++;
+        expect([t.titleGameText, t.championText]).toEqual([game.titleGameText, title.championText]);
+        expect(t.text).toBe(`Title game ${game.titleGameText} · champion ${title.championText}`);
       }
     }
+    expect(mixed).toBeGreaterThan(0);
     for (const r of steady.ranking) {
       const before = shown.ranking.find((x) => x.teamId === r.teamId);
       if (held.ranks.includes(r.teamId) && before) expect(r.text).toBe(before.text);
       else expect(r.text).toBe(quick.ranking.find((x) => x.teamId === r.teamId)!.text);
     }
+  });
+
+  it("a title game not yet settled keeps its shown matchup while those two still lead the race", () => {
+    // A race whose two leaders are both held: the quick run's matchup swapped for another keeps the shown one.
+    const c = steady.conferences.find((x) => {
+      const was = shown.conferences.find((y) => y.conference === x.conference)!;
+      return x.final && !x.final.exact && was.final && !was.final.exact && was.final.teams.every((id) => held.titleGame.includes(id) && held.champion.includes(id));
+    })!;
+    const was = shown.conferences.find((y) => y.conference === c.conference)!;
+    const third = c.teams.find((t) => !was.final!.teams.includes(t.teamId))!.teamId;
+    const swapped = { ...quick, conferences: quick.conferences.map((x) => (x.conference === c.conference ? { ...x, final: { ...x.final!, teams: [x.final!.teams[0], third] as [number, number], key: [x.final!.teams[0], third].sort((a, b) => a - b).join("|") } } : x)) };
+    expect(steadyLab(shown, swapped, held).conferences.find((x) => x.conference === c.conference)!.final).toEqual(was.final);
+    // A settled matchup, or one whose leaders changed, is the quick run's.
+    const settled = { ...quick, conferences: quick.conferences.map((x) => (x.conference === c.conference ? { ...x, final: { ...x.final!, exact: true } } : x)) };
+    expect(steadyLab(shown, settled, held).conferences.find((x) => x.conference === c.conference)!.final!.exact).toBe(true);
+    const nobody = { field: [], titleGame: [], champion: [], ranks: [] };
+    for (const x of steadyLab(shown, quick, nobody).conferences) {
+      const lead = x.teams.slice(0, 2).map((t) => t.teamId).sort((a, b) => a - b).join("|");
+      if (x.final && !x.final.exact && lead !== shown.conferences.find((y) => y.conference === x.conference)!.final?.key) expect(x.final).toEqual(quick.conferences.find((y) => y.conference === x.conference)!.final);
+    }
+  });
+
+  it("an estimate from the shown run, kept steady, flips fewer field odds back than the estimate alone", () => {
+    const estimate = seasonLab(season, { iterations: FULL, seed: 7, conferences, locks: { games: pick }, reuse: shown.national, estimate: true });
+    expect(estimate.national.iterations).toBeLessThan(FULL);
+    const kept = steadyLab(shown, estimate, labHeld(shown, estimate));
+    const bounces = (mid: { fieldTexts: Record<number, string> }) =>
+      Object.keys(full.fieldTexts).filter((id) => shown.fieldTexts[Number(id)] !== mid.fieldTexts[Number(id)] && mid.fieldTexts[Number(id)] !== full.fieldTexts[Number(id)]).length;
+    expect(bounces(kept)).toBeLessThan(bounces(estimate) / 4);
   });
 
   it("picks, records and the summary are the quick run's", () => {
