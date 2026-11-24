@@ -150,22 +150,24 @@ describe("the Pac-12's week-13 flex games", () => {
   const name = (s: Season, id: number) => s.teams.find((t) => t.id === id)!.name;
   const week13 = (s: Season) => s.games.filter((g) => g.week === 13).map((g) => `${name(s, g.awayId)} at ${name(s, g.homeId)}`).sort();
 
-  it("until the data has them, the four projected pairings are played on Nov. 28, home teams as announced", () => {
+  it("until the data has them, the four pairings the league announced stand in, kicking off Nov. 28 Eastern, home teams as announced", () => {
     const s = fromCfbd(conference);
     expect(week13(s)).toEqual([
-      "Boise State at Utah State", "Oregon State at Washington State", "San Diego State at Fresno State", "Texas State at Colorado State",
+      "Boise State at Colorado State", "Oregon State at Fresno State", "San Diego State at Washington State", "Texas State at Utah State",
     ]);
     for (const g of s.games.filter((x) => x.week === 13)) {
       expect(g).toMatchObject({ conferenceGame: false, completed: false, neutralSite: false, homePoints: null, projected: true });
-      expect(g.start.startsWith("2026-11-28")).toBe(true);
     }
+    expect(s.games.filter((x) => x.week === 13).map((x) => x.start).sort()).toEqual([
+      "2026-11-28T23:00:00.000Z", "2026-11-28T23:30:00.000Z", "2026-11-29T02:30:00.000Z", "2026-11-29T03:00:00.000Z",
+    ]);
     expect(new Set(s.games.map((g) => g.id)).size).toBe(s.games.length);
   });
 
   it("a flex game the data has is a non-conference game, and replaces the projected games of both its teams", () => {
     // CFBD lists a flexed Boise State at Fresno State, flagged a conference game like every game between members.
     const s = fromCfbd([...conference, ["Fresno State", "Boise State", 13, "Fresno State", true]]);
-    expect(week13(s)).toEqual(["Boise State at Fresno State", "Oregon State at Washington State", "Texas State at Colorado State"]);
+    expect(week13(s)).toEqual(["Boise State at Fresno State", "San Diego State at Washington State", "Texas State at Utah State"]);
     const real = s.games.find((g) => g.week === 13 && g.homeId === s.id("Fresno State"))!;
     expect(real.conferenceGame).toBe(false);
     expect(real.projected).toBeUndefined();
@@ -177,7 +179,7 @@ describe("the Pac-12's week-13 flex games", () => {
 
   it("a member's week-13 game against a non-member keeps its pairing out", () => {
     const s = fromCfbd([...conference, ["Nevada", "Boise State", 13, null, false]]);
-    expect(week13(s)).toEqual(["Boise State at Nevada", "Oregon State at Washington State", "San Diego State at Fresno State", "Texas State at Colorado State"]);
+    expect(week13(s)).toEqual(["Boise State at Nevada", "Oregon State at Fresno State", "San Diego State at Washington State", "Texas State at Utah State"]);
   });
 
   it("a lone flex game between members in week 13 is never taken for the title game", () => {

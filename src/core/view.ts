@@ -245,9 +245,9 @@ export type PlayoffSignal = {
   swing: number;
   /** The side whose win helps. */
   rooting: number;
-  /** "Root for Utah over BYU: 34% if Utah wins, 22% if BYU does.", plus " A projected matchup, not yet confirmed." for one. */
+  /** "Root for Utah over BYU: 34% if Utah wins, 22% if BYU does.", plus " A matchup the league announced that the schedule data doesn't list yet." for one. */
   text: string;
-  /** A matchup the conference projected but hasn't confirmed (the Pac-12's flex week). */
+  /** A matchup the conference announced that the data lacks (the Pac-12's flex week). */
   projected: boolean;
 };
 

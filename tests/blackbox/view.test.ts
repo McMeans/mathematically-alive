@@ -77,7 +77,7 @@ describe("results elsewhere for the playoff", () => {
       const helps = s.rooting === s.homeId ? s.oddsIfHomeWins : s.oddsIfAwayWins;
       expect(helps).toBe(Math.max(s.oddsIfHomeWins, s.oddsIfAwayWins));
       expect(s.swing).toBeGreaterThanOrEqual(0.01);
-      expect(s.text).toMatch(/^Root for .+ over .+: .+ if .+ wins, .+ if .+ does\.$/);
+      expect(s.text).toMatch(/^Root for .+ over .+: .+ if .+ wins, .+ if .+ does\.( A matchup the league announced that the schedule data doesn't list yet\.)?$/);
     }
   });
 

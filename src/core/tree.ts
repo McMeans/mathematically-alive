@@ -241,7 +241,7 @@ export type SeasonWeek = {
    * `titleIfWin`/`titleIfLose`: its title-game odds the same way, where the conference's tiebreak counts non-conference
    * results (the Big 12's total wins); null elsewhere (the result reaches the title race only through the ranking) or once final.
    * `winChance`: "97% to win", locked or not; null once it's final.
-   * `projected`: a matchup the conference projected but hasn't confirmed (the Pac-12's flex week); `labels.projected` names it.
+   * `projected`: a matchup the conference announced that the data lacks (the Pac-12's flex week); `labels.projected` names it.
    * An unplayed one gets its week even when the conference plays no games that week.
    */
   nonConference: {
