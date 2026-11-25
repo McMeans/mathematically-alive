@@ -3,7 +3,7 @@
 // left and the conference races side by side (tabs on phones); a pinned team followed as you pick.
 import Link from "next/link";
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { conferenceShort, encodeLabBracket, labOddsChange, labShareCode, teamMatch, type BracketGame, type BracketSide, type LabBigGame, type LabBracketPicks, type LabConference, type LabFill, type LabLocks, type LabTeamOdds } from "@/core";
+import { conferenceShort, encodeLabBracket, labOddsChange, labShareCode, steadyLab, teamMatch, type BracketGame, type BracketSide, type LabBigGame, type LabBracketPicks, type LabConference, type LabFill, type LabLocks, type LabTeamOdds } from "@/core";
 import type { LabRequest, LabResponse, LabView } from "@/app/lab.worker";
 import { ShareButton } from "@/app/explorer/Share";
 import { TeamLogo } from "@/app/explorer/Board";
@@ -83,6 +83,8 @@ function useLab(initial: LabView) {
   /** Title picks from a link: their matchup is the one under the link's picks, known once those picks' run finishes. */
   const linkTitles = useRef<Set<string>>(new Set());
   const finals = useRef<LabConference[]>(initial.conferences);
+  // What the page shows now, for holding the odds a quick run barely moved (its handler sees only the first render).
+  const shownView = useRef<LabView>(initial);
   /**
    * A link's filled-in bracket: its code until the worker has read it, then the picks, waiting for the run that shows
    * the bracket they were made on. They apply only if that bracket has the same seeds.
@@ -120,6 +122,7 @@ function useLab(initial: LabView) {
     if (count(next) === 0) {
       worker.current?.postMessage({ kind: "reset", id } satisfies LabRequest);
       setView(initial);
+      shownView.current = initial;
       finals.current = initial.conferences;
       setRefining(false);
       setFailed(false);
@@ -168,7 +171,10 @@ function useLab(initial: LabView) {
       }
       if (r.id !== latest.current) return; // a newer pick is on its way
       if (r.kind === "result") {
-        setView(r.view);
+        // A quick run keeps the shown odds of teams the pick barely moved: its sampling noise would only bounce them.
+        const shown = r.held ? steadyLab(shownView.current, r.view, r.held) : r.view;
+        setView(shown);
+        shownView.current = shown;
         finals.current = r.view.conferences;
         setAddress(r.code);
         if (r.final) {

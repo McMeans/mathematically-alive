@@ -19,8 +19,14 @@ setTimeout(() => {
   last ??= simulateNational(season, { iterations: ITERATIONS, seed: SEED, conferences: SUPPORTED_CONFERENCES });
 }, 0);
 
-self.onmessage = (e: MessageEvent<SimRequest>) => {
+// The newest request seen. Requests queue while a run is busy; once it's done, only the newest of them runs.
+let newest = 0;
+
+self.onmessage = async (e: MessageEvent<SimRequest>) => {
   const { id, conference, teamId, locks, titles } = e.data;
+  newest = Math.max(newest, id);
+  await new Promise((r) => setTimeout(r, 0)); // let queued newer requests arrive
+  if (id !== newest) return; // the page would drop this result anyway
   if (conference === null) {
     const { national, ...r } = exploreIndependent(season, { iterations: ITERATIONS, seed: SEED, teamId, locks, reuse: last });
     last = national;

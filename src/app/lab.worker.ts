@@ -1,7 +1,7 @@
 // The Season Lab's simulations and link codec, off the main thread (the codec needs the whole season, which only
 // this worker loads). Each pick runs twice: a quick pass for numbers right away, then the full run. A newer pick
 // skips the full run of an older one.
-import { decodeLabBracket, decodeLabLocks, decodeLocks, decodeTitlePick, encodeLabLocks, fillLabLocks, labChanges, labTeamOdds, seasonLab, simulateBracket, type BracketGame, type LabBracketPicks, type LabChanges, type LabFill, type LabLocks, type LabTeamOdds, type NationalResult, type Season, type SeasonLab } from "@/core";
+import { decodeLabBracket, decodeLabLocks, decodeLocks, decodeTitlePick, encodeLabLocks, fillLabLocks, labChanges, labHeld, labTeamOdds, seasonLab, simulateBracket, type BracketGame, type LabBracketPicks, type LabChanges, type LabFill, type LabHeld, type LabLocks, type LabTeamOdds, type NationalResult, type Season, type SeasonLab } from "@/core";
 import { ITERATIONS, QUICK_ITERATIONS, SEED, SUPPORTED_CONFERENCES } from "./config";
 import data from "./data/season.json";
 
@@ -25,7 +25,8 @@ export type LabRequest =
   /** Back to no picks (the page shows its own no-picks view): the next pick's changes are against no picks. */
   | { kind: "reset"; id: number };
 export type LabResponse =
-  | { kind: "result"; id: number; final: boolean; view: LabView; code: string }
+  /** `held`: on a quick run, the odds the pick barely moved (`labHeld`), which the page keeps as shown. */
+  | { kind: "result"; id: number; final: boolean; view: LabView; code: string; held?: LabHeld }
   /** `bracket`: the link's filled-in bracket, checked against the season (null when it has none, or it doesn't fit). */
   | { kind: "opened"; id: number; locks: LabLocks; note: string; bracket: LabBracketPicks | null }
   | { kind: "filled"; id: number; locks: LabLocks }
@@ -84,7 +85,8 @@ self.onmessage = async (e: MessageEvent<LabRequest>) => {
     shown = q;
     const changes = opened ? null : labChanges(season, before, q);
     opened = false;
-    self.postMessage({ kind: "result", id: req.id, final: false, view: strip(q, changes, req.focus), code } satisfies LabResponse);
+    const held = labHeld(before, q);
+    self.postMessage({ kind: "result", id: req.id, final: false, view: strip(q, changes, req.focus), code, held } satisfies LabResponse);
     await new Promise((r) => setTimeout(r, 0)); // let a newer pick arrive
     if (req.id !== newest) return;
     const f = run(req.locks, ITERATIONS, full);
